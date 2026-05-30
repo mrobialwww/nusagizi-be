@@ -5,6 +5,7 @@ import (
 	"nusagizi_be/internal/auth"
 	"nusagizi_be/internal/config"
 	"nusagizi_be/internal/database"
+	"nusagizi_be/internal/handlers"
 	"nusagizi_be/internal/middleware"
 
 	// "nusagizi_be/internal/handlers"
@@ -67,6 +68,8 @@ func main() {
                 "user":    user,
             })
         })
+        protected.POST("/todo", handlers.CreateTodoHandler(pool))
+        protected.POST("/onboarding", handlers.OnboardingHandler(pool, cfg))
     }
 
 	router.Run(":" + cfg.Port)

@@ -1,9 +1,9 @@
 package middleware
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
-	"nusagizi_be/internal/auth"
 	"nusagizi_be/internal/repository"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
@@ -38,18 +38,34 @@ func GinMiddleware(jwtMiddleware *jwtmiddleware.JWTMiddleware, pool *pgxpool.Poo
             }
 
             userID := claims.RegisteredClaims.Subject
-
-            // Belum ada → ambil email dari JWT(CustomClaims) lalu insert
-            email := ""
-            if customClaims, ok := claims.CustomClaims.(*auth.CustomClaims); ok {
-                email = customClaims.Email
-            }
             
             // Lazy provisioning
             user, err := repository.GetUserBySub(pool, userID)
+
+            // Jika user belum ada di table Users
             if err != nil {
+                email := ""
                 
-                // Email ada di RegisteredClaims jika scope "email" diminta atau ambil dari token langsung
+                // Best Practice OIDC: Tarik data profil dari endpoint /userinfo Auth0 
+                // hanya pada saat pembuatan User baru di DB!
+                issuer := claims.RegisteredClaims.Issuer
+                userInfoURL := issuer + "userinfo"
+                
+                reqUserInfo, _ := http.NewRequest("GET", userInfoURL, nil)
+                reqUserInfo.Header.Set("Authorization", r.Header.Get("Authorization"))
+                
+                client := &http.Client{}
+                resp, reqErr := client.Do(reqUserInfo)
+                if reqErr == nil && resp.StatusCode == http.StatusOK {
+                    var userInfo struct {
+                        Email string `json:"email"`
+                    }
+                    if json.NewDecoder(resp.Body).Decode(&userInfo) == nil {
+                        email = userInfo.Email
+                    }
+                    resp.Body.Close()
+                }
+                
                 user, err = repository.CreateUserFromAuth0(pool, userID, email)
                 if err != nil {
                     slog.Error("Failed to create user", "error", err)
