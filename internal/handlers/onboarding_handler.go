@@ -59,26 +59,13 @@ func OnboardingHandler(pool *pgxpool.Pool, cfg *config.Config) gin.HandlerFunc {
 		}
 
 		// 5. Step C: Assign role ke user di Auth0
-		err = auth.AssignRoleToUser(
-			cfg.Auth0Domain,
-			cfg.Auth0ClientID,
-			cfg.Auth0ClientSecret,
-			auth0ID,
-			roleID,
-		)
+		err = auth.AssignRoleToUser(cfg.Auth0Domain, cfg.Auth0ClientID, cfg.Auth0ClientSecret, auth0ID, roleID)
 		if err != nil {
-			slog.Error("Failed to assign role in Auth0", "auth0_id", auth0ID, "role", req.Role, "error", err)
-
-			// Rollback: kembalikan DB ke kondisi semula agar tidak inkonsisten
-			if rbErr := repository.RollbackUserOnboarding(pool, auth0ID); rbErr != nil {
-				slog.Error("CRITICAL: Rollback also failed", "auth0_id", auth0ID, "error", rbErr)
-			}
-
-			c.JSON(http.StatusBadGateway, gin.H{"error": "Gagal mendaftarkan role, silakan coba lagi"})
+			slog.Error("Failed to assign Auth0 role", "auth0_id", auth0ID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan role di Auth0"})
 			return
 		}
 
-		// 6. Berhasil — Flutter boleh refresh JWT sekarang
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
 			"message": "Data onboarding berhasil disimpan! Silakan refresh token.",

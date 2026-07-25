@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -81,8 +82,10 @@ func AssignRoleToUser(domain, clientID, clientSecret, auth0Sub, roleID string) e
 		"roles": {roleID},
 	})
 
-	// Initialize the POST request to the Auth0 Management API users endpoint.
-	url := fmt.Sprintf("https://%s/api/v2/users/%s/roles", domain, auth0Sub)
+	// Encode auth0Sub karena mengandung karakter '|' yang harus menjadi '%7C' di URL path.
+	// Tanpa ini Auth0 mengembalikan 404 dan role tidak ter-assign.
+	encodedSub := url.PathEscape(auth0Sub)
+	url := fmt.Sprintf("https://%s/api/v2/users/%s/roles", domain, encodedSub)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("failed to build assign-role request: %w", err)
