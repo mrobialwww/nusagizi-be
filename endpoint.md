@@ -1,11 +1,10 @@
-# NusaGizi — Dokumentasi Endpoint API (v3, lengkap + endpoint tambahan)
+# NusaGizi — Dokumentasi Endpoint API (v4)
 
-Dokumen ini adalah revisi dari `NusaGizi_Endpoint_Documentation_v2.md`. Perubahan utama di v3:
+Dokumen ini adalah revisi dari `NusaGizi_Endpoint_Documentation_v3.md`, berdasarkan review langsung per endpoint. Ringkasan perubahan v3 -> v4 ada di tabel paling bawah dokumen. Riwayat sebelumnya:
 
-1. **Standar dokumentasi per endpoint dibuat konsisten penuh** — setiap endpoint sekarang selalu punya section _Path Params_, _Query Params_, _Request Body_ (+ tabel field), _Response Body_ (+ tabel field), dan _Response Error_, walau isinya "tidak ada" — supaya tidak ada endpoint yang penjelasannya lebih tipis dari yang lain.
-2. **Endpoint baru** ditambahkan untuk menutup celah CRUD yang belum ada di v2 (nomor 47–67), plus penyesuaian query params di beberapa endpoint lama (lihat tabel ringkasan di akhir dokumen).
-3. **Tidak ada pagination** — sesuai arahan, riwayat/list difilter per-bulan (`month`+`year`) atau age-range, bukan `page`/`limit`.
-4. **Endpoint autentikasi (login/register/refresh/logout) sengaja tidak dibuat** — sepenuhnya ditangani Auth0 di luar API ini.
+1. **v3**: standar dokumentasi per endpoint dibuat konsisten penuh (_Path Params_, _Query Params_, _Request Body_, _Response Body_, _Response Error_ di semua endpoint), endpoint baru nomor 47–67 ditambahkan untuk menutup celah CRUD.
+2. **Tidak ada pagination** — riwayat/list difilter per-bulan (`month`[+`year`]) atau age-range, bukan `page`/`limit`.
+3. **Endpoint autentikasi (login/register/refresh/logout) sengaja tidak dibuat** — sepenuhnya ditangani Auth0 di luar API ini.
 
 Nomor endpoint asli dari v1/v2 dipertahankan agar mudah dibandingkan; endpoint yang isinya diubah ditandai **[FIX]**, endpoint baru ditandai **[BARU]**.
 
@@ -483,45 +482,34 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 - **Method & Path**: `GET /children/{child_id}/growth-analyses`
 - **Authorization**: `child_growth_analyses` yang `child_growth_report_id`-nya milik `child_id` ybs
 - **Path Params**: `child_id` (UUID)
-- **Query Params [FIX]**:
+- **Query Params [FIX v4: dijadikan wajib]**:
 
-| Field         | Type | Wajib | Keterangan                                                                                                                                                         |
-| ------------- | ---- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| analysis_type | enum | Tidak | salah satu dari `weight_for_age`, `height_for_age`, `weight_for_height`, `bmi_for_age`, `head_circumference_for_age`. Jika kosong, kembalikan semua tipe           |
-| age_range     | enum | Tidak | `0-2`, `0-6`, atau `0-60` (satuan **bulan usia anak**, dihitung dari `child.birth_date` ke `child_growth_reports.measured_at`). Jika kosong, kembalikan semua umur |
+| Field         | Type | Wajib | Keterangan                                                                                                                     |
+| ------------- | ---- | ----- | ------------------------------------------------------------------------------------------------------------------------------ |
+| analysis_type | enum | Ya    | salah satu dari `weight_for_age`, `height_for_age`, `weight_for_height`, `bmi_for_age`, `head_circumference_for_age`           |
+| age_range     | enum | Ya    | `0-2`, `0-6`, atau `0-60` (satuan **bulan usia anak**, dihitung dari `child.birth_date` ke `child_growth_reports.measured_at`) |
 
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**:
+- **Response Body [FIX v4] (200)**:
 
 ```json
-[
-    {
-        "id": "...",
-        "analysis_type": "weight_for_age",
-        "z_score": -1.2,
-        "measured_at": "04-05-2026",
-        "age_months": 5
-    }
-]
+[{ "z_score": -1.2, "age_months": 5 }]
 ```
 
-| Field         | Type           | Keterangan                                     |
-| ------------- | -------------- | ---------------------------------------------- |
-| id            | UUID           |                                                |
-| analysis_type | enum           |                                                |
-| z_score       | number \| null |                                                |
-| measured_at   | date           | dari `child_growth_reports.measured_at` (join) |
-| age_months    | integer        | dihitung: umur anak (bulan) saat `measured_at` |
+| Field      | Type           | Keterangan                                                                               |
+| ---------- | -------------- | ---------------------------------------------------------------------------------------- |
+| z_score    | number \| null |                                                                                          |
+| age_months | integer        | dihitung: umur anak (bulan) saat `measured_at` — dipakai FE sebagai titik sumbu-X grafik |
 
 - **Response Error**:
 
-| Status | Kasus                                                |
-| ------ | ---------------------------------------------------- |
-| 400    | `age_range` bukan salah satu dari `0-2`/`0-6`/`0-60` |
-| 403    | `child_id` bukan milik user yang login               |
-| 404    | `child_id` tidak ditemukan                           |
+| Status | Kasus                                                                        |
+| ------ | ---------------------------------------------------------------------------- |
+| 400    | `analysis_type`/`age_range` tidak dikirim, atau bukan salah satu nilai valid |
+| 403    | `child_id` bukan milik user yang login                                       |
+| 404    | `child_id` tidak ditemukan                                                   |
 
-- **Catatan [FIX v3]**: filter tanggal (`date_from`/`date_to`) di v2 diganti jadi `age_range` — preset umur anak dalam bulan (`0-2`, `0-6`, `0-60`) sesuai band umur yang biasa dipakai untuk grafik pertumbuhan WHO, bukan rentang tanggal kalender bebas. `child_growth_analyses` tidak punya kolom tanggal sendiri — filter dilakukan dengan join ke `child_growth_reports.measured_at`, lalu `age_months` dihitung dari selisih `measured_at` dengan `child.birth_date`.
+- **Catatan [FIX v4]**: `analysis_type` & `age_range` dijadikan wajib (v3 masih opsional, tidak ada gunanya untuk kasus pakai grafik yang selalu butuh 1 tipe + 1 rentang umur spesifik). Response dipangkas jadi cuma `z_score`+`age_months` — cukup untuk mapping langsung ke titik grafik di FE. Field `id` & `analysis_type` dibuang karena sudah pasti seragam (difilter di query); `measured_at` diganti `age_months` karena itu yang langsung dipakai sebagai sumbu-X grafik pertumbuhan WHO, bukan tanggal kalender mentah. Query tetap join ke `child_growth_reports.measured_at` untuk hitung `age_months` dan untuk filter `age_range`.
 
 ### 5. Get riwayat child_growth_reports
 
@@ -658,24 +646,33 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     "domains": [
         {
             "nerve_name": "Gross motor skills",
-            "answers": [{ "question_id": "...", "answer": true }]
+            "total_question": 3,
+            "true_answer": 2
         },
-        { "nerve_name": "Fine motor skills", "answers": [] },
-        { "nerve_name": "Speech and language", "answers": [] },
-        { "nerve_name": "Socialization", "answers": [] }
+        {
+            "nerve_name": "Fine motor skills",
+            "total_question": 3,
+            "true_answer": 2
+        },
+        {
+            "nerve_name": "Speech and language",
+            "total_question": 3,
+            "true_answer": 2
+        },
+        { "nerve_name": "Socialization", "total_question": 3, "true_answer": 2 }
     ]
 }
 ```
 
-| Field                           | Type           | Keterangan                                                                                 |
-| ------------------------------- | -------------- | ------------------------------------------------------------------------------------------ |
-| id                              | UUID           |                                                                                            |
-| kpsp_score                      | integer        | 0-10                                                                                       |
-| next_check_date                 | date \| "done" |                                                                                            |
-| created_at                      | datetime       |                                                                                            |
-| domains[].nerve_name            | enum           | 4 aspek: `Gross motor skills`, `Fine motor skills`, `Speech and language`, `Socialization` |
-| domains[].answers[].question_id | UUID           |                                                                                            |
-| domains[].answers[].answer      | boolean        |                                                                                            |
+| Field                    | Type           | Keterangan                                                                                 |
+| ------------------------ | -------------- | ------------------------------------------------------------------------------------------ |
+| id                       | UUID           |                                                                                            |
+| kpsp_score               | integer        | 0-10                                                                                       |
+| next_check_date          | date \| "done" |                                                                                            |
+| created_at               | datetime       |                                                                                            |
+| domains[].nerve_name     | enum           | 4 aspek: `Gross motor skills`, `Fine motor skills`, `Speech and language`, `Socialization` |
+| domains[].total_question | integer        | jumlah pertanyaan di domain ini untuk `month_target` ybs                                   |
+| domains[].true_answer    | integer        | jumlah jawaban `true` di domain ini                                                        |
 
 - **Response Error**:
 
@@ -684,7 +681,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | `child_id` bukan milik user yang login            |
 | 404    | belum ada `child_development_reports` sama sekali |
 
-- **Catatan**: join `child_development_reports` -> `assessment_kpsp_answers` -> `assessment_kpsp_questions`, dikelompokkan per `nerve_name`.
+- **Catatan [FIX v4]**: v3 mengembalikan raw list jawaban per domain lalu FE yang menghitung `total_question`/`true_answer`. Diubah jadi agregasi di query (`GROUP BY nerve_name`, `COUNT(*)` untuk `total_question`, `COUNT(*) FILTER (WHERE answer = true)` untuk `true_answer`) — lebih baik dari sisi performa karena payload jauh lebih kecil dan logic agregasi cukup ditulis sekali di backend, tidak diulang di tiap platform client (mobile/web).
 
 ### 8. Get riwayat asesmen KPSP
 
@@ -693,7 +690,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Path Params**: `child_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: list `child_development_reports` (`id, kpsp_score, month_target, next_check_date, created_at`)
+- **Response Body [FIX v4] (200)**: list `child_development_reports` (`id, kpsp_score, month_target, created_at`)
 - **Response Error**:
 
 | Status | Kasus                       |
@@ -708,27 +705,44 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Path Params**: `child_development_report_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**:
+- **Response Body [FIX v4] (200)**:
 
 ```json
 {
     "id": "...",
     "kpsp_score": 8,
-    "next_check_date": "25-08-2026",
+    "month_target": 24,
     "recommended_actions": [
         { "id": "...", "title": "...", "action_text": "..." }
     ],
-    "domains": []
+    "domains": [
+        {
+            "nerve_name": "Gross motor skills",
+            "total_question": 3,
+            "true_answer": 2
+        },
+        {
+            "nerve_name": "Fine motor skills",
+            "total_question": 3,
+            "true_answer": 2
+        },
+        {
+            "nerve_name": "Speech and language",
+            "total_question": 3,
+            "true_answer": 2
+        },
+        { "nerve_name": "Socialization", "total_question": 3, "true_answer": 2 }
+    ]
 }
 ```
 
-| Field                                      | Type               | Keterangan              |
-| ------------------------------------------ | ------------------ | ----------------------- |
-| id                                         | UUID               |                         |
-| kpsp_score                                 | integer            |                         |
-| next_check_date                            | date \| "done"     |                         |
-| recommended_actions[].id/title/action_text | UUID/string/string |                         |
-| domains                                    | array\<object\>    | sama seperti endpoint 7 |
+| Field                                           | Type                 | Keterangan                                                                                    |
+| ----------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------- |
+| id                                              | UUID                 |                                                                                               |
+| kpsp_score                                      | integer              |                                                                                               |
+| month_target                                    | integer              | **[FIX v4]** menggantikan `next_check_date` (dihapus — tidak relevan di halaman detail hasil) |
+| recommended_actions[].id/title/action_text      | UUID/string/string   |                                                                                               |
+| domains[].nerve_name/total_question/true_answer | enum/integer/integer | **[FIX v4]** disamakan dengan format agregat endpoint 7                                       |
 
 - **Response Error**:
 
@@ -750,7 +764,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | month_target | integer | Ya    | salah satu dari `3,6,9,12,15,18,21,24,30,36,42,48,54,60` — sebelumnya tidak ada filter di dokumentasi lama, padahal soal berbeda per periode |
 
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: list `assessment_kpsp_questions` (`id, nerve_name, question_text, description`)
+- **Response Body [FIX v4] (200)**: list `assessment_kpsp_questions` (`id, month_target, nerve_name, question_text, description`) — field `month_target` ditambahkan ke tiap item response
 - **Response Error**:
 
 | Status | Kasus                                       |
@@ -762,7 +776,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Method & Path**: `POST /children/{child_id}/development-reports`
 - **Path Params**: `child_id` (UUID)
 - **Query Params**: `-` (tidak ada)
-- **Request Body [FIX]** (`child_development_report_id` dihapus — di-generate server):
+- **Request Body [FIX v4: `assessment_kpsp_answer` -> `answer`; `month_target` dikirim kembali oleh client]**:
 
 ```json
 {
@@ -770,11 +784,11 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     "list_answer": [
         {
             "assessment_kpsp_question_id": "021f1136-d24a-4e32-aaa8-cca24b9e608d",
-            "assessment_kpsp_answer": true
+            "answer": true
         },
         {
             "assessment_kpsp_question_id": "03b996b5-1377-4a91-a0ba-5632526e1c09",
-            "assessment_kpsp_answer": false
+            "answer": false
         }
     ]
 }
@@ -782,20 +796,20 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 | Field                                     | Type            | Wajib | Keterangan                                             |
 | ----------------------------------------- | --------------- | ----- | ------------------------------------------------------ |
-| month_target                              | integer         | Ya    | harus match `age_months` anak sesuai algoritma di atas |
+| month_target                              | integer         | Ya    | salah satu dari 3,6,9,12,15,18,21,24,30,36,42,48,54,60 |
 | list_answer                               | array\<object\> | Ya    | wajib 10 item (10 pertanyaan)                          |
 | list_answer[].assessment_kpsp_question_id | UUID            | Ya    |                                                        |
-| list_answer[].assessment_kpsp_answer      | boolean         | Ya    |                                                        |
+| list_answer[].answer                      | boolean         | Ya    |                                                        |
 
-- **Response Body (201)**: sama seperti endpoint 9 (termasuk `id` yang baru dibuat)
+- **Response Body (201)**: sama seperti endpoint 9 — field `id` di response **adalah** `child_development_report_id` yang baru dibuat
 - **Response Error**:
 
-| Status | Kasus                                                                                               |
-| ------ | --------------------------------------------------------------------------------------------------- |
-| 422    | `list_answer` bukan 10 item, atau ada `assessment_kpsp_question_id` yang tidak match `month_target` |
-| 403    | `child_id` bukan milik user yang login                                                              |
+| Status | Kasus                                                                                                                     |
+| ------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 422    | `list_answer` bukan 10 item, atau ada `assessment_kpsp_question_id` yang tidak match periode `month_target` anak saat ini |
+| 403    | `child_id` bukan milik user yang login                                                                                    |
 
-- **Catatan**: server menghitung `kpsp_score` & `next_check_date` sesuai algoritma di atas, lalu insert ke `assessment_attempt_recomendations` untuk pertanyaan yang dijawab `false`. Dipanggil setelah semua 10 soal dijawab.
+- **Catatan [FIX v4]**: `month_target` dikirim oleh client di body request, lalu divalidasi terhadap `child.birth_date` memakai algoritma di atas modul ini; `kpsp_score` & `next_check_date` tetap dihitung 100% di server. Alur pembuatan ID: server men-generate UUID baru untuk `child_development_report_id` **sebelum** proses insert, lalu UUID yang sama itu dipakai sebagai foreign key `child_development_report_id` di setiap row `assessment_kpsp_answers` yang diinsert dalam satu transaksi — jadi client tidak perlu (dan tidak boleh) generate/kirim ID ini. Setelah semua 10 soal dijawab, sistem juga insert ke `assessment_attempt_recomendations` untuk tiap pertanyaan yang dijawab `false`.
 
 ### 12. Update hasil asesmen KPSP terbaru
 
@@ -851,12 +865,12 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 - **Catatan**: `is_checked` didapat dari left join ke `checklist_milestone_progress` dengan `child_id` yang dikirim, supaya FE tahu item mana yang sudah dicentang tanpa request terpisah.
 
-### 14. Tandai checklist milestone
+### 14. Tandai checklist milestone (replace-all)
 
 - **Method & Path**: `PATCH /children/{child_id}/checklist-milestone-progress`
 - **Path Params**: `child_id` (UUID)
 - **Query Params**: `-` (tidak ada)
-- **Request Body [FIX: UUID, bukan integer]**:
+- **Request Body [FIX v4: semantik jadi replace-all, mencakup fungsi endpoint 55 lama]**:
 
 ```json
 {
@@ -867,9 +881,9 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 }
 ```
 
-| Field                        | Type          | Wajib | Keterangan                                                                                                   |
-| ---------------------------- | ------------- | ----- | ------------------------------------------------------------------------------------------------------------ |
-| checklist_milestone_task_ids | array\<UUID\> | Ya    | insert row ke `checklist_milestone_progress` untuk tiap id (idempotent — id yang sudah tercentang diabaikan) |
+| Field                        | Type          | Wajib | Keterangan                                                                                                                              |
+| ---------------------------- | ------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| checklist_milestone_task_ids | array\<UUID\> | Ya    | daftar **lengkap** task yang tercentang saat ini untuk `child_id` ini (bukan hanya yang baru dicentang). Kirim `[]` untuk uncheck semua |
 
 - **Response Body (200)**: `-` (body kosong)
 - **Response Error**:
@@ -878,6 +892,8 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | ------ | ------------------------------------------------------ |
 | 403    | `child_id` bukan milik user yang login                 |
 | 404    | ada `checklist_milestone_task_id` yang tidak ditemukan |
+
+- **Catatan [FIX v4]**: semantik diubah dari "tambah centang saja" (insert-only) menjadi **replace-all** — client selalu mengirim seluruh state checklist yang tercentang untuk `child_id` ini di tiap panggilan; server menghapus row `checklist_milestone_progress` yang tidak ada di list baru, dan insert yang belum ada. Dengan ini endpoint terpisah untuk uncheck tidak diperlukan lagi — uncheck satu item cukup dengan mengirim ulang list tanpa task tsb.
 
 ### 54. [BARU] Hapus development-report (salah input)
 
@@ -895,29 +911,6 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 404    | tidak ditemukan             |
 
 - **Catatan**: hard delete (`child_development_reports` tidak punya `deleted_at`). `assessment_kpsp_answers` & `assessment_attempt_recomendations` terkait ikut terhapus lewat `ON DELETE CASCADE`. Berbeda dari endpoint 12 (edit jawaban) — ini untuk kasus asesmen dibuat keliru sama sekali (mis. salah pilih anak).
-
-### 55. [BARU] Uncheck checklist milestone
-
-- **Method & Path**: `DELETE /children/{child_id}/checklist-milestone-progress/{checklist_milestone_task_id}`
-- **Authorization**: `child_id` milik user yang login
-- **Path Params**:
-
-| Field                       | Type | Keterangan |
-| --------------------------- | ---- | ---------- |
-| child_id                    | UUID |            |
-| checklist_milestone_task_id | UUID |            |
-
-- **Query Params**: `-` (tidak ada)
-- **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: `-` (body kosong)
-- **Response Error**:
-
-| Status | Kasus                                                                                      |
-| ------ | ------------------------------------------------------------------------------------------ |
-| 403    | `child_id` bukan milik user yang login                                                     |
-| 404    | row `checklist_milestone_progress` untuk pasangan id ini tidak ditemukan (belum dicentang) |
-
-- **Catatan**: celah dari v2 — endpoint 14 hanya bisa menambah centang (insert), tidak ada cara membatalkan centang yang salah pencet.
 
 ---
 
@@ -948,7 +941,12 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
         "id": "...",
         "is_completed": false,
         "items": [
-            { "id": "...", "ingredient_id": "...", "quantity": 0, "unit": "g" }
+            {
+                "id": "...",
+                "ingredient_name": "Bawang Merah",
+                "quantity": 0,
+                "unit": "g"
+            }
         ]
     },
     "menu": {
@@ -968,16 +966,16 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 }
 ```
 
-| Field                                                         | Type            | Keterangan                       |
-| ------------------------------------------------------------- | --------------- | -------------------------------- |
-| id                                                            | UUID            | `child_nutrition_reports.id`     |
-| calories/protein/fat/carbohydrate                             | integer         | aktual                           |
-| target_calories/target_protein/target_fat/target_carbohydrate | integer         | target                           |
-| shopping.id                                                   | UUID            | `daily_shoppings.id`             |
-| shopping.is_completed                                         | boolean         |                                  |
-| shopping.items[]                                              | array\<object\> | dari `ingredient_shopping_items` |
-| menu.id                                                       | UUID            | `daily_menus.id`                 |
-| menu.recipes[]                                                | array\<object\> | dari `recipes`                   |
+| Field                                                         | Type            | Keterangan                                                                                                                                                                    |
+| ------------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                                                            | UUID            | `child_nutrition_reports.id`                                                                                                                                                  |
+| calories/protein/fat/carbohydrate                             | integer         | aktual                                                                                                                                                                        |
+| target_calories/target_protein/target_fat/target_carbohydrate | integer         | target                                                                                                                                                                        |
+| shopping.id                                                   | UUID            | `daily_shoppings.id`                                                                                                                                                          |
+| shopping.is_completed                                         | boolean         |                                                                                                                                                                               |
+| shopping.items[]                                              | array\<object\> | `id, ingredient_name, quantity, unit` — dari `ingredient_shopping_items`, di-join ke `ingredients` untuk ambil `name` **[FIX v4]** (tidak lagi expose `ingredient_id` mentah) |
+| menu.id                                                       | UUID            | `daily_menus.id`                                                                                                                                                              |
+| menu.recipes[]                                                | array\<object\> | dari `recipes`                                                                                                                                                                |
 
 - **Response Error**:
 
@@ -1002,21 +1000,20 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | bukan milik user yang login |
 | 404    | belum ada menu hari ini     |
 
-### 17. Update status/bookmark recipe
+### 17. Update status selesai recipe [FIX v4: dipisah dari toggle bookmark]
 
-- **Method & Path**: `PATCH /recipes/{recipe_id}`
+- **Method & Path**: `PATCH /recipes/{recipe_id}/complete`
 - **Path Params**: `recipe_id` (UUID)
 - **Query Params**: `-` (tidak ada)
-- **Request Body [FIX: `is_done` -> `is_completed`]**:
+- **Request Body**:
 
 ```json
-{ "is_completed": true, "is_bookmarked": true }
+{ "is_completed": true }
 ```
 
-| Field         | Type    | Wajib | Keterangan |
-| ------------- | ------- | ----- | ---------- |
-| is_completed  | boolean | Tidak |            |
-| is_bookmarked | boolean | Tidak |            |
+| Field        | Type    | Wajib | Keterangan |
+| ------------ | ------- | ----- | ---------- |
+| is_completed | boolean | Ya    |            |
 
 - **Response Body (200)**: `-` (body kosong)
 - **Response Error**:
@@ -1026,19 +1023,46 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | `recipe_id` bukan milik anak dari user yang login |
 | 404    | `recipe_id` tidak ditemukan                       |
 
+### 68. [BARU] Update bookmark recipe
+
+- **Method & Path**: `PATCH /recipes/{recipe_id}/bookmark`
+- **Path Params**: `recipe_id` (UUID)
+- **Query Params**: `-` (tidak ada)
+- **Request Body**:
+
+```json
+{ "is_bookmarked": true }
+```
+
+| Field         | Type    | Wajib | Keterangan |
+| ------------- | ------- | ----- | ---------- |
+| is_bookmarked | boolean | Ya    |            |
+
+- **Response Body (200)**: `-` (body kosong)
+- **Response Error**:
+
+| Status | Kasus                                             |
+| ------ | ------------------------------------------------- |
+| 403    | `recipe_id` bukan milik anak dari user yang login |
+| 404    | `recipe_id` tidak ditemukan                       |
+
+- **Catatan**: v3 menggabungkan status selesai & bookmark di satu endpoint (17) — dipisah karena dua aksi ini independen di UI (mis. tombol "selesai masak" vs ikon bookmark, dipicu di momen yang berbeda).
+
 ### 18. Get detail recipe
 
 - **Method & Path**: `GET /recipes/{recipe_id}`
 - **Path Params**: `recipe_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: satu record `recipes` beserta list `main_ingredients` (diurutkan `priority`) dan `cooking_steps` (diurutkan `step_number`)
+- **Response Body [FIX v4] (200)**: satu record `recipes` beserta `main_ingredients` (**hanya** row dengan `priority = 1` — yaitu bahan yang sedang dipakai sekarang, bukan daftar opsi substitusi) dan `cooking_steps` (diurutkan `step_number`)
 - **Response Error**:
 
 | Status | Kasus                       |
 | ------ | --------------------------- |
 | 403    | bukan milik user yang login |
 | 404    | tidak ditemukan             |
+
+- **Catatan [FIX v4]**: v3 mengembalikan semua `main_ingredients` diurutkan `priority` (termasuk opsi substitusi priority 2, 3, dst). Diubah jadi hanya kembalikan `priority = 1` — opsi substitusi lain hanya relevan saat user memanggil endpoint 19 (tukar prioritas), tidak perlu ditampilkan di halaman detail resep.
 
 ### 19. Tukar prioritas main_ingredients
 
@@ -1051,12 +1075,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | main_ingredient_id | UUID | **[FIX]** sebelumnya tidak ada di spesifikasi endpoint — ditambahkan karena wajib untuk tahu ingredient mana yang ditukar |
 
 - **Query Params**: `-` (tidak ada)
-- **Request Body**: `{ "priority": 1 }`
-
-| Field    | Type    | Wajib | Keterangan |
-| -------- | ------- | ----- | ---------- |
-| priority | integer | Ya    | > 0        |
-
+- **Request Body [FIX v4: dihapus]**: `-` (tidak ada — cukup panggil endpoint ini, tidak perlu kirim apa pun)
 - **Response Body (200)**: `-` (body kosong)
 - **Response Error**:
 
@@ -1064,31 +1083,8 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | ------ | ------------------------------------------------------- |
 | 403    | `recipe_id` bukan milik user yang login                 |
 | 404    | `main_ingredient_id` tidak ditemukan di `recipe_id` tsb |
-| 422    | `priority` <= 0                                         |
 
-- **Catatan**: `main_ingredients` lain di recipe yang sama dengan `priority >= priority baru` digeser +1.
-
-### 20. Get riwayat daily_menus per bulan [FIX]
-
-- **Method & Path**: `GET /children/{child_id}/daily-menus`
-- **Path Params**: `child_id` (UUID)
-- **Query Params [FIX: `range=1m` diganti jadi filter bulan eksplisit]**:
-
-| Field | Type    | Wajib | Keterangan |
-| ----- | ------- | ----- | ---------- |
-| month | integer | Ya    | 1-12       |
-| year  | integer | Ya    | `YYYY`     |
-
-- **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: list `daily_menus`, satu item per hari di bulan tsb yang punya `child_nutrition_reports` (via relasi `child_nutrition_report_id`)
-- **Response Error**:
-
-| Status | Kasus                       |
-| ------ | --------------------------- |
-| 400    | `month` bukan 1-12          |
-| 403    | bukan milik user yang login |
-
-- **Catatan [FIX v3]**: v2 memakai `range=1m` (selalu "1 bulan terakhir dari hari ini"). Diganti jadi filter `month`+`year` eksplisit supaya user bisa lihat riwayat bulan mana pun, bukan cuma 30 hari terakhir. Filter tetap lewat `child_nutrition_reports.created_at` (via relasi `child_nutrition_report_id`), karena `daily_menus` sendiri tidak punya kolom tanggal.
+- **Catatan [FIX v4]**: `main_ingredient_id` di path otomatis di-set jadi `priority = 1`. `main_ingredients` lain di recipe yang sama otomatis digeser +1 (yang sebelumnya `priority=1` jadi `2`, yang `2` jadi `3`, dst).
 
 ### 21. Get bookmark menu
 
@@ -1116,7 +1112,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | year  | integer | Ya    | `YYYY`     |
 
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: list `child_nutrition_reports` dalam bulan tsb (field sama seperti bagian atas endpoint 15, tanpa `shopping`/`menu`), diurutkan `created_at` naik:
+- **Response Body [FIX v4] (200)**: list `child_nutrition_reports` dalam bulan tsb, diurutkan `created_at` naik:
 
 ```json
 [
@@ -1124,16 +1120,20 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
         "id": "...",
         "created_at": "...",
         "calories": 800,
-        "target_calories": 900,
         "protein": 20,
-        "target_protein": 25,
         "fat": 15,
-        "target_fat": 20,
         "carbohydrate": 100,
-        "target_carbohydrate": 120
+        "meal_times": ["sarapan", "makan_siang"]
     }
 ]
 ```
+
+| Field                             | Type          | Keterangan                                                                                                                                                       |
+| --------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                                | UUID          | `child_nutrition_reports.id`                                                                                                                                     |
+| created_at                        | datetime      |                                                                                                                                                                  |
+| calories/protein/fat/carbohydrate | integer       | aktual — **[FIX v4]** field `target_*` dihapus dari response ini                                                                                                 |
+| meal_times                        | array\<enum\> | **[FIX v4]** `recipes.meal_time` dari resep yang `is_completed = true` pada `daily_menus` hari itu, join `child_nutrition_reports` -> `daily_menus` -> `recipes` |
 
 - **Response Error**:
 
@@ -1311,13 +1311,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 - **Method & Path**: `GET /mother-profiles/{mother_profile_id}/child-photos`
 - **Path Params**: `mother_profile_id` (UUID)
-- **Query Params [FIX: ditambahkan]**:
-
-| Field          | Type    | Wajib | Keterangan                                                                                                          |
-| -------------- | ------- | ----- | ------------------------------------------------------------------------------------------------------------------- |
-| child_id       | UUID    | Tidak | filter hanya foto anak tsb. Jika kosong, kembalikan foto semua anak milik mother ini                                |
-| pending_review | boolean | Tidak | jika `true`, hanya kembalikan `is_review_required = true` (antrian foto dari caregiver yang belum di-review mother) |
-
+- **Query Params [FIX v4: dihapus, kembali seperti v2]**: `-` (tidak ada — selalu kembalikan foto semua anak milik mother ini)
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**: list `child_photos` (`id, child_id, photo_url, is_review_required`)
 - **Response Error**:
@@ -1325,8 +1319,6 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | Status | Kasus                                           |
 | ------ | ----------------------------------------------- |
 | 403    | `mother_profile_id` bukan milik user yang login |
-
-- **Catatan [FIX v3]**: v2 tidak punya cara memfilter per anak (kalau mother punya >1 anak, semua foto tercampur) maupun melihat antrian foto yang butuh review dari caregiver.
 
 ### 40. Get foto anak dari suatu contact
 
@@ -1345,14 +1337,9 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 - **Method & Path**: `GET /mother-profiles/{mother_profile_id}/child-photos/all`
 - **Path Params**: `mother_profile_id` (UUID)
-- **Query Params [FIX: ditambahkan]**:
-
-| Field    | Type | Wajib | Keterangan               |
-| -------- | ---- | ----- | ------------------------ |
-| child_id | UUID | Tidak | sama seperti endpoint 39 |
-
+- **Query Params [FIX v4: dihapus]**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: list `child_photos` (`id, photo_url`)
+- **Response Body [FIX v4] (200)**: list `child_photos` (`id, photo_url`) — hanya yang `is_review_required = false` (foto caregiver yang masih pending review tidak ikut tampil di gabungan ini)
 - **Response Error**:
 
 | Status | Kasus                       |
@@ -1365,7 +1352,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Path Params**: `child_photo_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: satu record penuh `child_photos` (`id, child_id, photo_url, caption, visibility, is_review_required, created_at`)
+- **Response Body [FIX v4] (200)**: `id, child_id, photo_url, caption` — field `visibility`, `is_review_required`, `created_at` dihapus dari response (tidak dibutuhkan di halaman detail foto)
 - **Response Error**:
 
 | Status | Kasus                       |
@@ -1393,7 +1380,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | Field              | Type          | Wajib                          | Keterangan                                               |
 | ------------------ | ------------- | ------------------------------ | -------------------------------------------------------- |
 | url                | string        | Ya                             | -> `child_photos.photo_url`                              |
-| caption            | string        | Tidak                          |                                                          |
+| caption            | string        | Ya **[FIX v4]**                |                                                          |
 | visibility         | enum          | Ya                             | `all` / `private` / `only`                               |
 | list_visibility    | array\<UUID\> | Wajib jika `visibility="only"` | tiap item `contact_id` -> insert row `photo_shared_with` |
 | is_review_required | boolean       | Tidak (default `false`)        |                                                          |
@@ -1401,10 +1388,10 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Response Body (201)**: `{ "id": "<child_photo_id>" }`
 - **Response Error**:
 
-| Status | Kasus                                             |
-| ------ | ------------------------------------------------- |
-| 422    | `visibility="only"` tapi `list_visibility` kosong |
-| 403    | `child_id` bukan milik user yang login            |
+| Status | Kasus                                                                    |
+| ------ | ------------------------------------------------------------------------ |
+| 422    | `caption` kosong, atau `visibility="only"` tapi `list_visibility` kosong |
+| 403    | `child_id` bukan milik user yang login                                   |
 
 - **Catatan**: `visibility` diisi enum (`all`/`private`/`only`). `list_visibility` (array `contact_id`) hanya dipakai & wajib diisi ketika `visibility = "only"` — masing-masing di-insert sebagai row di `photo_shared_with`. `captions` -> `caption` (sesuai nama kolom, singular).
 
@@ -1538,14 +1525,36 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Path Params**: `mother_profile_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: list `caregiver_engagements`
+- **Response Body [FIX v4] (200)**:
+
+```json
+[
+    {
+        "caregiver_engagement_id": "...",
+        "child_id": "...",
+        "child_name": "...",
+        "caregiver_profile_id": "...",
+        "caregiver_name": "...",
+        "phone_number": "081234567899"
+    }
+]
+```
+
+| Field                   | Type           | Keterangan                                                                             |
+| ----------------------- | -------------- | -------------------------------------------------------------------------------------- |
+| caregiver_engagement_id | UUID           | `caregiver_engagements.id`                                                             |
+| child_id, child_name    | UUID, string   | `child.id`, `child.full_name`                                                          |
+| caregiver_profile_id    | UUID           | `caregiver_profiles.id`                                                                |
+| caregiver_name          | string         | `users.full_name` (lewat `caregiver_profiles.user_id`)                                 |
+| phone_number            | string \| null | **[FIX v4]** dari `users.phone_number` — nomor yang bisa dihubungi untuk caregiver ybs |
+
 - **Response Error**:
 
 | Status | Kasus                       |
 | ------ | --------------------------- |
 | 403    | bukan milik user yang login |
 
-- **Contoh query [FIX — PK diperbaiki jadi `id`]**:
+- **Contoh query [FIX v4 — tambah `phone_number`]**:
 
 ```sql
 SELECT
@@ -1553,8 +1562,8 @@ SELECT
   c.full_name     AS child_name,
   ce.id           AS caregiver_engagement_id,
   ce.caregiver_profile_id,
-  cp.id           AS caregiver_profile_id_check,
-  u.full_name     AS caregiver_name
+  u.full_name     AS caregiver_name,
+  u.phone_number  AS phone_number
 FROM child c
 JOIN caregiver_engagements ce ON ce.child_id = c.id
 JOIN caregiver_profiles cp    ON cp.id = ce.caregiver_profile_id
@@ -1578,6 +1587,23 @@ WHERE c.mother_profile_id = ?
 | 404    | tidak ditemukan             |
 
 - **Catatan**: soft delete — set `caregiver_engagements.deleted_at = now()`.
+
+### 69. [BARU] Get riwayat akses caregiver yang sudah dicabut (POV mother)
+
+- **Method & Path**: `GET /mother-profiles/{mother_profile_id}/caregiver-engagements/revoked`
+- **Authorization**: sama seperti endpoint 27
+- **Path Params**: `mother_profile_id` (UUID)
+- **Query Params**: `-` (tidak ada)
+- **Request Body**: `-` (tidak ada)
+- **Response Body (200)**: sama seperti endpoint 27 (termasuk `phone_number`), tapi filter `ce.deleted_at IS NOT NULL`
+- **Response Error**:
+
+| Status | Kasus                       |
+| ------ | --------------------------- |
+| 403    | bukan milik user yang login |
+
+- **Contoh query**: sama seperti endpoint 27, ganti baris terakhir jadi `AND ce.deleted_at IS NOT NULL;`
+- **Catatan**: celah dari v3 — endpoint 27 hanya menampilkan akses yang masih aktif, tidak ada cara melihat riwayat caregiver yang aksesnya sudah dicabut.
 
 ### 29. Get profil caregiver [FIX]
 
@@ -1613,17 +1639,17 @@ WHERE c.mother_profile_id = ?
 - **Path Params**: `caregiver_profile_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: list `child` (`id, full_name, birth_date, gender, photo_url`)
+- **Response Body [FIX v4] (200)**: list `child` (`id, full_name, photo_url`) — `birth_date`/`gender` dihapus dari response ini
 - **Response Error**:
 
 | Status | Kasus                       |
 | ------ | --------------------------- |
 | 403    | bukan milik user yang login |
 
-- **Contoh query [FIX — `photo` -> `photo_url`, PK diperbaiki]**:
+- **Contoh query [FIX v4]**:
 
 ```sql
-SELECT c.id, c.full_name, c.birth_date, c.gender, c.photo_url
+SELECT c.id, c.full_name, c.photo_url
 FROM caregiver_engagements ce
 JOIN child c ON c.id = ce.child_id
 WHERE ce.caregiver_profile_id = ?
@@ -1636,7 +1662,7 @@ WHERE ce.caregiver_profile_id = ?
 - **Path Params**: `child_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: sama seperti endpoint 15
+- **Response Body [FIX v4] (200)**: subset dari endpoint 15 — hanya `id, shopping, menu` (field nutrisi aktual/target di top-level tidak ikut disertakan, karena POV caregiver tidak perlu lihat angka target gizi)
 - **Response Error**: sama seperti endpoint 15, ditambah 403 jika tidak ada `caregiver_engagements` aktif untuk `child_id` ini
 
 ### 36. Get detail recipe (POV caregiver)
@@ -1658,22 +1684,21 @@ WHERE ce.caregiver_profile_id = ?
 - **Path Params**: `mother_profile_id` (UUID)
 - **Query Params**:
 
-| Field  | Type    | Wajib            | Keterangan                                      |
-| ------ | ------- | ---------------- | ----------------------------------------------- |
-| status | enum    | Ya               | `active` (default filter `valid_date >= now()`) |
-| month  | integer | Tidak **[BARU]** | 1-12, filter tambahan pada `valid_date`         |
-| year   | integer | Tidak **[BARU]** | `YYYY`, wajib diisi bersama `month`             |
+| Field  | Type    | Wajib              | Keterangan                                                                                                                                                                                                             |
+| ------ | ------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| status | enum    | Ya                 | `active` (default filter `valid_date >= now()`)                                                                                                                                                                        |
+| month  | integer | Tidak **[FIX v4]** | 1-12. Default: bulan berjalan. Filter berdasarkan **nomor bulan saja** (`EXTRACT(MONTH FROM valid_date) = month`) — tidak peduli tahun, jadi mother bisa lihat "semua catatan bulan Juli" dari tahun manapun sekaligus |
 
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**: list, tiap item: `{ id, valid_date, recommendation, created_at, child_name, prohibition_count, allergy_count }`
 - **Response Error**:
 
-| Status | Kasus                                          |
-| ------ | ---------------------------------------------- |
-| 400    | `month` dikirim tanpa `year` (atau sebaliknya) |
-| 403    | bukan milik user yang login                    |
+| Status | Kasus                       |
+| ------ | --------------------------- |
+| 400    | `month` bukan 1-12          |
+| 403    | bukan milik user yang login |
 
-- **Catatan**: `prohibition_count`/`allergy_count` dihitung dari `medical_restrictions` per `medical_note_id`, dikelompokkan per `type`. **[FIX v3 — ASUMSI]**: query param `month`/`year` ditambahkan sebagai filter opsional tambahan di atas `status=active`, untuk melihat catatan yang valid pada bulan tertentu (bukan hanya "aktif sekarang"). Jika maksud aslinya berbeda, mohon dikoreksi.
+- **Catatan [FIX v4]**: `prohibition_count`/`allergy_count` dihitung dari `medical_restrictions` per `medical_note_id`, dikelompokkan per `type`. Param `year` dihapus (v3 mewajibkan `year` bersama `month`) — kini `month` berdiri sendiri dan opsional, default ke bulan berjalan jika tidak dikirim, dan mencocokkan nomor bulan tanpa syarat tahun.
 
 ### 31. Get riwayat medical_notes (sudah tidak aktif) [FIX]
 
@@ -1681,21 +1706,20 @@ WHERE ce.caregiver_profile_id = ?
 - **Path Params**: `mother_profile_id` (UUID)
 - **Query Params**:
 
-| Field  | Type    | Wajib            | Keterangan                              |
-| ------ | ------- | ---------------- | --------------------------------------- |
-| status | enum    | Ya               | `history` (filter `valid_date < now()`) |
-| month  | integer | Tidak **[BARU]** | 1-12                                    |
-| year   | integer | Tidak **[BARU]** | `YYYY`, wajib diisi bersama `month`     |
+| Field  | Type    | Wajib              | Keterangan                                                                                            |
+| ------ | ------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
+| status | enum    | Ya                 | `history` (filter `valid_date < now()`)                                                               |
+| month  | integer | Tidak **[FIX v4]** | 1-12. Default: bulan berjalan. Sama seperti endpoint 30 — filter nomor bulan saja, tidak peduli tahun |
 
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**: sama seperti #30
 - **Response Error**: sama seperti #30
-- **Catatan**: sama seperti catatan endpoint 30 — `month`/`year` memfilter `valid_date` pada rentang bulan yang diminta, di atas kondisi `status=history`.
+- **Catatan**: sama seperti catatan endpoint 30.
 
 ### 32. Get rincian medical_notes
 
 - **Method & Path [FIX]**: `GET /medical-notes/{medical_note_id}`
-- **Auth [FIX]**: divalidasi lewat `medical_note_id` -> pastikan `child_id` pemilik note tsb dimiliki oleh mother/caregiver yang login. (Dokumentasi lama merujuk `doctor_profiles`/`medical_relationship_id` yang sudah dihapus di migration `000005_simplify_medical_module`.)
+- **Auth**: divalidasi lewat `medical_note_id` -> pastikan `child_id` pemilik note tsb dimiliki oleh mother/caregiver yang login.
 - **Path Params**: `medical_note_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
@@ -1709,13 +1733,14 @@ WHERE ce.caregiver_profile_id = ?
 
 ### 33. Tambah catatan dokter
 
-- **Method & Path**: `POST /children/{child_id}/medical-notes`
-- **Path Params**: `child_id` (UUID)
+- **Method & Path [FIX v4]**: `POST /medical-notes`
+- **Path Params [FIX v4]**: `-` (tidak ada — `child_id` sekarang dikirim di body, bukan di path)
 - **Query Params**: `-` (tidak ada)
-- **Request Body**:
+- **Request Body [FIX v4: tambah `child_id`, `facility_location` jadi opsional]**:
 
 ```json
 {
+    "child_id": "2c8c5e18-0eca-4bf8-9ef0-831dbc3358cb",
     "doctor_name": "dr. Tirta",
     "facility_location": "RSSA",
     "recommendation": "Berikan makanan bertekstur lembut dan tinggi kalori...",
@@ -1733,8 +1758,9 @@ WHERE ce.caregiver_profile_id = ?
 
 | Field                                   | Type            | Wajib              | Keterangan                                                |
 | --------------------------------------- | --------------- | ------------------ | --------------------------------------------------------- |
+| child_id                                | UUID            | Ya **[FIX v4]**    | anak yang dituju catatan ini                              |
 | doctor_name                             | string          | Ya                 | maks 150 karakter, teks bebas (bukan FK)                  |
-| facility_location                       | string          | Ya                 | maks 150 karakter                                         |
+| facility_location                       | string          | Tidak **[FIX v4]** | maks 150 karakter                                         |
 | recommendation                          | string          | Ya                 |                                                           |
 | daily_nutrition_targets                 | array\<object\> | Tidak              | tiap item -> row `daily_nutrition_targets`                |
 | daily_nutrition_targets[].nutrient_name | string          | Ya (jika item ada) |                                                           |
@@ -1746,11 +1772,12 @@ WHERE ce.caregiver_profile_id = ?
 - **Response Body (201)**: `{ "id": "<medical_note_id>" }`
 - **Response Error**:
 
-| Status | Kasus                                                                  |
-| ------ | ---------------------------------------------------------------------- |
-| 400    | `valid_date` bukan tanggal valid                                       |
-| 422    | `doctor_name`/`facility_location`/`recommendation`/`valid_date` kosong |
-| 403    | `child_id` bukan milik user yang login                                 |
+| Status | Kasus                                                         |
+| ------ | ------------------------------------------------------------- |
+| 400    | `valid_date` bukan tanggal valid                              |
+| 422    | `child_id`/`doctor_name`/`recommendation`/`valid_date` kosong |
+| 403    | `child_id` bukan milik user yang login                        |
+| 404    | `child_id` tidak ditemukan                                    |
 
 - **Catatan**: `prohibitions[]` -> row `medical_restrictions` dengan `type = 'prohibition'`; `allergies[]` -> row `medical_restrictions` dengan `type = 'allergy'`.
 
@@ -1760,7 +1787,32 @@ WHERE ce.caregiver_profile_id = ?
 - **Authorization**: sama seperti endpoint 32
 - **Path Params**: `medical_note_id` (UUID)
 - **Query Params**: `-` (tidak ada)
-- **Request Body**: sama seperti endpoint 33, semua field opsional
+- **Request Body [FIX v4: dijabarkan eksplisit]**: semua field opsional, kirim hanya yang mau diubah
+
+```json
+{
+    "doctor_name": "dr. Tirta",
+    "facility_location": "RSSA",
+    "recommendation": "Berikan makanan bertekstur lembut dan tinggi kalori...",
+    "daily_nutrition_targets": [
+        { "nutrient_name": "calories", "quantity": 10 }
+    ],
+    "prohibitions": ["Makanan Keras"],
+    "allergies": ["Kacang Tanah"],
+    "valid_date": "22-07-2026"
+}
+```
+
+| Field                   | Type            | Wajib | Keterangan                                                        |
+| ----------------------- | --------------- | ----- | ----------------------------------------------------------------- |
+| doctor_name             | string          | Tidak | maks 150 karakter                                                 |
+| facility_location       | string          | Tidak | maks 150 karakter                                                 |
+| recommendation          | string          | Tidak |                                                                   |
+| daily_nutrition_targets | array\<object\> | Tidak | replace-all — kirim seluruh daftar baru, bukan hanya yang berubah |
+| prohibitions            | array\<string\> | Tidak | replace-all                                                       |
+| allergies               | array\<string\> | Tidak | replace-all                                                       |
+| valid_date              | date            | Tidak | `DD-MM-YYYY`                                                      |
+
 - **Response Body (200)**: `-` (body kosong)
 - **Response Error**:
 
@@ -1770,7 +1822,7 @@ WHERE ce.caregiver_profile_id = ?
 | 404    | tidak ditemukan             |
 | 422    | field yang diisi kosong     |
 
-- **Catatan**: untuk `daily_nutrition_targets`/`prohibitions`/`allergies`, strategi update disarankan replace-all (sama seperti pola di endpoint 24). Celah dari v2 — sebelumnya hanya bisa create (33), tidak bisa edit kalau ada salah input (mis. salah ketik `valid_date`).
+- **Catatan**: `child_id` tidak bisa diubah lewat endpoint ini (catatan medis tidak bisa dipindah ke anak lain — kalau salah anak, hapus lalu buat ulang lewat endpoint 33). Untuk `daily_nutrition_targets`/`prohibitions`/`allergies`, strategi update replace-all (sama seperti pola di endpoint 24). Celah dari v2 — sebelumnya hanya bisa create (33), tidak bisa edit kalau ada salah input (mis. salah ketik `valid_date`).
 
 ### 66. [BARU] Hapus catatan dokter
 
@@ -1799,17 +1851,18 @@ WHERE ce.caregiver_profile_id = ?
 - **Path Params**: `user_id` (UUID)
 - **Query Params [BARU]**:
 
-| Field             | Type | Wajib | Keterangan                                                                                                                                                                                                                     |
-| ----------------- | ---- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| notification_type | enum | Tidak | salah satu dari 8 nilai (`meal_reminder`, `growth_development_reminder`, `doctor_activity`, `photos_activity`, `shop_activity`, `invitation_activity`, `new_menu_reminder`, `achievement`). Jika kosong, kembalikan semua tipe |
+| Field             | Type | Wajib | Keterangan                                                                                                                                                                                                                                                     |
+| ----------------- | ---- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| notification_type | enum | Tidak | salah satu dari 8 nilai (`meal_reminder`, `growth_development_reminder`, `doctor_activity`, `photos_activity`, `shop_activity`, `invitation_activity`, `new_menu_reminder`, `achievement`); kalau tidak dikirim, return semua notifikasi tanpa filter kategori |
 
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**: list `notification` (`id, title, message, notification_type, created_at`)
 - **Response Error**:
 
-| Status | Kasus                     |
-| ------ | ------------------------- |
-| 403    | `user_id` di path ≠ token |
+| Status | Kasus                                                                |
+| ------ | -------------------------------------------------------------------- |
+| 400    | `notification_type` dikirim tapi bukan salah satu dari 8 nilai valid |
+| 403    | `user_id` di path ≠ token                                            |
 
 - **Catatan [FIX v3]**: filter `notification_type` ditambahkan untuk kebutuhan tab/kategori di UI notifikasi. **Keterbatasan skema** — tabel `notification` tidak punya kolom `is_read`, sehingga fitur "tandai sudah dibaca"/badge unread **tidak bisa diimplementasikan** dengan skema saat ini. Kalau dibutuhkan, perlu penambahan kolom `is_read BOOLEAN NOT NULL DEFAULT false` di migration terpisah (di luar cakupan dokumen ini).
 
@@ -1846,20 +1899,24 @@ WHERE ce.caregiver_profile_id = ?
 {
     "id": "...",
     "full_name": "...",
+    "birth_date": "22-07-2026",
     "height_cm": 89,
     "weight_kg": 12.4,
     "kpsp_score": 8,
     "protein": 30,
-    "target_protein": 35
+    "target_protein": 35,
+    "streak": 5
 }
 ```
 
 | Field                   | Type            | Keterangan                                                  |
 | ----------------------- | --------------- | ----------------------------------------------------------- |
 | id, full_name           | UUID, string    | `child`                                                     |
+| birth_date              | date            | **[FIX v4]** `child.birth_date`                             |
 | height_cm, weight_kg    | number \| null  | dari `child_growth_reports` **terbaru** per `child_id`      |
 | kpsp_score              | integer \| null | dari `child_development_reports` **terbaru** per `child_id` |
 | protein, target_protein | integer \| null | dari `child_nutrition_reports` **terbaru** per `child_id`   |
+| streak                  | integer         | **[FIX v4]** `child.upload_streak_days`                     |
 
 - **Response Error**:
 
@@ -1871,43 +1928,66 @@ WHERE ce.caregiver_profile_id = ?
 
 ---
 
-## Ringkasan Semua Endpoint Baru (v3, nomor 47–67)
+## Ringkasan Semua Endpoint Baru (nomor 47–69)
 
-| #   | Modul             | Method & Path                                                        | Ringkasan                                  |
-| --- | ----------------- | -------------------------------------------------------------------- | ------------------------------------------ |
-| 47  | Auth & User       | `POST /mother-profiles`                                              | Daftar sebagai mother (role selection)     |
-| 48  | Auth & User       | `POST /caregiver-profiles`                                           | Daftar sebagai caregiver (role selection)  |
-| 49  | Auth & User       | `GET /mother-profiles/{id}`                                          | Get profil mother sendiri                  |
-| 50  | Child Profile     | `GET /children/{child_id}`                                           | Get detail profil anak (lengkap)           |
-| 51  | Child Profile     | `GET /mother-profiles/{id}/children`                                 | Get list anak (ringan, tanpa stats)        |
-| 52  | Child Growth      | `PATCH /growth-reports/{id}`                                         | Edit record pengukuran                     |
-| 53  | Child Growth      | `DELETE /growth-reports/{id}`                                        | Hapus record pengukuran                    |
-| 54  | Child Development | `DELETE /development-reports/{id}`                                   | Hapus record asesmen KPSP                  |
-| 55  | Child Development | `DELETE /children/{child_id}/checklist-milestone-progress/{task_id}` | Uncheck milestone                          |
-| 56  | Child Nutrition   | `GET /children/{child_id}/nutrition-reports`                         | Riwayat nutrition report per bulan         |
-| 57  | Child Nutrition   | `PATCH /daily-shoppings/{id}`                                        | Tandai belanja selesai                     |
-| 58  | Child Nutrition   | `POST /daily-shoppings/{id}/items`                                   | Tambah item belanja manual                 |
-| 59  | Child Nutrition   | `PATCH /ingredient-shopping-items/{id}`                              | Update qty/unit item belanja               |
-| 60  | Child Nutrition   | `DELETE /ingredient-shopping-items/{id}`                             | Hapus item belanja                         |
-| 61  | Child Nutrition   | `GET /ingredients`                                                   | Search master ingredients (autocomplete)   |
-| 62  | Photos & Contacts | `POST /mother-profiles/{id}/contacts`                                | Tambah contact/teman                       |
-| 63  | Photos & Contacts | `PATCH /child-photos/{id}`                                           | Edit caption/visibility/review status foto |
-| 64  | Photos & Contacts | `DELETE /child-photos/{id}`                                          | Hapus foto                                 |
-| 65  | Medical           | `PATCH /medical-notes/{id}`                                          | Edit catatan dokter                        |
-| 66  | Medical           | `DELETE /medical-notes/{id}`                                         | Hapus catatan dokter                       |
-| 67  | Notification      | `DELETE /notifications/{id}`                                         | Hapus 1 notifikasi                         |
+| #   | Modul             | Method & Path                                             | Ringkasan                                                |
+| --- | ----------------- | --------------------------------------------------------- | -------------------------------------------------------- |
+| 47  | Auth & User       | `POST /mother-profiles`                                   | Daftar sebagai mother (role selection)                   |
+| 48  | Auth & User       | `POST /caregiver-profiles`                                | Daftar sebagai caregiver (role selection)                |
+| 49  | Auth & User       | `GET /mother-profiles/{id}`                               | Get profil mother sendiri                                |
+| 50  | Child Profile     | `GET /children/{child_id}`                                | Get detail profil anak (lengkap)                         |
+| 51  | Child Profile     | `GET /mother-profiles/{id}/children`                      | Get list anak (ringan, tanpa stats)                      |
+| 52  | Child Growth      | `PATCH /growth-reports/{id}`                              | Edit record pengukuran                                   |
+| 53  | Child Growth      | `DELETE /growth-reports/{id}`                             | Hapus record pengukuran                                  |
+| 54  | Child Development | `DELETE /development-reports/{id}`                        | Hapus record asesmen KPSP                                |
+| 56  | Child Nutrition   | `GET /children/{child_id}/nutrition-reports`              | Riwayat nutrition report per bulan                       |
+| 57  | Child Nutrition   | `PATCH /daily-shoppings/{id}`                             | Tandai belanja selesai                                   |
+| 58  | Child Nutrition   | `POST /daily-shoppings/{id}/items`                        | Tambah item belanja manual                               |
+| 59  | Child Nutrition   | `PATCH /ingredient-shopping-items/{id}`                   | Update qty/unit item belanja                             |
+| 60  | Child Nutrition   | `DELETE /ingredient-shopping-items/{id}`                  | Hapus item belanja                                       |
+| 61  | Child Nutrition   | `GET /ingredients`                                        | Search master ingredients (autocomplete)                 |
+| 62  | Photos & Contacts | `POST /mother-profiles/{id}/contacts`                     | Tambah contact/teman                                     |
+| 63  | Photos & Contacts | `PATCH /child-photos/{id}`                                | Edit caption/visibility/review status foto               |
+| 64  | Photos & Contacts | `DELETE /child-photos/{id}`                               | Hapus foto                                               |
+| 65  | Medical           | `PATCH /medical-notes/{id}`                               | Edit catatan dokter                                      |
+| 66  | Medical           | `DELETE /medical-notes/{id}`                              | Hapus catatan dokter                                     |
+| 67  | Notification      | `DELETE /notifications/{id}`                              | Hapus 1 notifikasi                                       |
+| 68  | Child Nutrition   | `PATCH /recipes/{id}/bookmark`                            | **[BARU v4]** Toggle bookmark recipe (dipisah dari 17)   |
+| 69  | Caregiver         | `GET /mother-profiles/{id}/caregiver-engagements/revoked` | **[BARU v4]** Riwayat akses caregiver yang sudah dicabut |
 
-## Ringkasan Perubahan pada Endpoint Lama (v2 → v3)
+**Endpoint 55 (v3) dihapus di v4** — fungsinya digabung ke endpoint 14 (lihat catatan di endpoint 14).
 
-| #      | Perubahan                                                                                                                                                                                                     |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Global | Setiap endpoint sekarang selalu punya section Path Params, Query Params, Request Body (+ tabel field), Response Body (+ tabel field), Response Error — konsisten di semua 46 endpoint lama + 21 endpoint baru |
-| Global | Format error standar ditambahkan (Section 0)                                                                                                                                                                  |
-| 2      | Tambah query param `notification_type`; dicatat keterbatasan skema untuk fitur read/unread                                                                                                                    |
-| 4      | Filter `date_from`/`date_to` diganti `age_range` (preset `0-2`/`0-6`/`0-60` bulan usia anak)                                                                                                                  |
-| 20     | Filter `range=1m` diganti `month`+`year` eksplisit                                                                                                                                                            |
-| 29     | Response ditambah join ke `users` (sebelumnya cuma record `caregiver_profiles` yang nyaris kosong)                                                                                                            |
-| 30, 31 | Tambah query param opsional `month`+`year` di atas filter `status`                                                                                                                                            |
-| 39, 41 | Tambah query param `child_id` (dan `pending_review` khusus di 39)                                                                                                                                             |
+## Ringkasan Perubahan v3 → v4
 
-**Perubahan dari dokumentasi v1 (dipertahankan dari v2, lihat detail di narasi tiap endpoint di atas)**: penamaan field → English snake_case, ID → UUID, format tanggal → `DD-MM-YYYY`, fix path/auth/request-body di berbagai endpoint (6, 9/11/12, 11, 13, 14, 15/16/35, 17, 19, 22/24, 24, 27/34, 30, 32, 37, 43), serta penambahan endpoint 45/46 di v2.
+| #       | Perubahan                                                                                                                                                                                                  |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1       | Tambah field `birth_date`, `streak` di response                                                                                                                                                            |
+| 2       | `notification_type` tetap opsional (revert dari "jadi wajib" di FIX v4)                                                                                                                                    |
+| 4       | `analysis_type` & `age_range` jadi wajib; response dipangkas jadi cuma `z_score`+`age_months`                                                                                                              |
+| 7       | `domains` diubah dari raw list jawaban jadi agregat `total_question`/`true_answer` per domain (dihitung di query, bukan di FE)                                                                             |
+| 8       | `next_check_date` dihapus dari response                                                                                                                                                                    |
+| 9       | `next_check_date` → `month_target`; `domains` disamakan formatnya dengan endpoint 7                                                                                                                        |
+| 10      | Tambah field `month_target` di response                                                                                                                                                                    |
+| 11      | Field `assessment_kpsp_answer` → `answer`; `month_target` dihapus dari request (dihitung server); diperjelas alur generate `child_development_report_id`                                                   |
+| 14      | Semantik jadi **replace-all** (menggantikan endpoint 55 yang dihapus)                                                                                                                                      |
+| 15      | `shopping.items[].ingredient_id` → `ingredient_name` (join ke `ingredients`)                                                                                                                               |
+| 17      | Dipecah jadi 2 endpoint: 17 (`is_completed` saja) + 68 baru (`is_bookmarked` saja)                                                                                                                         |
+| 18      | `main_ingredients` di response cuma yang `priority=1`, bukan semua diurutkan                                                                                                                               |
+| 19      | Request body dihapus — panggil endpoint saja, otomatis set `priority=1`                                                                                                                                    |
+| 20      | **Dihapus** (tidak dibutuhkan)                                                                                                                                                                             |
+| 27      | Tambah field `phone_number` (dari `users.phone_number`) di response & contoh query                                                                                                                         |
+| 30, 31  | `year` dihapus; `month` opsional (default bulan berjalan), filter nomor bulan tanpa syarat tahun                                                                                                           |
+| 32      | Hapus catatan referensi `doctor_profiles`/`medical_relationship_id` lama dari deskripsi                                                                                                                    |
+| 33      | Path jadi flat (`POST /medical-notes`, tanpa `child_id` di path); `child_id` ditambahkan ke body; `facility_location` jadi opsional; wajib hanya `child_id`, `doctor_name`, `recommendation`, `valid_date` |
+| 34      | Response cuma `id, full_name, photo_url` (hapus `birth_date`, `gender`)                                                                                                                                    |
+| 35      | Response cuma `id, shopping, menu` (hapus field nutrisi top-level)                                                                                                                                         |
+| 39      | Query params dihapus (balik seperti v2, tanpa filter)                                                                                                                                                      |
+| 41      | Query params dihapus; response difilter `is_review_required=false`                                                                                                                                         |
+| 42      | Response cuma `id, child_id, photo_url, caption` (hapus `visibility`, `is_review_required`, `created_at`)                                                                                                  |
+| 43      | `caption` jadi wajib                                                                                                                                                                                       |
+| 56      | Field `target_*` dihapus; tambah `meal_times` (join ke `recipes` yang `is_completed=true`)                                                                                                                 |
+| 65      | Field request body dijabarkan eksplisit satu per satu, semua opsional                                                                                                                                      |
+| Baru    | Endpoint 68 (bookmark recipe), 69 (riwayat akses caregiver dicabut)                                                                                                                                        |
+| Dihapus | Endpoint 20, 55                                                                                                                                                                                            |
+
+**Perubahan dari v1/v2 (dipertahankan, lihat detail di narasi tiap endpoint)**: penamaan field → English snake_case, ID → UUID, format tanggal → `DD-MM-YYYY`, fix path/auth/request-body di berbagai endpoint, serta penambahan endpoint 45–67 di v2/v3.
