@@ -973,7 +973,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | target_calories/target_protein/target_fat/target_carbohydrate | integer         | target                                                                                                                                                                        |
 | shopping.id                                                   | UUID            | `daily_shoppings.id`                                                                                                                                                          |
 | shopping.is_completed                                         | boolean         |                                                                                                                                                                               |
-| shopping.items[]                                              | array\<object\> | `id, ingredient_name, quantity, unit` — dari `ingredient_shopping_items`, di-join ke `ingredients` untuk ambil `name` **[FIX v4]** (tidak lagi expose `ingredient_id` mentah) |
+| shopping.items[]                                              | array\<object\> | `id, ingredient_name, category, quantity, unit` — dari `ingredient_shopping_items`, di-join ke `ingredients` untuk ambil `name` dan `category` **[FIX v4]** (tidak lagi expose `ingredient_id` mentah) |
 | menu.id                                                       | UUID            | `daily_menus.id`                                                                                                                                                              |
 | menu.recipes[]                                                | array\<object\> | dari `recipes`                                                                                                                                                                |
 
@@ -1054,7 +1054,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Path Params**: `recipe_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body [FIX v4] (200)**: satu record `recipes` beserta `main_ingredients` (**hanya** row dengan `priority = 1` — yaitu bahan yang sedang dipakai sekarang, bukan daftar opsi substitusi) dan `cooking_steps` (diurutkan `step_number`)
+- **Response Body [FIX v4] (200)**: satu record `recipes` beserta `main_ingredients` (**hanya** row dengan `priority = 1` — yaitu bahan yang sedang dipakai sekarang, bukan daftar opsi substitusi, dan kini menyertakan `category`) dan `cooking_steps` (diurutkan `step_number`)
 - **Response Error**:
 
 | Status | Kasus                       |
@@ -1075,16 +1075,17 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | main_ingredient_id | UUID | **[FIX]** sebelumnya tidak ada di spesifikasi endpoint — ditambahkan karena wajib untuk tahu ingredient mana yang ditukar |
 
 - **Query Params**: `-` (tidak ada)
-- **Request Body [FIX v4: dihapus]**: `-` (tidak ada — cukup panggil endpoint ini, tidak perlu kirim apa pun)
+- **Request Body**: `{ "category": "Kategori Bahan" }` (Digunakan untuk membatasi ruang lingkup pergeseran prioritas hanya pada bahan dengan kategori yang sama).
 - **Response Body (200)**: `-` (body kosong)
 - **Response Error**:
 
 | Status | Kasus                                                   |
 | ------ | ------------------------------------------------------- |
+| 400    | format body tidak sesuai (misal: category kosong)       |
 | 403    | `recipe_id` bukan milik user yang login                 |
 | 404    | `main_ingredient_id` tidak ditemukan di `recipe_id` tsb |
 
-- **Catatan [FIX v4]**: `main_ingredient_id` di path otomatis di-set jadi `priority = 1`. `main_ingredients` lain di recipe yang sama otomatis digeser +1 (yang sebelumnya `priority=1` jadi `2`, yang `2` jadi `3`, dst).
+- **Catatan [FIX v4]**: `main_ingredient_id` di path otomatis di-set jadi `priority = 1`. `main_ingredients` lain di recipe yang sama otomatis digeser +1 (yang sebelumnya `priority=1` jadi `2`, yang `2` jadi `3`, dst) **HANYA** jika mereka memiliki `category` yang sama dengan yang dilempar di Request Body.
 
 ### 21. Get bookmark menu
 
@@ -1184,7 +1185,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 | Field         | Type   | Wajib | Keterangan                                            |
 | ------------- | ------ | ----- | ----------------------------------------------------- |
-| ingredient_id | UUID   | Ya    | harus ada di master `ingredients` (lihat endpoint 61) |
+| ingredient_id | String | Ya    | harus ada di master `ingredients` (tipe string, lihat endpoint 61) |
 | quantity      | number | Ya    | > 0                                                   |
 | unit          | string | Ya    | maks 20 karakter                                      |
 
