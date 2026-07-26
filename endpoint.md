@@ -865,12 +865,12 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 - **Catatan**: `is_checked` didapat dari left join ke `checklist_milestone_progress` dengan `child_id` yang dikirim, supaya FE tahu item mana yang sudah dicentang tanpa request terpisah.
 
-### 14. Tandai checklist milestone (replace-all)
+### 14. Tandai checklist milestone (Sync / UPSERT)
 
 - **Method & Path**: `PATCH /children/{child_id}/checklist-milestone-progress`
 - **Path Params**: `child_id` (UUID)
 - **Query Params**: `-` (tidak ada)
-- **Request Body [FIX v4: semantik jadi replace-all, mencakup fungsi endpoint 55 lama]**:
+- **Request Body [FIX v4: semantik jadi Sync/UPSERT, mencakup fungsi endpoint 55 lama]**:
 
 ```json
 {
@@ -893,7 +893,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | `child_id` bukan milik user yang login                 |
 | 404    | ada `checklist_milestone_task_id` yang tidak ditemukan |
 
-- **Catatan [FIX v4]**: semantik diubah dari "tambah centang saja" (insert-only) menjadi **replace-all** — client selalu mengirim seluruh state checklist yang tercentang untuk `child_id` ini di tiap panggilan; server menghapus row `checklist_milestone_progress` yang tidak ada di list baru, dan insert yang belum ada. Dengan ini endpoint terpisah untuk uncheck tidak diperlukan lagi — uncheck satu item cukup dengan mengirim ulang list tanpa task tsb.
+- **Catatan [FIX v4]**: Menggunakan semantik **Sync / UPSERT** (penyempurnaan dari pendekatan *replace-all* mentah) — client selalu mengirim seluruh state checklist yang tercentang untuk `child_id` ini di tiap panggilan; server secara cerdas menghapus baris `checklist_milestone_progress` yang dilepas centangnya (uncheck) menggunakan logika selisih/diff, dan melakukan *Insert* bersyarat (`ON CONFLICT DO NOTHING`) untuk baris baru. Hal ini merupakan standar *Best Practice* karena menghemat beban *Write I/O* pada database serta mempertahankan riwayat waktu asli pencapaian tugas (`created_at`) milik sang anak. Dengan ini endpoint terpisah untuk *uncheck* tidak diperlukan lagi.
 
 ### 54. [BARU] Hapus development-report (salah input)
 
