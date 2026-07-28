@@ -1,0 +1,208 @@
+package services
+
+import (
+	"context"
+	"fmt"
+
+	"nusagizi_be/internal/models/photos_contacts"
+	"nusagizi_be/internal/repository"
+
+	"github.com/google/uuid"
+)
+
+type PhotosContactsService struct {
+	repo          *repository.PhotosContactsRepository
+	motherRepo    *repository.MotherProfileRepository
+	childRepo     *repository.ChildRepository
+	caregiverRepo *repository.CaregiverRepository
+}
+
+func NewPhotosContactsService(
+	repo *repository.PhotosContactsRepository,
+	motherRepo *repository.MotherProfileRepository,
+	childRepo *repository.ChildRepository,
+	caregiverRepo *repository.CaregiverRepository,
+) *PhotosContactsService {
+	return &PhotosContactsService{
+		repo:          repo,
+		motherRepo:    motherRepo,
+		childRepo:     childRepo,
+		caregiverRepo: caregiverRepo,
+	}
+}
+
+// GetContacts (Endpoint: 41)
+func (s *PhotosContactsService) GetContacts(ctx context.Context, userID string) ([]photos_contacts.ContactResponse, error) {
+	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetContacts(ctx, motherProfileID)
+}
+
+// AddContact (Endpoint: 49)
+func (s *PhotosContactsService) AddContact(ctx context.Context, userID string, relatedMotherProfileID uuid.UUID) (uuid.UUID, error) {
+	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if motherProfileID == relatedMotherProfileID {
+		return uuid.Nil, fmt.Errorf("cannot add yourself as contact")
+	}
+	return s.repo.CreateContact(ctx, motherProfileID, relatedMotherProfileID)
+}
+
+// DeleteContact (Endpoint: 42)
+func (s *PhotosContactsService) DeleteContact(ctx context.Context, userID string, contactID uuid.UUID) error {
+	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.DeleteContact(ctx, contactID, motherProfileID)
+}
+
+// GetMotherChildPhotos (Endpoint: 43)
+func (s *PhotosContactsService) GetMotherChildPhotos(ctx context.Context, userID string) ([]photos_contacts.ChildPhotoResponse, error) {
+	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetMotherChildPhotos(ctx, motherProfileID)
+}
+
+// GetContactChildPhotos (Endpoint: 44)
+func (s *PhotosContactsService) GetContactChildPhotos(ctx context.Context, userID string, contactID uuid.UUID) ([]photos_contacts.ChildPhotoResponse, error) {
+	// The caller must own the contact.
+	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if contactID belongs to motherProfileID
+	contacts, err := s.repo.GetContacts(ctx, motherProfileID)
+	if err != nil {
+		return nil, err
+	}
+	owns := false
+	for _, c := range contacts {
+		if c.ContactID == contactID {
+			owns = true
+			break
+		}
+	}
+	if !owns {
+		return nil, fmt.Errorf("%w: contact does not belong to you", ErrForbidden)
+	}
+
+	// Fetch photos of children from the contact
+	return s.repo.GetContactChildPhotos(ctx, contactID)
+}
+
+// GetAllChildPhotos (Endpoint: 45)
+func (s *PhotosContactsService) GetAllChildPhotos(ctx context.Context, userID string) ([]photos_contacts.ChildPhotoResponse, error) {
+	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetAllChildPhotos(ctx, motherProfileID)
+}
+
+// GetPhotoDetail (Endpoint: 46)
+func (s *PhotosContactsService) GetPhotoDetail(ctx context.Context, userID string, photoID uuid.UUID) (*photos_contacts.ChildPhotoResponse, error) {
+	// 1. Get the photo to know the childID
+	photo, err := s.repo.GetPhotoDetail(ctx, photoID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Check if user is the mother
+	if err := checkMotherOwnership(ctx, userID, photo.ChildID, s.motherRepo, s.childRepo); err == nil {
+		return photo, nil
+	}
+
+	// 3. Check if user is an active caregiver
+	if err := checkCaregiverAccess(ctx, userID, photo.ChildID, s.caregiverRepo); err == nil {
+		return photo, nil
+	}
+
+	// 4. Check if user is an authorized contact
+	hasAccess, err := s.repo.CheckContactPhotoAccess(ctx, userID, photoID)
+	if err != nil {
+		return nil, err
+	}
+	if !hasAccess {
+		return nil, fmt.Errorf("%w: user does not have permission to view this photo", ErrForbidden)
+	}
+
+	return photo, nil
+}
+
+// AddPhotoMother (Endpoint: 47)
+func (s *PhotosContactsService) AddPhotoMother(ctx context.Context, userID string, childID uuid.UUID, input *photos_contacts.CreatePhotoInput) (uuid.UUID, error) {
+	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
+		return uuid.Nil, err
+	}
+
+	if input.Caption == "" {
+		return uuid.Nil, fmt.Errorf("caption is required")
+	}
+
+	if input.Visibility == "only" && len(input.ListVisibility) == 0 {
+		return uuid.Nil, fmt.Errorf("list_visibility is required when visibility is 'only'")
+	}
+
+	// Force is_review_required to false
+	input.IsReviewRequired = false
+
+	return s.repo.CreatePhoto(ctx, childID, input)
+}
+
+// AddPhotoCaregiver (Endpoint: 48)
+func (s *PhotosContactsService) AddPhotoCaregiver(ctx context.Context, userID string, childID uuid.UUID, input *photos_contacts.CreatePhotoInput) (uuid.UUID, error) {
+	if err := checkCaregiverAccess(ctx, userID, childID, s.caregiverRepo); err != nil {
+		return uuid.Nil, err
+	}
+
+	if !input.IsReviewRequired {
+		return uuid.Nil, fmt.Errorf("is_review_required must be true for caregiver uploads")
+	}
+
+	input.Visibility = "private" // Default for caregiver
+
+	return s.repo.CreatePhoto(ctx, childID, input)
+}
+
+// UpdatePhoto (Endpoint: 50)
+func (s *PhotosContactsService) UpdatePhoto(ctx context.Context, userID string, photoID uuid.UUID, input *photos_contacts.UpdatePhotoInput) error {
+	// Access control: photo must belong to mother's child
+	// Fetch photo to get childID
+	photo, err := s.repo.GetPhotoDetail(ctx, photoID)
+	if err != nil {
+		return err
+	}
+	if err := checkMotherOwnership(ctx, userID, photo.ChildID, s.motherRepo, s.childRepo); err != nil {
+		return err
+	}
+
+	if input.Visibility != nil && *input.Visibility == "only" {
+		if input.ListVisibility == nil || len(*input.ListVisibility) == 0 {
+			return fmt.Errorf("list_visibility is required when visibility is 'only'")
+		}
+	}
+
+	return s.repo.UpdatePhoto(ctx, photoID, input)
+}
+
+// DeletePhoto (Endpoint: 51)
+func (s *PhotosContactsService) DeletePhoto(ctx context.Context, userID string, photoID uuid.UUID) error {
+	photo, err := s.repo.GetPhotoDetail(ctx, photoID)
+	if err != nil {
+		return err
+	}
+	if err := checkMotherOwnership(ctx, userID, photo.ChildID, s.motherRepo, s.childRepo); err != nil {
+		return err
+	}
+
+	return s.repo.DeletePhoto(ctx, photoID)
+}

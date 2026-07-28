@@ -12,18 +12,27 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type UserRepository struct {
+	pool *pgxpool.Pool
+}
+
+func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
+	return &UserRepository{pool: pool}
+}
+
 // GetUserBySub returns a user by Auth0 sub (auth0_id).
 // Used by the auth middleware for lazy provisioning.
-func GetUserBySub(pool *pgxpool.Pool, sub string) (*models.User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (r *UserRepository) GetUserBySub(ctx context.Context, sub string) (*models.User, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var u models.User
 	var query string = `SELECT id, auth0_id, email, full_name, gender, phone_number, photo_url, deleted_at, created_at, updated_at 
 		FROM users 
-		WHERE auth0_id = $1 AND deleted_at IS NULL`
+		WHERE auth0_id = $1 
+			AND deleted_at IS NULL`
 
-	err := pool.QueryRow(ctx, query, sub).Scan(
+	err := r.pool.QueryRow(ctx, query, sub).Scan(
 		&u.ID,
 		&u.Auth0ID,
 		&u.Email,
@@ -43,19 +52,17 @@ func GetUserBySub(pool *pgxpool.Pool, sub string) (*models.User, error) {
 }
 
 // CreateUserFromAuth0 inserts a new user on first Auth0 login (lazy provisioning).
-// The username parameter is accepted for backward compatibility but is not stored
-// (there is no username column in the users table).
-func CreateUserFromAuth0(pool *pgxpool.Pool, sub, email, username string) (*models.User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (r *UserRepository) CreateUserFromAuth0(ctx context.Context, sub, email, username string) (*models.User, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var u models.User
 	var query string = `
-		INSERT INTO users (auth0_id, email)
-		VALUES ($1, $2)
+		INSERT INTO users (auth0_id, email, full_name)
+		VALUES ($1, $2, $3)
 		ON CONFLICT (auth0_id) DO UPDATE SET updated_at = now()
 		RETURNING id, auth0_id, email, full_name, gender, phone_number, photo_url, deleted_at, created_at, updated_at`
-	err := pool.QueryRow(ctx, query, sub, email).Scan(
+	err := r.pool.QueryRow(ctx, query, sub, email, username).Scan(
 		&u.ID,
 		&u.Auth0ID,
 		&u.Email,
@@ -74,10 +81,9 @@ func CreateUserFromAuth0(pool *pgxpool.Pool, sub, email, username string) (*mode
 	return &u, nil
 }
 
-// GetUserProfileByID returns a user with has_mother_profile and has_caregiver_profile flags.
-// Used by endpoint 45 (GET /users/{user_id}).
-func GetUserProfileByID(pool *pgxpool.Pool, userID string) (*models.UserProfileResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// GetProfileByID returns a user with has_mother_profile and has_caregiver_profile flags.
+func (r *UserRepository) GetProfileByID(ctx context.Context, userID string) (*models.UserProfileResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var resp models.UserProfileResponse
@@ -92,9 +98,10 @@ func GetUserProfileByID(pool *pgxpool.Pool, userID string) (*models.UserProfileR
 			EXISTS(SELECT 1 FROM mother_profiles    WHERE user_id = u.id) AS has_mother_profile,
 			EXISTS(SELECT 1 FROM caregiver_profiles WHERE user_id = u.id) AS has_caregiver_profile
 		FROM users u
-		WHERE u.id = $1 AND u.deleted_at IS NULL
+		WHERE u.id = $1 
+			AND u.deleted_at IS NULL
 	`
-	err := pool.QueryRow(ctx, query, userID).Scan(
+	err := r.pool.QueryRow(ctx, query, userID).Scan(
 		&resp.ID,
 		&resp.Email,
 		&resp.FullName,
@@ -110,11 +117,9 @@ func GetUserProfileByID(pool *pgxpool.Pool, userID string) (*models.UserProfileR
 	return &resp, err
 }
 
-// UpdateUser performs a partial update on the users table.
-// Only non-nil fields in input are updated.
-// Used by endpoint 23 (PATCH /users/{user_id}).
-func UpdateUser(pool *pgxpool.Pool, userID string, input models.UpdateUserInput) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// Update performs a partial update on the users table.
+func (r *UserRepository) Update(ctx context.Context, userID string, input models.UpdateUserInput) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	setParts := []string{}
@@ -151,13 +156,13 @@ func UpdateUser(pool *pgxpool.Pool, userID string, input models.UpdateUserInput)
 	var query string = fmt.Sprintf(`
 		UPDATE users 
 		SET %s 
-		WHERE id = $%d AND deleted_at IS NULL`,
+		WHERE id = $%d 
+			AND deleted_at IS NULL`,
 		strings.Join(setParts, ", "),
 		idx,
 	)
 
-	cmdTag, err := pool.Exec(ctx, query, args...)
-
+	cmdTag, err := r.pool.Exec(ctx, query, args...)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return ErrConflict
@@ -170,19 +175,18 @@ func UpdateUser(pool *pgxpool.Pool, userID string, input models.UpdateUserInput)
 	return nil
 }
 
-// SoftDeleteUser sets deleted_at = now() for the given user.
-// Used by endpoint 25 (DELETE /users/{user_id}).
-func SoftDeleteUser(pool *pgxpool.Pool, userID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// SoftDelete sets deleted_at = now() for the given user.
+func (r *UserRepository) SoftDelete(ctx context.Context, userID string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var query string = `
 		UPDATE users 
 		SET deleted_at = now() 
-		WHERE id = $1 AND deleted_at IS NULL`
+		WHERE id = $1 
+			AND deleted_at IS NULL`
 
-	cmdTag, err := pool.Exec(ctx, query, userID)
-
+	cmdTag, err := r.pool.Exec(ctx, query, userID)
 	if err != nil {
 		return err
 	}
@@ -192,9 +196,9 @@ func SoftDeleteUser(pool *pgxpool.Pool, userID string) error {
 	return nil
 }
 
-// UpdateUserOnboarding sets up the correct profile for a user based on their chosen role.
-func UpdateUserOnboarding(pool *pgxpool.Pool, auth0ID, role string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// UpdateOnboarding sets up the correct profile for a user based on their chosen role.
+func (r *UserRepository) UpdateOnboarding(ctx context.Context, auth0ID, role string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var tableName string
@@ -214,9 +218,6 @@ func UpdateUserOnboarding(pool *pgxpool.Pool, auth0ID, role string) error {
 		SELECT id FROM users WHERE auth0_id = $1
 		ON CONFLICT (user_id) DO NOTHING`, tableName)
 
-	_, err := pool.Exec(ctx, query, auth0ID)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := r.pool.Exec(ctx, query, auth0ID)
+	return err
 }

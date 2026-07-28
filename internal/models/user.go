@@ -16,7 +16,7 @@ type User struct {
 	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
 }
 
-// UserProfileResponse is the response body for GET /users/{user_id} (endpoint 45).
+// UserProfileResponse is the response body
 type UserProfileResponse struct {
 	ID                  string  `json:"id"`
 	FullName            *string `json:"full_name"`
@@ -28,11 +28,31 @@ type UserProfileResponse struct {
 	HasCaregiverProfile bool    `json:"has_caregiver_profile"`
 }
 
-// UpdateUserInput is the request body for PATCH /users/{user_id} (endpoint 23).
+// UpdateUserInput is the request body
 // All fields are optional — only send fields that need to be changed.
 type UpdateUserInput struct {
 	FullName    *string `json:"full_name"`
 	Email       *string `json:"email"`
 	PhoneNumber *string `json:"phone_number"`
 	Gender      *string `json:"gender"`
+}
+
+// MotherProfileResponse is the response body
+type MotherProfileResponse struct {
+	ID          string  `json:"id"`
+	UserID      string  `json:"user_id"`
+	FullName    *string `json:"full_name"`
+	Email       string  `json:"email"`
+	PhoneNumber *string `json:"phone_number"`
+	PhotoURL    *string `json:"photo_url"`
+}
+
+// CaregiverProfileResponse is the response body
+type CaregiverProfileResponse struct {
+	ID          string  `json:"id"`
+	UserID      string  `json:"user_id"`
+	FullName    *string `json:"full_name"`
+	Email       string  `json:"email"`
+	PhoneNumber *string `json:"phone_number"`
+	PhotoURL    *string `json:"photo_url"`
 }

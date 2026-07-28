@@ -7,8 +7,8 @@ import (
 )
 
 type CookingStep struct {
-	ID          uuid.UUID `json:"cooking_steps_id" db:"cooking_steps_id"`
-	FoodID      uuid.UUID `json:"food_id" db:"food_id"`
+	ID          uuid.UUID `json:"id" db:"id"`
+	RecipeID    uuid.UUID `json:"recipe_id" db:"recipe_id"`
 	StepNumber  int       `json:"step_number" db:"step_number"`
 	Instruction string    `json:"instruction" db:"instruction"`
 	ImageURL    string    `json:"image_url" db:"image_url"`

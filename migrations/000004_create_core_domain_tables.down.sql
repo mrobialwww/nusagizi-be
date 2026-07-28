@@ -49,7 +49,6 @@ DROP TABLE IF EXISTS child_development_reports;
 -- ---------------------------------------------------------------------
 -- create child growth
 -- ---------------------------------------------------------------------
-DROP TABLE IF EXISTS child_growth_analyses;
 DROP TABLE IF EXISTS child_growth_reports;
 
 -- ---------------------------------------------------------------------
@@ -71,6 +70,7 @@ DROP TABLE IF EXISTS mother_profiles;
 
 DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
 ALTER TABLE users 
+    ADD COLUMN role VARCHAR(50),
     DROP COLUMN IF EXISTS full_name,
     DROP COLUMN IF EXISTS gender,
     DROP COLUMN IF EXISTS phone_number,
@@ -84,7 +84,6 @@ DROP TYPE IF EXISTS medical_restriction_type;
 DROP TYPE IF EXISTS child_photo_visibility;
 DROP TYPE IF EXISTS recipe_meal_time;
 DROP TYPE IF EXISTS nerve_name;
-DROP TYPE IF EXISTS growth_analysis_type;
 DROP TYPE IF EXISTS child_allergy_category;
 DROP TYPE IF EXISTS notification_type;
 DROP TYPE IF EXISTS gender_type;

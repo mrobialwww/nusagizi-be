@@ -16,14 +16,6 @@ CREATE TYPE gender_type AS ENUM ('male', 'female');
 -- ENUM: child_allergy_profile.category
 CREATE TYPE child_allergy_category AS ENUM ('food', 'medicine', 'animal', 'others');
 
--- ENUM: child_growth_analyses.analysis_type
-CREATE TYPE growth_analysis_type AS ENUM (
-    'weight_for_age',
-    'height_for_age',
-    'weight_for_height',
-    'bmi_for_age',
-    'head_circumference_for_age'
-);
 
 -- ENUM: nerve_name (aspek tumbuh kembang KPSP)
 -- ASUMSI: dipakai di assessment_kpsp_questions.nerve_name dan checklist_milestone_tasks.nerve_name
@@ -52,8 +44,9 @@ CREATE TYPE medical_restriction_type AS ENUM ('prohibition', 'allergy');
 -- ENUM: notification.type
 CREATE TYPE notification_type AS ENUM ('meal_reminder', 'growth_development_reminder', 'doctor_activity', 'photos_activity', 'shop_activity', 'invitation_activity', 'new_menu_reminder', 'achievement');
 
--- users (already created in 000001, adding new columns)
+-- users (already created in 000001)
 ALTER TABLE users 
+    DROP COLUMN role,
     ADD COLUMN full_name VARCHAR(150),
     ADD COLUMN gender gender_type,
     ADD COLUMN phone_number VARCHAR(20),
@@ -199,19 +192,6 @@ CREATE INDEX idx_child_growth_reports_child_id ON child_growth_reports(child_id)
 CREATE TRIGGER trg_child_growth_reports_updated_at BEFORE UPDATE ON child_growth_reports
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- child_growth_reports -> child_growth_analyses (1:N), enum analysis_type
-CREATE TABLE child_growth_analyses (
-    id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    child_growth_report_id   UUID NOT NULL REFERENCES child_growth_reports(id) ON DELETE CASCADE,
-    analysis_type            growth_analysis_type NOT NULL,
-    z_score                  NUMERIC(5,2),
-    created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX idx_child_growth_analyses_report_id ON child_growth_analyses(child_growth_report_id);
-CREATE TRIGGER trg_child_growth_analyses_updated_at BEFORE UPDATE ON child_growth_analyses
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
 -- ---------------------------------------------------------------------
 -- create child development
 -- ---------------------------------------------------------------------
@@ -260,10 +240,10 @@ CREATE INDEX idx_assessment_kpsp_answers_question_id ON assessment_kpsp_answers(
 CREATE TRIGGER trg_assessment_kpsp_answers_updated_at BEFORE UPDATE ON assessment_kpsp_answers
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- assessment_kpsp_questions -> recommended_actions (1:N)
+-- assessment_kpsp_questions -> recommended_actions (1:1)
 CREATE TABLE recommended_actions (
     id                            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    assessment_kpsp_question_id   UUID NOT NULL REFERENCES assessment_kpsp_questions(id) ON DELETE CASCADE,
+    assessment_kpsp_question_id   UUID NOT NULL UNIQUE REFERENCES assessment_kpsp_questions(id) ON DELETE CASCADE,
     title                         VARCHAR(50) NOT NULL,
     action_text                   TEXT NOT NULL,
     created_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -367,7 +347,7 @@ CREATE TRIGGER trg_recipes_updated_at BEFORE UPDATE ON recipes
 
 -- Master ingredients (dipakai main_ingredients & ingredient_shopping_items)
 CREATE TABLE ingredients (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id          VARCHAR(100) PRIMARY KEY,
     name        VARCHAR(150) NOT NULL UNIQUE,
     image_url   TEXT NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -380,12 +360,14 @@ CREATE TRIGGER trg_ingredients_updated_at BEFORE UPDATE ON ingredients
 CREATE TABLE main_ingredients (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     recipe_id      UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
-    ingredient_id  UUID NOT NULL REFERENCES ingredients(id) ON DELETE RESTRICT,
+    ingredient_id  VARCHAR(5) NOT NULL REFERENCES ingredients(id) ON DELETE RESTRICT,
     quantity       NUMERIC(8,2) NOT NULL CHECK (quantity > 0),
-    unit           VARCHAR(20) NOT NULL,
+    unit           VARCHAR(50) NOT NULL,
     priority       INTEGER NOT NULL CHECK (priority > 0),
+    slot           VARCHAR(25) NOT NULL,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (recipe_id, ingredient_id)
 );
 CREATE INDEX idx_main_ingredients_recipe_id ON main_ingredients(recipe_id);
 CREATE INDEX idx_main_ingredients_ingredient_id ON main_ingredients(ingredient_id);
@@ -423,9 +405,9 @@ CREATE TRIGGER trg_daily_shoppings_updated_at BEFORE UPDATE ON daily_shoppings
 CREATE TABLE ingredient_shopping_items (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     daily_shopping_id   UUID NOT NULL REFERENCES daily_shoppings(id) ON DELETE CASCADE,
-    ingredient_id       UUID NOT NULL REFERENCES ingredients(id) ON DELETE RESTRICT,
+    ingredient_id       VARCHAR(5) NOT NULL REFERENCES ingredients(id) ON DELETE RESTRICT,
     quantity            NUMERIC(8,2) NOT NULL CHECK (quantity > 0),
-    unit                VARCHAR(20) NOT NULL,
+    unit                VARCHAR(50) NOT NULL,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );

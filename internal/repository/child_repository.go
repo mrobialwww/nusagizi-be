@@ -13,14 +13,111 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// CreateChild inserts a new child row and returns the new UUID.
-// Must be called within a transaction (pgx.Tx).
-func CreateChild(tx pgx.Tx, motherProfileID uuid.UUID, input *models.CreateChildInput) (uuid.UUID, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+type ChildRepository struct {
+	pool *pgxpool.Pool
+}
+
+func NewChildRepository(pool *pgxpool.Pool) *ChildRepository {
+	return &ChildRepository{pool: pool}
+}
+
+// Create inserts a new child and all sub-profiles within an internal transaction.
+func (r *ChildRepository) Create(ctx context.Context, motherProfileID uuid.UUID, input *models.CreateChildInput) (uuid.UUID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	birthDate, err := time.Parse(models.DateLayout, input.BirthDate)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	defer tx.Rollback(ctx) // no-op if already committed
 
+	childID, err := r.insertChild(ctx, tx, motherProfileID, input)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	// Insert allergy sub-profiles
+	if input.Allergies != nil {
+		var query string = `
+			INSERT INTO child_allergy_profile (child_id, category, allergen_name)
+			VALUES ($1, $2::child_allergy_category, $3)`
+
+		for _, name := range input.Allergies.Food {
+			if _, err := tx.Exec(ctx, query, childID, "food", name); err != nil {
+				return uuid.Nil, err
+			}
+		}
+		for _, name := range input.Allergies.Medicine {
+			if _, err := tx.Exec(ctx, query, childID, "medicine", name); err != nil {
+				return uuid.Nil, err
+			}
+		}
+		for _, name := range input.Allergies.Animal {
+			if _, err := tx.Exec(ctx, query, childID, "animal", name); err != nil {
+				return uuid.Nil, err
+			}
+		}
+		for _, name := range input.Allergies.Others {
+			if _, err := tx.Exec(ctx, query, childID, "others", name); err != nil {
+				return uuid.Nil, err
+			}
+		}
+	}
+
+	// Insert favorite food sub-profiles
+	if len(input.FavoriteFoods) > 0 {
+		var query string = `INSERT INTO favorite_food_profile (child_id, food_name) VALUES ($1, $2)`
+
+		for _, food := range input.FavoriteFoods {
+			if _, err := tx.Exec(ctx, query, childID, food); err != nil {
+				return uuid.Nil, err
+			}
+		}
+	}
+
+	// Insert favorite texture sub-profiles
+	if len(input.FavoriteTextures) > 0 {
+		var query string = `INSERT INTO favorite_texture_profile (child_id, texture_name) VALUES ($1, $2)`
+
+		for _, texture := range input.FavoriteTextures {
+			if _, err := tx.Exec(ctx, query, childID, texture); err != nil {
+				return uuid.Nil, err
+			}
+		}
+	}
+
+	// Insert diet sub-profiles
+	if len(input.Diets) > 0 {
+		var query string = `INSERT INTO child_diet_profile (child_id, diet_name) VALUES ($1, $2)`
+
+		for _, diet := range input.Diets {
+			if _, err := tx.Exec(ctx, query, childID, diet); err != nil {
+				return uuid.Nil, err
+			}
+		}
+	}
+
+	// Insert chronic disease sub-profiles
+	if len(input.ChronicDiseases) > 0 {
+		var query string = `INSERT INTO child_chronic_disease_profile (child_id, disease_name) VALUES ($1, $2)`
+
+		for _, disease := range input.ChronicDiseases {
+			if _, err := tx.Exec(ctx, query, childID, disease); err != nil {
+				return uuid.Nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, err
+	}
+	return childID, nil
+}
+
+// insertChild inserts the main child row and returns the new UUID. Must be called within a transaction.
+func (r *ChildRepository) insertChild(ctx context.Context, tx pgx.Tx, motherProfileID uuid.UUID, input *models.CreateChildInput) (uuid.UUID, error) {
+	birthDate, err := time.Parse(models.DateLayout, input.BirthDate)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("invalid birth_date format, expected DD-MM-YYYY: %w", err)
 	}
@@ -55,205 +152,136 @@ func CreateChild(tx pgx.Tx, motherProfileID uuid.UUID, input *models.CreateChild
 	return childID, err
 }
 
-// BulkInsertAllergyProfiles inserts all allergy category rows for a child.
-// Must be called within a transaction.
-func BulkInsertAllergyProfiles(tx pgx.Tx, childID uuid.UUID, allergies *models.Allergies) error {
-	if allergies == nil {
-		return nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// Update performs a partial update of the main child row and replace-all for sub-profiles, within an internal transaction.
+// A nil pointer field means the field was not sent → keep existing data.
+func (r *ChildRepository) Update(ctx context.Context, childID uuid.UUID, input *models.UpdateChildInput) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	type entry struct {
-		category string
-		names    []string
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
 	}
-	entries := []entry{
-		{"food", allergies.Food},
-		{"medicine", allergies.Medicine},
-		{"animal", allergies.Animal},
-		{"others", allergies.Others},
-	}
-	for _, e := range entries {
-		for _, name := range e.names {
-			var query string = `
-				INSERT INTO child_allergy_profile (
-					child_id,
-					category,
-					allergen_name
-				)
-				VALUES ($1, $2::child_allergy_category, $3)`
+	defer tx.Rollback(ctx)
 
-			if _, err := tx.Exec(ctx, query, childID, e.category, name); err != nil {
+	if err := r.updateChildRow(ctx, tx, childID, input); err != nil {
+		return err
+	}
+
+	if input.Allergies != nil {
+		var delQuery string = `
+			DELETE FROM child_allergy_profile 
+			WHERE child_id = $1`
+
+		if _, err := tx.Exec(ctx, delQuery, childID); err != nil {
+			return err
+		}
+		var query string = `
+			INSERT INTO child_allergy_profile (child_id, category, allergen_name)
+			VALUES ($1, $2::child_allergy_category, $3)`
+
+		for _, name := range input.Allergies.Food {
+			if _, err := tx.Exec(ctx, query, childID, "food", name); err != nil {
+				return err
+			}
+		}
+		for _, name := range input.Allergies.Medicine {
+			if _, err := tx.Exec(ctx, query, childID, "medicine", name); err != nil {
+				return err
+			}
+		}
+		for _, name := range input.Allergies.Animal {
+			if _, err := tx.Exec(ctx, query, childID, "animal", name); err != nil {
+				return err
+			}
+		}
+		for _, name := range input.Allergies.Others {
+			if _, err := tx.Exec(ctx, query, childID, "others", name); err != nil {
 				return err
 			}
 		}
 	}
-	return nil
-}
 
-// BulkInsertFavoriteFoods inserts favorite food profile rows for a child.
-// Must be called within a transaction.
-func BulkInsertFavoriteFoods(tx pgx.Tx, childID uuid.UUID, foods []string) error {
-	if len(foods) == 0 {
-		return nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	if input.FavoriteFoods != nil {
+		var delQuery string = `
+			DELETE FROM favorite_food_profile 
+			WHERE child_id = $1`
 
-	var query string = `
-		INSERT INTO favorite_food_profile (child_id, food_name)
-		VALUES ($1, $2)`
-
-	for _, food := range foods {
-		if _, err := tx.Exec(ctx, query, childID, food); err != nil {
+		if _, err := tx.Exec(ctx, delQuery, childID); err != nil {
 			return err
 		}
-	}
-	return nil
-}
+		if len(*input.FavoriteFoods) > 0 {
+			var insQuery string = `INSERT INTO favorite_food_profile (child_id, food_name) VALUES ($1, $2)`
 
-// BulkInsertFavoriteTextures inserts favorite texture profile rows for a child.
-// Must be called within a transaction.
-func BulkInsertFavoriteTextures(tx pgx.Tx, childID uuid.UUID, textures []string) error {
-	if len(textures) == 0 {
-		return nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var query string = `
-		INSERT INTO favorite_texture_profile (child_id, texture_name) 
-		VALUES ($1, $2)`
-
-	for _, texture := range textures {
-		if _, err := tx.Exec(ctx, query, childID, texture); err != nil {
-			return err
+			for _, food := range *input.FavoriteFoods {
+				if _, err := tx.Exec(ctx, insQuery, childID, food); err != nil {
+					return err
+				}
+			}
 		}
 	}
-	return nil
-}
 
-// BulkInsertDiets inserts child diet profile rows for a child.
-// Must be called within a transaction.
-func BulkInsertDiets(tx pgx.Tx, childID uuid.UUID, diets []string) error {
-	if len(diets) == 0 {
-		return nil
-	}
+	if input.FavoriteTextures != nil {
+		var delQuery string = `
+			DELETE FROM favorite_texture_profile 
+			WHERE child_id = $1`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var query string = `
-		INSERT INTO child_diet_profile (child_id, diet_name) 
-		VALUES ($1, $2)`
-
-	for _, diet := range diets {
-		if _, err := tx.Exec(ctx, query, childID, diet); err != nil {
+		if _, err := tx.Exec(ctx, delQuery, childID); err != nil {
 			return err
 		}
-	}
-	return nil
-}
+		if len(*input.FavoriteTextures) > 0 {
+			var insQuery string = `INSERT INTO favorite_texture_profile (child_id, texture_name) VALUES ($1, $2)`
 
-// BulkInsertChronicDiseases inserts chronic disease profile rows for a child.
-// Must be called within a transaction.
-func BulkInsertChronicDiseases(tx pgx.Tx, childID uuid.UUID, diseases []string) error {
-	if len(diseases) == 0 {
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var query string = `
-		INSERT INTO child_chronic_disease_profile (child_id, disease_name) 
-		VALUES ($1, $2)`
-
-	for _, disease := range diseases {
-		if _, err := tx.Exec(ctx, query, childID, disease); err != nil {
-			return err
+			for _, texture := range *input.FavoriteTextures {
+				if _, err := tx.Exec(ctx, insQuery, childID, texture); err != nil {
+					return err
+				}
+			}
 		}
 	}
-	return nil
+
+	if input.Diets != nil {
+		var delQuery string = `
+			DELETE FROM child_diet_profile 
+			WHERE child_id = $1`
+
+		if _, err := tx.Exec(ctx, delQuery, childID); err != nil {
+			return err
+		}
+		if len(*input.Diets) > 0 {
+			var insQuery string = `INSERT INTO child_diet_profile (child_id, diet_name) VALUES ($1, $2)`
+
+			for _, diet := range *input.Diets {
+				if _, err := tx.Exec(ctx, insQuery, childID, diet); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	if input.ChronicDiseases != nil {
+		var delQuery string = `
+			DELETE FROM child_chronic_disease_profile 
+			WHERE child_id = $1`
+
+		if _, err := tx.Exec(ctx, delQuery, childID); err != nil {
+			return err
+		}
+		if len(*input.ChronicDiseases) > 0 {
+			var insQuery string = `INSERT INTO child_chronic_disease_profile (child_id, disease_name) VALUES ($1, $2)`
+			for _, disease := range *input.ChronicDiseases {
+				if _, err := tx.Exec(ctx, insQuery, childID, disease); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
-// DeleteAllergyProfiles deletes all allergy profiles for a child.
-// Must be called within a transaction.
-func DeleteAllergyProfiles(tx pgx.Tx, childID uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var query string = `
-		DELETE FROM child_allergy_profile 
-		WHERE child_id = $1`
-
-	_, err := tx.Exec(ctx, query, childID)
-	return err
-}
-
-// DeleteFavoriteFoods deletes all favorite food profiles for a child.
-// Must be called within a transaction.
-func DeleteFavoriteFoods(tx pgx.Tx, childID uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var query string = `
-		DELETE FROM favorite_food_profile 
-		WHERE child_id = $1`
-
-	_, err := tx.Exec(ctx, query, childID)
-	return err
-}
-
-// DeleteFavoriteTextures deletes all favorite texture profiles for a child.
-// Must be called within a transaction.
-func DeleteFavoriteTextures(tx pgx.Tx, childID uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var query string = `
-		DELETE FROM favorite_texture_profile 
-		WHERE child_id = $1`
-
-	_, err := tx.Exec(ctx, query, childID)
-	return err
-}
-
-// DeleteDiets deletes all diet profiles for a child.
-// Must be called within a transaction.
-func DeleteDiets(tx pgx.Tx, childID uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var query string = `
-		DELETE FROM child_diet_profile 
-		WHERE child_id = $1`
-
-	_, err := tx.Exec(ctx, query, childID)
-	return err
-}
-
-// DeleteChronicDiseases deletes all chronic disease profiles for a child.
-// Must be called within a transaction.
-func DeleteChronicDiseases(tx pgx.Tx, childID uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var query string = `
-		DELETE FROM child_chronic_disease_profile 
-		WHERE child_id = $1`
-
-	_, err := tx.Exec(ctx, query, childID)
-	return err
-}
-
-// UpdateChild updates the main child row with only non-nil fields (partial update).
-// Must be called within a transaction.
-func UpdateChild(tx pgx.Tx, childID uuid.UUID, input *models.UpdateChildInput) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+// updateChildRow performs a partial update on the main child row. Must be called within a transaction.
+func (r *ChildRepository) updateChildRow(ctx context.Context, tx pgx.Tx, childID uuid.UUID, input *models.UpdateChildInput) error {
 	setParts := []string{}
 	args := []any{}
 	idx := 1
@@ -307,13 +335,13 @@ func UpdateChild(tx pgx.Tx, childID uuid.UUID, input *models.UpdateChildInput) e
 	var query string = fmt.Sprintf(`
 		UPDATE child 
 		SET %s 
-		WHERE id = $%d AND deleted_at IS NULL`,
+		WHERE id = $%d 
+			AND deleted_at IS NULL`,
 		strings.Join(setParts, ", "),
 		idx,
 	)
 
 	cmdTag, err := tx.Exec(ctx, query, args...)
-
 	if err != nil {
 		return err
 	}
@@ -323,26 +351,62 @@ func UpdateChild(tx pgx.Tx, childID uuid.UUID, input *models.UpdateChildInput) e
 	return nil
 }
 
-// CheckChildOwnership returns true if the child belongs to the given mother profile and is not deleted.
-func CheckChildOwnership(pool *pgxpool.Pool, childID, motherProfileID uuid.UUID) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// CheckOwnership returns true if the child belongs to the given mother profile and is not deleted.
+func (r *ChildRepository) CheckOwnership(ctx context.Context, childID, motherProfileID uuid.UUID) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var exists bool
 	var query string = `
 		SELECT EXISTS(
 			SELECT 1 FROM child
-			WHERE id = $1 AND mother_profile_id = $2 AND deleted_at IS NULL
+			WHERE id = $1 
+				AND mother_profile_id = $2 
+				AND deleted_at IS NULL
 		)
 	`
-	err := pool.QueryRow(ctx, query, childID, motherProfileID).Scan(&exists)
+	err := r.pool.QueryRow(ctx, query, childID, motherProfileID).Scan(&exists)
 	return exists, err
 }
 
-// GetChildByID returns full child detail with all sub-profiles assembled.
-// Used by endpoint 50 (GET /children/{child_id}).
-func GetChildByID(pool *pgxpool.Pool, childID uuid.UUID) (*models.ChildDetailResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+// GetSimpleByID returns simple child detail.
+func (r *ChildRepository) GetSimpleByID(ctx context.Context, childID uuid.UUID) (*models.ChildSimpleResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var child models.ChildSimpleResponse
+	var birthDate time.Time
+
+	query := `
+		SELECT 
+			id, full_name, birth_date, gender, photo_url, upload_streak_days
+		FROM child
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	err := r.pool.QueryRow(ctx, query, childID).Scan(
+		&child.ID,
+		&child.FullName,
+		&birthDate,
+		&child.Gender,
+		&child.PhotoURL,
+		&child.UploadStreakDays,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	child.BirthDate = birthDate.Format(models.DateLayout)
+	return &child, nil
+}
+
+// GetByID returns full child detail with all sub-profiles assembled.
+func (r *ChildRepository) GetByID(ctx context.Context, childID uuid.UUID) (*models.ChildDetailResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	// 1. Fetch main child row
@@ -359,9 +423,10 @@ func GetChildByID(pool *pgxpool.Pool, childID uuid.UUID) (*models.ChildDetailRes
 			notes_profile,
 			upload_streak_days
 		FROM child
-		WHERE id = $1 AND deleted_at IS NULL
+		WHERE id = $1 
+			AND deleted_at IS NULL
 	`
-	err := pool.QueryRow(ctx, query, childID).Scan(
+	err := r.pool.QueryRow(ctx, query, childID).Scan(
 		&c.ID,
 		&c.FullName,
 		&c.Gender,
@@ -398,14 +463,14 @@ func GetChildByID(pool *pgxpool.Pool, childID uuid.UUID) (*models.ChildDetailRes
 	}
 
 	// 2. Fetch allergies
-	allergies, err := getChildAllergies(ctx, pool, childID)
+	allergies, err := r.getChildAllergies(ctx, childID)
 	if err != nil {
 		return nil, err
 	}
 	resp.Allergies = allergies
 
 	// 3-6. Fetch the remaining string-list sub-profiles
-	if err := populateChildStringProfiles(ctx, pool, childID, resp); err != nil {
+	if err := r.populateChildStringProfiles(ctx, childID, resp); err != nil {
 		return nil, err
 	}
 
@@ -413,7 +478,7 @@ func GetChildByID(pool *pgxpool.Pool, childID uuid.UUID) (*models.ChildDetailRes
 }
 
 // getChildAllergies is a helper to fetch and group allergies by category for a child.
-func getChildAllergies(ctx context.Context, pool *pgxpool.Pool, childID uuid.UUID) (models.Allergies, error) {
+func (r *ChildRepository) getChildAllergies(ctx context.Context, childID uuid.UUID) (models.Allergies, error) {
 	allergies := models.Allergies{
 		Food:     []string{},
 		Medicine: []string{},
@@ -422,7 +487,7 @@ func getChildAllergies(ctx context.Context, pool *pgxpool.Pool, childID uuid.UUI
 	}
 
 	var allergyQuery string = `SELECT category, allergen_name FROM child_allergy_profile WHERE child_id = $1`
-	rows, err := pool.Query(ctx, allergyQuery, childID)
+	rows, err := r.pool.Query(ctx, allergyQuery, childID)
 	if err != nil {
 		return allergies, err
 	}
@@ -448,7 +513,7 @@ func getChildAllergies(ctx context.Context, pool *pgxpool.Pool, childID uuid.UUI
 }
 
 // populateChildStringProfiles fetches and populates favorite foods, textures, diets, and diseases for a child.
-func populateChildStringProfiles(ctx context.Context, pool *pgxpool.Pool, childID uuid.UUID, resp *models.ChildDetailResponse) error {
+func (r *ChildRepository) populateChildStringProfiles(ctx context.Context, childID uuid.UUID, resp *models.ChildDetailResponse) error {
 	queries := []struct {
 		query string
 		dest  *[]string
@@ -484,7 +549,7 @@ func populateChildStringProfiles(ctx context.Context, pool *pgxpool.Pool, childI
 	}
 
 	for _, q := range queries {
-		rows, err := pool.Query(ctx, q.query, childID)
+		rows, err := r.pool.Query(ctx, q.query, childID)
 		if err != nil {
 			return err
 		}
@@ -508,20 +573,19 @@ func populateChildStringProfiles(ctx context.Context, pool *pgxpool.Pool, childI
 	return nil
 }
 
-// GetChildrenByMotherProfileID returns a lightweight list of children for a mother.
-// Used by endpoint 51 (GET /mother-profiles/{id}/children).
-func GetChildrenByMotherProfileID(pool *pgxpool.Pool, motherProfileID uuid.UUID) ([]models.ChildListItem, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// GetByMotherProfileID returns a lightweight list of children for a mother.
+func (r *ChildRepository) GetByMotherProfileID(ctx context.Context, motherProfileID uuid.UUID) ([]models.ChildListItem, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var query string = `
 		SELECT id, full_name, birth_date, gender, photo_url
 		FROM child
-		WHERE mother_profile_id = $1 AND deleted_at IS NULL
+		WHERE mother_profile_id = $1 
+			AND deleted_at IS NULL
 		ORDER BY created_at ASC
 	`
-	rows, err := pool.Query(ctx, query, motherProfileID)
-
+	rows, err := r.pool.Query(ctx, query, motherProfileID)
 	if err != nil {
 		return nil, err
 	}
@@ -540,19 +604,18 @@ func GetChildrenByMotherProfileID(pool *pgxpool.Pool, motherProfileID uuid.UUID)
 	return result, rows.Err()
 }
 
-// SoftDeleteChild sets deleted_at = now() for the given child.
-// Used by endpoint 46 (DELETE /children/{child_id}).
-func SoftDeleteChild(pool *pgxpool.Pool, childID uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// SoftDelete sets deleted_at = now() for the given child.
+func (r *ChildRepository) SoftDelete(ctx context.Context, childID uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var query string = `
 		UPDATE child 
 		SET deleted_at = now() 
-		WHERE id = $1 AND deleted_at IS NULL`
+		WHERE id = $1 
+			AND deleted_at IS NULL`
 
-	cmdTag, err := pool.Exec(ctx, query, childID)
-
+	cmdTag, err := r.pool.Exec(ctx, query, childID)
 	if err != nil {
 		return err
 	}

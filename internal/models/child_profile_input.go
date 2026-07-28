@@ -11,7 +11,7 @@ type Allergies struct {
 	Others   []string `json:"others"`
 }
 
-// CreateChildInput is the request body for POST /children (endpoint 22).
+// CreateChildInput is the request body
 type CreateChildInput struct {
 	FullName         string     `json:"full_name" binding:"required,max=150"`
 	BirthDate        string     `json:"birth_date" binding:"required"` // DD-MM-YYYY
@@ -27,7 +27,7 @@ type CreateChildInput struct {
 	Notes            *string    `json:"notes"`
 }
 
-// UpdateChildInput is the request body for PATCH /children/{child_id} (endpoint 24).
+// UpdateChildInput is the request body
 // All fields are optional. Pointer slices distinguish "not sent" (nil) from "empty / clear all" ([]).
 type UpdateChildInput struct {
 	FullName         *string    `json:"full_name"`
@@ -44,7 +44,17 @@ type UpdateChildInput struct {
 	Notes            *string    `json:"notes"`
 }
 
-// ChildDetailResponse is the response body for GET /children/{child_id} (endpoint 50).
+// ChildSimpleResponse is the response body for
+type ChildSimpleResponse struct {
+	ID               string  `json:"id"`
+	FullName         string  `json:"full_name"`
+	BirthDate        string  `json:"birth_date"`
+	Gender           string  `json:"gender"`
+	PhotoURL         *string `json:"photo_url"`
+	UploadStreakDays int     `json:"upload_streak_days"`
+}
+
+// ChildDetailResponse is the response body
 type ChildDetailResponse struct {
 	ID               string    `json:"id"`
 	FullName         string    `json:"full_name"`
@@ -62,7 +72,7 @@ type ChildDetailResponse struct {
 	Notes            *string   `json:"notes"`
 }
 
-// ChildListItem is one entry in the list response for GET /mother-profiles/{id}/children (endpoint 51).
+// ChildListItem is one entry in the list response
 type ChildListItem struct {
 	ID        string  `json:"id"`
 	FullName  string  `json:"full_name"`

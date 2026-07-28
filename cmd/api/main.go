@@ -7,6 +7,8 @@ import (
 	"nusagizi_be/internal/database"
 	"nusagizi_be/internal/handlers"
 	"nusagizi_be/internal/middleware"
+	"nusagizi_be/internal/repository"
+	"nusagizi_be/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,17 +37,36 @@ func main() {
 		log.Fatal("Failed to create JWT validator:", err)
 	}
 
-	// 4. JWT middleware
+	// 4. JWT middleware initialization
 	jwtMiddleware, err := middleware.NewMiddleware(jwtValidator)
 	if err != nil {
 		log.Fatal("Failed to create JWT middleware:", err)
 	}
 
-	// 5. Setup Gin
+	// 5. DI Wiring: Repositories -> Services -> Handlers
+
+	// Repositories
+	userRepo := repository.NewUserRepository(pool)
+	motherRepo := repository.NewMotherProfileRepository(pool)
+	childRepo := repository.NewChildRepository(pool)
+	caregiverRepo := repository.NewCaregiverRepository(pool)
+
+	// Services
+	userSvc := services.NewUserService(userRepo, motherRepo, caregiverRepo)
+	childSvc := services.NewChildService(childRepo, motherRepo, caregiverRepo)
+
+	// Handlers
+	onboardHandler := handlers.NewOnboardingHandler(userRepo, cfg)
+	userHandler := handlers.NewUserHandler(userSvc)
+	childHandler := handlers.NewChildHandler(childSvc)
+
+	// 6. Router Setup
+
+	// 7. Setup Gin
 	var router *gin.Engine = gin.Default()
 	router.SetTrustedProxies(nil)
 
-	// 6. Public routes
+	// 8. Public routes
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message":  "NusaGizi API is running!",
@@ -54,24 +75,27 @@ func main() {
 		})
 	})
 
-	// 7. Protected routes (require valid Auth0 JWT)
+	// 9. Protected routes (require valid Auth0 JWT)
 	protected := router.Group("/")
-	protected.Use(middleware.GinMiddleware(jwtMiddleware, pool))
+	// Note: GinMiddleware now requires userRepo instead of pool
+	protected.Use(middleware.GinMiddleware(jwtMiddleware, userRepo))
 	{
 		// Legacy — onboarding sets role in Auth0 + DB
-		protected.POST("/onboarding", handlers.OnboardingHandler(pool, cfg))
+		protected.POST("/onboarding", onboardHandler.Handle)
 
 		// Modul 1: Auth & User Profile
-		protected.GET("/users/:user_id", handlers.GetUserHandler(pool))
-		protected.PATCH("/users/:user_id", handlers.UpdateUserHandler(pool))
-		protected.DELETE("/users/:user_id", handlers.DeleteUserHandler(pool))
+		protected.GET("/users", userHandler.Get)
+		protected.PATCH("/users", userHandler.Update)
+		protected.DELETE("/users", userHandler.Delete)
+		protected.GET("/mother-profiles", userHandler.GetMotherProfile)
+		protected.GET("/caregiver-profiles", userHandler.GetCaregiverProfile)
 
 		// Modul 2: Child Profile
-		protected.POST("/children", handlers.CreateChildHandler(pool))
-		protected.GET("/children/:child_id", handlers.GetChildHandler(pool))
-		protected.PATCH("/children/:child_id", handlers.UpdateChildHandler(pool))
-		protected.DELETE("/children/:child_id", handlers.DeleteChildHandler(pool))
-		protected.GET("/mother-profiles/:mother_profile_id/children", handlers.GetChildrenHandler(pool))
+		protected.POST("/children", childHandler.Create)
+		protected.GET("/children/:child_id", childHandler.Get)
+		protected.PATCH("/children/:child_id", childHandler.Update)
+		protected.DELETE("/children/:child_id", childHandler.Delete)
+		protected.GET("/children", childHandler.ListByMother)
 	}
 
 	router.Run(":" + cfg.Port)

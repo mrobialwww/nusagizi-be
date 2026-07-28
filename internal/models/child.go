@@ -23,38 +23,3 @@ type Child struct {
 	UpdatedAt            time.Time  `json:"updated_at" db:"updated_at"`
 }
 
-// FavoriteFood mirrors the favorite_food_profile table.
-type FavoriteFood struct {
-	ID       uuid.UUID `db:"id"`
-	ChildID  uuid.UUID `db:"child_id"`
-	FoodName string    `db:"food_name"`
-}
-
-// FavoriteTexture mirrors the favorite_texture_profile table.
-type FavoriteTexture struct {
-	ID          uuid.UUID `db:"id"`
-	ChildID     uuid.UUID `db:"child_id"`
-	TextureName string    `db:"texture_name"`
-}
-
-// ChildDiet mirrors the child_diet_profile table.
-type ChildDiet struct {
-	ID       uuid.UUID `db:"id"`
-	ChildID  uuid.UUID `db:"child_id"`
-	DietName string    `db:"diet_name"`
-}
-
-// ChildChronicDisease mirrors the child_chronic_disease_profile table.
-type ChildChronicDisease struct {
-	ID          uuid.UUID `db:"id"`
-	ChildID     uuid.UUID `db:"child_id"`
-	DiseaseName string    `db:"disease_name"`
-}
-
-// ChildAllergy mirrors the child_allergy_profile table.
-type ChildAllergy struct {
-	ID           uuid.UUID `db:"id"`
-	ChildID      uuid.UUID `db:"child_id"`
-	Category     string    `db:"category"` // ENUM: food, medicine, animal, others
-	AllergenName string    `db:"allergen_name"`
-}

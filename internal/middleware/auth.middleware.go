@@ -9,7 +9,6 @@ import (
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func NewMiddleware(jwtValidator *validator.Validator) (*jwtmiddleware.JWTMiddleware, error) {
@@ -25,7 +24,7 @@ func NewMiddleware(jwtValidator *validator.Validator) (*jwtmiddleware.JWTMiddlew
 	)
 }
 
-func GinMiddleware(jwtMiddleware *jwtmiddleware.JWTMiddleware, pool *pgxpool.Pool) gin.HandlerFunc {
+func GinMiddleware(jwtMiddleware *jwtmiddleware.JWTMiddleware, userRepo *repository.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var handled bool
 
@@ -37,10 +36,11 @@ func GinMiddleware(jwtMiddleware *jwtmiddleware.JWTMiddleware, pool *pgxpool.Poo
 				return
 			}
 
-			userID := claims.RegisteredClaims.Subject
+			auth0ID := claims.RegisteredClaims.Subject
 
 			// Lazy provisioning
-			user, err := repository.GetUserBySub(pool, userID)
+			ctx := r.Context()
+			user, err := userRepo.GetUserBySub(ctx, auth0ID)
 
 			// Jika user belum ada di table Users, lakukan lazy provisioning.
 			// Email & username dibaca dari JWT custom claims yang ditambahkan via Auth0 Post Login Actions — tidak perlu hit /userinfo.
@@ -60,14 +60,15 @@ func GinMiddleware(jwtMiddleware *jwtmiddleware.JWTMiddleware, pool *pgxpool.Poo
 					username = email
 				}
 
-				user, err = repository.CreateUserFromAuth0(pool, userID, email, username)
+				user, err = userRepo.CreateUserFromAuth0(ctx, auth0ID, email, username)
 				if err != nil {
 					slog.Error("Failed to create user", "error", err)
 					return
 				}
 			}
 
-			c.Set("user_id", userID)
+			c.Set("user_id", user.ID)
+			c.Set("auth0_id", auth0ID)
 			c.Set("user", user)
 			handled = true
 		})).ServeHTTP(c.Writer, c.Request)

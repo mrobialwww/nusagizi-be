@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sync"
@@ -105,7 +106,8 @@ func AssignRoleToUser(domain, clientID, clientSecret, auth0Sub, roleID string) e
 
 	// Auth0 returns HTTP 204 (No Content) upon successful role assignment.
 	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("assign-role API returned unexpected status: %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("assign-role API returned unexpected status: %d, response: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	return nil

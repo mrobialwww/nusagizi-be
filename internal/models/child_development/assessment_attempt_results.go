@@ -11,19 +11,12 @@ type RecommendedAction struct {
 	ID                       uuid.UUID `json:"recommended_action_id" db:"recommended_action_id"`
 	AssessmentKPSPQuestionID uuid.UUID `json:"assessment_kpsp_question_id" db:"assessment_kpsp_question_id"`
 	Title                    string    `json:"title" db:"title"`
-	Description              string    `json:"description" db:"description"`
+	ActionText               string    `json:"action_text" db:"action_text"`
 	CreatedAt                time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt                time.Time `json:"updated_at" db:"updated_at"`
 }
 
-type AssessmentKPSPAnswer struct {
-	ID                       uuid.UUID `json:"assessment_kpsp_answer_id" db:"assessment_kpsp_answer_id"`
-	ChildDevelopmentReportID uuid.UUID `json:"child_development_report_id" db:"child_development_report_id"`
-	AssessmentKPSPQuestionID uuid.UUID `json:"assessment_kpsp_question_id" db:"assessment_kpsp_question_id"`
-	Answer                   bool      `json:"assessment_kpsp_answer" db:"assessment_kpsp_answer"`
-	CreatedAt                time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt                time.Time `json:"updated_at" db:"updated_at"`
-}
+
 
 type AssessmentKPSPQuestion struct {
 	ID          uuid.UUID       `json:"assessment_kpsp_question_id" db:"assessment_kpsp_question_id"`
