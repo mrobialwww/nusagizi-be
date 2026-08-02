@@ -12,6 +12,12 @@ var ErrNotFound = errors.New("not found")
 // ErrConflict is returned when a unique constraint is violated.
 var ErrConflict = errors.New("conflict")
 
+// ErrForbidden is returned when a user does not have permission.
+var ErrForbidden = errors.New("forbidden")
+
+// ErrInvalidRole is returned when a user tries to assign an invalid role.
+var ErrInvalidRole = errors.New("invalid role: must be mother, caregiver, or doctor")
+
 const uniqueViolationCode = "23505"
 
 // isUniqueViolation returns true if the error is a PostgreSQL unique constraint violation.

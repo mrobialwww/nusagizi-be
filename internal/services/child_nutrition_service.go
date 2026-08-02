@@ -31,7 +31,7 @@ func NewChildNutritionService(
 	}
 }
 
-// GetTodayNutritionReport (Endpoint: 28)
+// GetTodayNutritionReport (Endpoint: 29)
 func (s *ChildNutritionService) GetTodayNutritionReport(ctx context.Context, userID string, childID uuid.UUID) (*child_nutri.TodayNutritionReportResponse, error) {
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func (s *ChildNutritionService) GetTodayNutritionReport(ctx context.Context, use
 	return s.repo.GetTodayNutritionReport(ctx, childID)
 }
 
-// GetTodayDailyMenu (Endpoint: 29)
+// GetTodayDailyMenu (Endpoint: 30)
 func (s *ChildNutritionService) GetTodayDailyMenu(ctx context.Context, userID string, childID uuid.UUID) (*child_nutri.MenuResponse, error) {
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
@@ -47,42 +47,55 @@ func (s *ChildNutritionService) GetTodayDailyMenu(ctx context.Context, userID st
 	return s.repo.GetTodayDailyMenu(ctx, childID)
 }
 
-// UpdateRecipeCompleteStatus (Endpoint: 30)
-func (s *ChildNutritionService) UpdateRecipeCompleteStatus(ctx context.Context, userID string, childID uuid.UUID, recipeID uuid.UUID, isCompleted bool) error {
+// UpdateRecipeCompleteStatus (Endpoint: 31)
+func (s *ChildNutritionService) UpdateRecipeCompleteStatus(ctx context.Context, userID string, recipeID uuid.UUID, portionsConsumed float64) error {
+	childID, err := s.repo.GetChildIDByRecipeID(ctx, recipeID)
+	if err != nil {
+		return err
+	}
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return err
 	}
-	return s.repo.UpdateRecipeCompleteStatus(ctx, recipeID, isCompleted)
+	return s.repo.UpdateRecipeCompleteStatus(ctx, recipeID, portionsConsumed)
 }
 
-// UpdateRecipeBookmarkStatus (Endpoint: 31)
-func (s *ChildNutritionService) UpdateRecipeBookmarkStatus(ctx context.Context, userID string, childID uuid.UUID, recipeID uuid.UUID, isBookmarked bool) error {
+// UpdateRecipeBookmarkStatus (Endpoint: 32)
+func (s *ChildNutritionService) UpdateRecipeBookmarkStatus(ctx context.Context, userID string, recipeID uuid.UUID, isBookmarked bool) error {
+	childID, err := s.repo.GetChildIDByRecipeID(ctx, recipeID)
+	if err != nil {
+		return err
+	}
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return err
 	}
 	return s.repo.UpdateRecipeBookmarkStatus(ctx, recipeID, isBookmarked)
 }
 
-// GetRecipeDetail (Endpoint: 32)
-func (s *ChildNutritionService) GetRecipeDetail(ctx context.Context, userID string, childID uuid.UUID, recipeID uuid.UUID) (*child_nutri.RecipeDetailResponse, error) {
+// GetRecipeDetail (Endpoint: 33)
+func (s *ChildNutritionService) GetRecipeDetail(ctx context.Context, userID string, recipeID uuid.UUID) (*child_nutri.RecipeDetailResponse, error) {
+	childID, err := s.repo.GetChildIDByRecipeID(ctx, recipeID)
+	if err != nil {
+		return nil, err
+	}
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
 	}
 	return s.repo.GetRecipeDetail(ctx, recipeID)
 }
 
-// SwapMainIngredientPriority (Endpoint: 33)
-func (s *ChildNutritionService) SwapMainIngredientPriority(ctx context.Context, userID string, childID uuid.UUID, recipeID uuid.UUID, mainIngredientID uuid.UUID, slot string) error {
+// SwapMainIngredientPriority (Endpoint: 34)
+func (s *ChildNutritionService) SwapMainIngredientPriority(ctx context.Context, userID string, recipeID uuid.UUID, slot string, priority int) error {
+	childID, err := s.repo.GetChildIDByRecipeID(ctx, recipeID)
+	if err != nil {
+		return err
+	}
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return err
 	}
-	if slot == "" {
-		return fmt.Errorf("slot cannot be empty")
-	}
-	return s.repo.SwapMainIngredientPriority(ctx, recipeID, mainIngredientID, slot)
+	return s.repo.SwapMainIngredientPriority(ctx, recipeID, slot, priority)
 }
 
-// GetBookmarkedRecipes (Endpoint: 34)
+// GetBookmarkedRecipes (Endpoint: 35)
 func (s *ChildNutritionService) GetBookmarkedRecipes(ctx context.Context, userID string, childID uuid.UUID) ([]child_nutri.RecipeResponse, error) {
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
@@ -90,8 +103,7 @@ func (s *ChildNutritionService) GetBookmarkedRecipes(ctx context.Context, userID
 	return s.repo.GetBookmarkedRecipes(ctx, childID)
 }
 
-
-// GetNutritionReportsByMonth (Endpoint: 35)
+// GetNutritionReportsByMonth (Endpoint: 36)
 func (s *ChildNutritionService) GetNutritionReportsByMonth(ctx context.Context, userID string, childID uuid.UUID, month int, year int) ([]child_nutri.NutritionReportSummaryResponse, error) {
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
@@ -105,54 +117,26 @@ func (s *ChildNutritionService) GetNutritionReportsByMonth(ctx context.Context, 
 	return s.repo.GetNutritionReportsByMonth(ctx, childID, month, year)
 }
 
-// UpdateDailyShoppingStatus (Endpoint: 36)
-func (s *ChildNutritionService) UpdateDailyShoppingStatus(ctx context.Context, userID string, childID uuid.UUID, shoppingID uuid.UUID, isCompleted bool) error {
-	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
-		return err
+// GetDailyShopIngredients (Endpoint: 37)
+func (s *ChildNutritionService) GetDailyShopIngredients(ctx context.Context, userID string) ([]child_nutri.DailyShopIngredient, error) {
+	// 1. Coba mother profile terlebih dahulu
+	if motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID); err == nil {
+		return s.repo.GetDailyShopByMother(ctx, motherProfileID)
 	}
-	return s.repo.UpdateDailyShoppingStatus(ctx, shoppingID, isCompleted)
+
+	// 2. Jika bukan mother, coba caregiver profile
+	if caregiverProfileID, err := s.caregiverRepo.GetByUserID(ctx, userID); err == nil {
+		return s.repo.GetDailyShopByCaregiver(ctx, caregiverProfileID)
+	}
+
+	// 3. Jika bukan keduanya, return error
+	return nil, fmt.Errorf("%w: user has no access (must be mother or caregiver)", repository.ErrForbidden)
 }
 
-// AddShoppingItem (Endpoint: 37)
-func (s *ChildNutritionService) AddShoppingItem(ctx context.Context, userID string, childID uuid.UUID, shoppingID uuid.UUID, input *child_nutri.ShoppingItemInput) (uuid.UUID, error) {
+// GetTodayMenuShopping (Endpoint: 38)
+func (s *ChildNutritionService) GetTodayMenuShopping(ctx context.Context, userID string, childID uuid.UUID) (*child_nutri.MenuShoppingResponse, error) {
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
-		return uuid.Nil, err
+		return nil, err
 	}
-	if input.Quantity <= 0 {
-		return uuid.Nil, fmt.Errorf("quantity must be greater than 0")
-	}
-	if input.Unit == "" {
-		return uuid.Nil, fmt.Errorf("unit cannot be empty")
-	}
-	return s.repo.AddShoppingItem(ctx, shoppingID, input)
-}
-
-// UpdateShoppingItem (Endpoint: 38)
-func (s *ChildNutritionService) UpdateShoppingItem(ctx context.Context, userID string, childID uuid.UUID, itemID uuid.UUID, input *child_nutri.UpdateShoppingItemInput) error {
-	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
-		return err
-	}
-	if input.Quantity != nil && *input.Quantity <= 0 {
-		return fmt.Errorf("quantity must be greater than 0")
-	}
-	if input.Unit != nil && *input.Unit == "" {
-		return fmt.Errorf("unit cannot be empty")
-	}
-	return s.repo.UpdateShoppingItem(ctx, itemID, input)
-}
-
-// DeleteShoppingItem (Endpoint: 39)
-func (s *ChildNutritionService) DeleteShoppingItem(ctx context.Context, userID string, childID uuid.UUID, itemID uuid.UUID) error {
-	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
-		return err
-	}
-	return s.repo.DeleteShoppingItem(ctx, itemID)
-}
-
-// SearchIngredients (Endpoint: 40 - Global data, no childID required)
-func (s *ChildNutritionService) SearchIngredients(ctx context.Context, nameQuery string) ([]child_nutri.Ingredient, error) {
-	if len(nameQuery) < 2 {
-		return nil, fmt.Errorf("search query must be at least 2 characters long")
-	}
-	return s.repo.SearchIngredients(ctx, nameQuery)
+	return s.repo.GetTodayMenuShopping(ctx, childID)
 }

@@ -2,14 +2,11 @@ package services
 
 import (
 	"context"
-	"errors"
 	"nusagizi_be/internal/models"
 	"nusagizi_be/internal/repository"
 
 	"github.com/google/uuid"
 )
-
-var ErrForbidden = errors.New("forbidden")
 
 type UserService struct {
 	repo          *repository.UserRepository
@@ -71,7 +68,7 @@ func (s *UserService) GetMotherProfile(ctx context.Context, userID string) (*mod
 	}, nil
 }
 
-// GetCaregiverProfile returns the caregiver profile (Endpoint: 56)
+// GetCaregiverProfile returns the caregiver profile (Endpoint: 58)
 func (s *UserService) GetCaregiverProfile(ctx context.Context, userID string) (*models.CaregiverProfileResponse, error) {
 	// 1. Validate ownership & get ID
 	actualCaregiverID, err := s.caregiverRepo.GetByUserID(ctx, userID)

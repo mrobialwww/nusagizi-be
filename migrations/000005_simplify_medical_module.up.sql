@@ -12,7 +12,7 @@ DROP TABLE IF EXISTS doctor_profiles CASCADE;
 -- Recreate medical_notes linking to child directly
 CREATE TABLE medical_notes (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    child_id                    UUID NOT NULL REFERENCES child(id) ON DELETE CASCADE,
+    child_id                    UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
     doctor_name                 VARCHAR(150) NOT NULL,
     facility_location           VARCHAR(150) NOT NULL,
     recommendation              TEXT NOT NULL,
@@ -41,7 +41,7 @@ CREATE TRIGGER trg_medical_restrictions_updated_at BEFORE UPDATE ON medical_rest
 CREATE TABLE daily_nutrition_targets (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     medical_note_id  UUID NOT NULL REFERENCES medical_notes(id) ON DELETE CASCADE,
-    nutrient_name    VARCHAR(100) NOT NULL,
+    nutrient_name    nutrient_type NOT NULL,
     quantity         NUMERIC(8,2) NOT NULL CHECK (quantity > 0),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()

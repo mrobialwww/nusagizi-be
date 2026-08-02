@@ -210,7 +210,7 @@ func (r *UserRepository) UpdateOnboarding(ctx context.Context, auth0ID, role str
 	case "doctor":
 		tableName = "doctor_profiles"
 	default:
-		return errors.New("invalid role: must be mother, caregiver, or doctor")
+		return ErrInvalidRole
 	}
 
 	var query string = fmt.Sprintf(`

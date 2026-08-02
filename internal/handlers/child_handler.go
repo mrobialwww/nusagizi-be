@@ -8,40 +8,62 @@ import (
 	"nusagizi_be/internal/repository"
 	"nusagizi_be/internal/services"
 
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type ChildHandler struct {
-	svc *services.ChildService
+	service *services.ChildService
 }
 
-func NewChildHandler(svc *services.ChildService) *ChildHandler {
-	return &ChildHandler{svc: svc}
+func NewChildHandler(service *services.ChildService) *ChildHandler {
+	return &ChildHandler{service: service}
 }
 
-// Create handles POST /children (endpoint 7).
-func (h *ChildHandler) Create(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+// CreateChildProfile (Endpoint: 7)
+func (h *ChildHandler) CreateChildProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
 	var input models.CreateChildInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", err.Error()))
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": err.Error()}})
 		return
 	}
 
-	childID, err := h.svc.CreateChild(c.Request.Context(), requester.ID, &input)
+	// Validate input name
+	if strings.TrimSpace(input.FullName) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "full_name cannot be empty"}})
+		return
+	}
+
+	// Validate input birth_date format
+	if _, err := time.Parse(models.DateLayout, input.BirthDate); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid birth_date format, must be DD-MM-YYYY"}})
+		return
+	}
+
+	// Validate input gender
+	if input.Gender != "male" && input.Gender != "female" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "gender must be 'male' or 'female'"}})
+		return
+	}
+
+	childID, err := h.service.CreateChild(c.Request.Context(), requester.ID, &input)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "no active mother profile for this user"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "no active mother profile for this user"}})
 		default:
 			slog.Error("CreateChild failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
@@ -49,41 +71,57 @@ func (h *ChildHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": childID})
 }
 
-// Update handles PATCH /children/:child_id (endpoint 8).
-func (h *ChildHandler) Update(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+// UpdateChildProfile (Endpoint: 8)
+func (h *ChildHandler) UpdateChildProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
 	childID, err := uuid.Parse(c.Param("child_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", "invalid child_id format"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
 		return
 	}
 
 	var input models.UpdateChildInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", err.Error()))
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": err.Error()}})
 		return
 	}
 
+	// Validate input name
+	if input.FullName != nil && strings.TrimSpace(*input.FullName) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "full_name cannot be empty"}})
+		return
+	}
+
+	// Validate input birth_date format
+	if input.BirthDate != nil {
+		if _, err := time.Parse(models.DateLayout, *input.BirthDate); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid birth_date format, must be DD-MM-YYYY"}})
+			return
+		}
+	}
+
+	// Validate input gender
 	if input.Gender != nil && *input.Gender != "male" && *input.Gender != "female" {
-		c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", "gender must be 'male' or 'female'"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "gender must be 'male' or 'female'"}})
 		return
 	}
 
-	err = h.svc.UpdateChild(c.Request.Context(), requester.ID, childID, &input)
+	err = h.service.UpdateChild(c.Request.Context(), requester.ID, childID, &input)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you do not own this child profile"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not own this child profile"}})
 		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "child not found or already deleted"))
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "child not found or already deleted"}})
 		default:
 			slog.Error("UpdateChild failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
@@ -91,30 +129,31 @@ func (h *ChildHandler) Update(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// Delete handles DELETE /children/:child_id (endpoint 9).
-func (h *ChildHandler) Delete(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+// DeleteChildProfile (Endpoint: 9)
+func (h *ChildHandler) DeleteChildProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
 	childID, err := uuid.Parse(c.Param("child_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", "invalid child_id format"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
 		return
 	}
 
-	err = h.svc.DeleteChild(c.Request.Context(), requester.ID, childID)
+	err = h.service.DeleteChild(c.Request.Context(), requester.ID, childID)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you do not own this child profile"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not own this child profile"}})
 		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "child not found or already deleted"))
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "child not found or already deleted"}})
 		default:
 			slog.Error("DeleteChild failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
@@ -122,30 +161,31 @@ func (h *ChildHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// Get handles GET /children/:child_id (endpoint 10).
-func (h *ChildHandler) Get(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+// GetChildProfile (Endpoint: 10)
+func (h *ChildHandler) GetChildProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
 	childID, err := uuid.Parse(c.Param("child_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", "invalid child_id format"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
 		return
 	}
 
-	resp, err := h.svc.GetChildDetail(c.Request.Context(), requester.ID, childID)
+	resp, err := h.service.GetChildDetail(c.Request.Context(), requester.ID, childID)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you do not own this child profile"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not own this child profile"}})
 		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "child not found or already deleted"))
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "child not found or already deleted"}})
 		default:
 			slog.Error("GetChildDetail failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
@@ -153,27 +193,60 @@ func (h *ChildHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// ListByMother handles GET /mother-profiles/:mother_profile_id/children (endpoint 11).
+// ListByMother (Endpoint: 11)
 func (h *ChildHandler) ListByMother(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
 	// ID is automatically deduced from the requester's token in the service layer
 
-	children, err := h.svc.GetChildrenByMother(c.Request.Context(), requester.ID)
+	children, err := h.service.GetChildrenByMother(c.Request.Context(), requester.ID)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you do not own this mother profile"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not own this mother profile"}})
 		default:
 			slog.Error("GetChildrenByMother failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
 
 	c.JSON(http.StatusOK, children)
+}
+
+// GetChildSimple (Endpoint: 12)
+func (h *ChildHandler) GetChildSimple(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
+	}
+
+	childID, err := uuid.Parse(c.Param("child_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
+		return
+	}
+
+	resp, err := h.service.GetChildSimple(c.Request.Context(), requester.ID, childID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this child profile"}})
+		case errors.Is(err, repository.ErrNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "child not found or already deleted"}})
+		default:
+			slog.Error("GetChildSimple failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

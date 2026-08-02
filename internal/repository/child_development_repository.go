@@ -161,26 +161,34 @@ func (r *ChildDevelopmentRepository) GetDevelopmentReportByID(ctx context.Contex
 		}
 	}
 
-	// Fetch recommendations
-	queryRecs := `
-		SELECT r.id, r.assessment_kpsp_question_id, r.title, r.action_text
-		FROM assessment_attempt_recomendations aar
-		JOIN recommended_actions r ON aar.recommended_action_id = r.id
-		WHERE aar.child_development_report_id = $1
-	`
-	rowsRec, err := r.pool.Query(ctx, queryRecs, reportID)
-	if err == nil {
-		defer rowsRec.Close()
-		for rowsRec.Next() {
-			var rec child_dev.RecommendedAction
-			if err := rowsRec.Scan(&rec.ID, &rec.AssessmentKPSPQuestionID, &rec.Title, &rec.ActionText); err != nil {
-				return nil, err
-			}
-			report.RecommendedActions = append(report.RecommendedActions, rec)
-		}
-	}
-
 	return &report, nil
+}
+
+// GetRecommendationsByNerveName fetches recommended actions for a given nerve name
+func (r *ChildDevelopmentRepository) GetRecommendationsByNerveName(ctx context.Context, reportID uuid.UUID, nerveName string) ([]child_dev.RecommendedAction, error) {
+	var recs []child_dev.RecommendedAction
+
+	queryRecs := `
+		SELECT ra.id, ra.assessment_kpsp_question_id, ra.title, ra.action_text
+		FROM assessment_attempt_recomendations aar
+		JOIN recommended_actions ra ON aar.recommended_action_id = ra.id
+		JOIN assessment_kpsp_questions akq ON ra.assessment_kpsp_question_id = akq.id
+		WHERE aar.child_development_report_id = $1 AND akq.nerve_name = $2
+	`
+	rowsRec, err := r.pool.Query(ctx, queryRecs, reportID, nerveName)
+	if err != nil {
+		return nil, err
+	}
+	defer rowsRec.Close()
+
+	for rowsRec.Next() {
+		var rec child_dev.RecommendedAction
+		if err := rowsRec.Scan(&rec.ID, &rec.AssessmentKPSPQuestionID, &rec.Title, &rec.ActionText); err != nil {
+			return nil, err
+		}
+		recs = append(recs, rec)
+	}
+	return recs, nil
 }
 
 // GetKPSPQuestions returns KPSP questions filtered by monthTarget.
@@ -493,4 +501,42 @@ func (r *ChildDevelopmentRepository) UpdateChecklistMilestone(ctx context.Contex
 	}
 
 	return tx.Commit(ctx)
+}
+
+// GetRecommendationsByReportID fetches all recommendation items for a given child_development_report_id.
+func (r *ChildDevelopmentRepository) GetRecommendationsByReportID(ctx context.Context, reportID uuid.UUID) ([]child_dev.RecommendationItem, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT
+			akq.nerve_name,
+			ra.action_text
+		FROM assessment_attempt_recomendations aar
+		JOIN recommended_actions ra
+			ON ra.id = aar.recommended_action_id
+		JOIN assessment_kpsp_questions akq
+			ON akq.id = ra.assessment_kpsp_question_id
+		WHERE aar.child_development_report_id = $1
+		ORDER BY akq.nerve_name
+	`
+
+	rows, err := r.pool.Query(ctx, query, reportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []child_dev.RecommendationItem
+	for rows.Next() {
+		var item child_dev.RecommendationItem
+		if err := rows.Scan(&item.NerveName, &item.ActionText); err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	if results == nil {
+		results = []child_dev.RecommendationItem{}
+	}
+	return results, rows.Err()
 }

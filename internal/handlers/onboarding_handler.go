@@ -45,8 +45,7 @@ func (h *OnboardingHandler) Handle(c *gin.Context) {
 	}
 
 	// 3. Update database: simpan role (cari user berdasarkan auth0_id)
-	ctx := c.Request.Context()
-	err := h.userRepo.UpdateOnboarding(ctx, auth0ID, req.Role)
+	err := h.userRepo.UpdateOnboarding(c.Request.Context(), auth0ID, req.Role)
 	if err != nil {
 		slog.Error("Failed to update user onboarding", "auth0_id", auth0ID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update onboarding data"})

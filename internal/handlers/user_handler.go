@@ -4,6 +4,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
+
 	"nusagizi_be/internal/models"
 	"nusagizi_be/internal/repository"
 	"nusagizi_be/internal/services"
@@ -11,48 +13,33 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// getUserFromCtx extracts the authenticated *models.User set by the auth middleware.
-func getUserFromCtx(c *gin.Context) (*models.User, bool) {
-	v, exists := c.Get("user")
-	if !exists {
-		return nil, false
-	}
-	user, ok := v.(*models.User)
-	return user, ok
-}
-
-// errResp builds the standard error JSON body.
-func errResp(code, message string) gin.H {
-	return gin.H{"error": gin.H{"code": code, "message": message}}
-}
-
 type UserHandler struct {
-	svc *services.UserService
+	service *services.UserService
 }
 
-func NewUserHandler(svc *services.UserService) *UserHandler {
-	return &UserHandler{svc: svc}
+func NewUserHandler(service *services.UserService) *UserHandler {
+	return &UserHandler{service: service}
 }
 
-// Get handles GET /users/:user_id (endpoint 3).
-func (h *UserHandler) Get(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+// GetUserProfile (Endpoint: 3)
+func (h *UserHandler) GetUserProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
-	ctx := c.Request.Context()
-	resp, err := h.svc.GetUser(ctx, requester.ID)
+	resp, err := h.service.GetUser(c.Request.Context(), requester.ID)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you can only access your own profile"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you can only access your own profile"}})
 		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "user not found"))
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "user not found"}})
 		default:
 			slog.Error("GetUser failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
@@ -60,38 +47,60 @@ func (h *UserHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// Update handles PATCH /users/:user_id (endpoint 1).
-func (h *UserHandler) Update(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+// UpdateUserProfile (Endpoint: 1)
+func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
 	var input models.UpdateUserInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", err.Error()))
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": err.Error()}})
 		return
 	}
 
+	// Validate input name
+	if input.FullName != nil && strings.TrimSpace(*input.FullName) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "full_name cannot be empty"}})
+		return
+	}
+
+	// Validate input email
+	if input.Email != nil {
+		email := strings.TrimSpace(*input.Email)
+		if email == "" || !strings.Contains(email, "@") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid email format"}})
+			return
+		}
+	}
+
+	// Validate input phone number
+	if input.PhoneNumber != nil && strings.TrimSpace(*input.PhoneNumber) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "phone_number cannot be empty"}})
+		return
+	}
+
+	// Validate input gender
 	if input.Gender != nil && *input.Gender != "male" && *input.Gender != "female" {
-		c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", "gender must be 'male' or 'female'"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "gender must be 'male' or 'female'"}})
 		return
 	}
 
-	ctx := c.Request.Context()
-	err := h.svc.UpdateUser(ctx, requester.ID, input)
+	err := h.service.UpdateUser(c.Request.Context(), requester.ID, input)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you can only update your own profile"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you can only update your own profile"}})
 		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "user not found"))
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "user not found"}})
 		case errors.Is(err, repository.ErrConflict):
-			c.JSON(http.StatusConflict, errResp("CONFLICT", "email already in use"))
+			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "CONFLICT", "message": "email already in use"}})
 		default:
 			slog.Error("UpdateUser failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
@@ -99,25 +108,25 @@ func (h *UserHandler) Update(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// Delete handles DELETE /users/:user_id (endpoint 2).
-func (h *UserHandler) Delete(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+// DeleteUserProfile (Endpoint: 2)
+func (h *UserHandler) DeleteUserProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
-	ctx := c.Request.Context()
-	err := h.svc.SoftDeleteUser(ctx, requester.ID)
+	err := h.service.SoftDeleteUser(c.Request.Context(), requester.ID)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you can only delete your own account"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you can only delete your own account"}})
 		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "user not found or already deleted"))
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "user not found or already deleted"}})
 		default:
 			slog.Error("DeleteUser failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
@@ -125,25 +134,25 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// GetMotherProfile handles GET /mother-profiles (endpoint 6).
+// GetMotherProfile (Endpoint: 6)
 func (h *UserHandler) GetMotherProfile(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
-	ctx := c.Request.Context()
-	resp, err := h.svc.GetMotherProfile(ctx, requester.ID)
+	resp, err := h.service.GetMotherProfile(c.Request.Context(), requester.ID)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you do not have a mother profile"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have a mother profile"}})
 		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "mother profile not found"))
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "mother profile not found"}})
 		default:
 			slog.Error("GetMotherProfile failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
@@ -151,28 +160,76 @@ func (h *UserHandler) GetMotherProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetCaregiverProfile handles GET /caregiver-profiles (endpoint 56).
+// GetCaregiverProfile (Endpoint: 58)
 func (h *UserHandler) GetCaregiverProfile(c *gin.Context) {
-	requester, ok := getUserFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
 
-	ctx := c.Request.Context()
-	resp, err := h.svc.GetCaregiverProfile(ctx, requester.ID)
+	resp, err := h.service.GetCaregiverProfile(c.Request.Context(), requester.ID)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrForbidden):
-			c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you do not have a caregiver profile"))
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have a caregiver profile"}})
 		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "caregiver profile not found"))
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "caregiver profile not found"}})
 		default:
 			slog.Error("GetCaregiverProfile failed", "error", err)
-			c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+// CreateMotherProfile (Endpoint: 4)
+func (h *UserHandler) CreateMotherProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
+	}
+
+	motherProfileID, err := h.service.CreateMotherProfile(c.Request.Context(), requester.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrConflict):
+			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "CONFLICT", "message": "mother profile already exists for this user"}})
+		default:
+			slog.Error("CreateMotherProfile failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"id": motherProfileID})
+}
+
+// CreateCaregiverProfile (Endpoint: 5)
+func (h *UserHandler) CreateCaregiverProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
+	}
+
+	caregiverProfileID, err := h.service.CreateCaregiverProfile(c.Request.Context(), requester.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrConflict):
+			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "CONFLICT", "message": "caregiver profile already exists for this user"}})
+		default:
+			slog.Error("CreateCaregiverProfile failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"id": caregiverProfileID})
 }

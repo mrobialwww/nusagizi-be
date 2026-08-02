@@ -2,9 +2,12 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"nusagizi_be/internal/models/notification"
+
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -16,25 +19,18 @@ func NewNotificationRepository(pool *pgxpool.Pool) *NotificationRepository {
 	return &NotificationRepository{pool: pool}
 }
 
-// GetNotifications returns notifications for a user, optionally filtered by type.
-func (r *NotificationRepository) GetNotifications(ctx context.Context, userID string, notificationType *string) ([]notification.NotificationResponse, error) {
+// GetNotifications returns all notifications for a user.
+func (r *NotificationRepository) GetNotifications(ctx context.Context, userID string) ([]notification.NotificationResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	query := `
 		SELECT id, title, message, notification_type, created_at
-		FROM notification
+		FROM notifications
 		WHERE user_id = $1
+		ORDER BY created_at DESC
 	`
-	args := []interface{}{userID}
 
-	if notificationType != nil {
-		query += ` AND notification_type = $2`
-		args = append(args, *notificationType)
-	}
-
-	query += ` ORDER BY created_at DESC`
-
-	rows, err := r.pool.Query(ctx, query, args...)
+	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -49,4 +45,26 @@ func (r *NotificationRepository) GetNotifications(ctx context.Context, userID st
 		results = append(results, res)
 	}
 	return results, rows.Err()
+}
+
+// GetLatestNotification returns the most recent notification for a user.
+func (r *NotificationRepository) GetLatestNotification(ctx context.Context, userID string) (*notification.NotificationResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	query := `
+		SELECT id, title, message, notification_type, created_at
+		FROM notifications
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	var res notification.NotificationResponse
+	err := r.pool.QueryRow(ctx, query, userID).Scan(&res.ID, &res.Title, &res.Message, &res.NotificationType, &res.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &res, nil
 }

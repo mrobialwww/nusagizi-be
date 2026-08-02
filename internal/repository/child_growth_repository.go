@@ -39,7 +39,7 @@ func (r *ChildGrowthRepository) GetLatestGrowthReport(ctx context.Context, child
 			+ EXTRACT(MONTH FROM AGE(r.measured_at, c.birth_date)))::int AS age_months,
 			c.gender
 		FROM child_growth_reports r
-		JOIN child c ON c.id = r.child_id
+		JOIN children c ON c.id = r.child_id
 		WHERE r.child_id = $1
 		ORDER BY r.measured_at DESC
 		LIMIT 1
@@ -84,7 +84,7 @@ func (r *ChildGrowthRepository) GetGrowthMeasurements(ctx context.Context, child
 			(EXTRACT(YEAR  FROM AGE(r.measured_at, c.birth_date)) * 12 + EXTRACT(MONTH FROM AGE(r.measured_at, c.birth_date)))::int AS age_months,
 			c.gender
 		FROM child_growth_reports r
-		JOIN child c ON c.id = r.child_id
+		JOIN children c ON c.id = r.child_id
 		WHERE r.child_id = $1
 			AND r.measured_at >= c.birth_date + make_interval(months => $2)
 			AND r.measured_at <  c.birth_date + make_interval(months => $3 + 1)
@@ -144,7 +144,7 @@ func (r *ChildGrowthRepository) GetGrowthReports(ctx context.Context, childID uu
 			+ EXTRACT(MONTH FROM AGE(r.measured_at, c.birth_date)))::int AS age_months,
 			c.gender
 		FROM child_growth_reports r
-		JOIN child c ON c.id = r.child_id
+		JOIN children c ON c.id = r.child_id
 		WHERE r.child_id = $1
 		ORDER BY r.measured_at DESC
 	`

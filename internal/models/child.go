@@ -14,8 +14,6 @@ type Child struct {
 	Gender               string     `json:"gender" db:"gender"`
 	BirthDate            time.Time  `json:"-" db:"birth_date"`
 	PhotoURL             *string    `json:"photo_url" db:"photo_url"`
-	FoodFrequencyProfile int        `json:"food_frequency" db:"food_frequency_profile"`
-	FoodGoalProfile      string     `json:"food_goal" db:"food_goal_profile"`
 	NotesProfile         *string    `json:"notes" db:"notes_profile"`
 	UploadStreakDays     int        `json:"upload_streak_days" db:"upload_streak_days"`
 	DeletedAt            *time.Time `json:"-" db:"deleted_at"`
@@ -23,3 +21,31 @@ type Child struct {
 	UpdatedAt            time.Time  `json:"updated_at" db:"updated_at"`
 }
 
+// ChildInfo is a lightweight struct used for generating AI menu payloads without loading the entire Child model.
+type ChildInfo struct {
+	ID        uuid.UUID
+	Nama      string
+	Sex       string
+	BirthDate time.Time
+}
+
+// GrowthPoint represents a single measurement point for a child's growth.
+type GrowthPoint struct {
+	MeasurementDate time.Time
+	WeightKg        float64
+	HeightCm        float64
+	HeadCircCm      float64
+}
+
+// MedicalNote represents an active medical note for a child.
+type MedicalNote struct {
+	ID             uuid.UUID
+	DoctorName     string
+	Recommendation string
+}
+
+// NutritionTargets represents the daily targets for energy and protein from a medical note.
+type NutritionTargets struct {
+	EnergiKkal float64
+	ProteinG   float64
+}

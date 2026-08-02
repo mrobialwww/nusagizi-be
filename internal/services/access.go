@@ -35,7 +35,7 @@ func checkChildAccess(
 		}
 	}
 
-	return fmt.Errorf("%w: user does not have access to this child", ErrForbidden)
+	return fmt.Errorf("%w: user does not have access to this child", repository.ErrForbidden)
 }
 
 // checkMotherOwnership verifies if the given user is the mother (owner) of the child.
@@ -54,7 +54,7 @@ func checkMotherOwnership(
 			return nil
 		}
 	}
-	return fmt.Errorf("%w: user does not have owner access to this child", ErrForbidden)
+	return fmt.Errorf("%w: user does not have owner access to this child", repository.ErrForbidden)
 }
 
 // checkCaregiverAccess verifies if the given user is a caregiver who has active access to the child.
@@ -71,6 +71,5 @@ func checkCaregiverAccess(
 			return nil
 		}
 	}
-	return fmt.Errorf("%w: user does not have caregiver access to this child", ErrForbidden)
+	return fmt.Errorf("%w: user does not have caregiver access to this child", repository.ErrForbidden)
 }
-

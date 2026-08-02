@@ -22,8 +22,6 @@ type CreateChildInput struct {
 	Diets            []string   `json:"diets"`
 	FavoriteFoods    []string   `json:"favorite_foods"`
 	FavoriteTextures []string   `json:"favorite_textures"`
-	FoodFrequency    int        `json:"food_frequency" binding:"required,min=1"`
-	FoodGoal         string     `json:"food_goal" binding:"required"`
 	Notes            *string    `json:"notes"`
 }
 
@@ -39,8 +37,6 @@ type UpdateChildInput struct {
 	Diets            *[]string  `json:"diets"`
 	FavoriteFoods    *[]string  `json:"favorite_foods"`
 	FavoriteTextures *[]string  `json:"favorite_textures"`
-	FoodFrequency    *int       `json:"food_frequency"`
-	FoodGoal         *string    `json:"food_goal"`
 	Notes            *string    `json:"notes"`
 }
 
@@ -67,8 +63,6 @@ type ChildDetailResponse struct {
 	Diets            []string  `json:"diets"`
 	FavoriteFoods    []string  `json:"favorite_foods"`
 	FavoriteTextures []string  `json:"favorite_textures"`
-	FoodFrequency    int       `json:"food_frequency"`
-	FoodGoal         string    `json:"food_goal"`
 	Notes            *string   `json:"notes"`
 }
 

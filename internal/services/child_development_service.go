@@ -40,7 +40,7 @@ func (s *ChildDevelopmentService) GetLatestDevelopmentReport(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	status := determineKPSPStatus(report.KPSPScore)
+	status := DetermineKPSPStatus(report.KPSPScore)
 	report.Status = &status
 	return report, nil
 }
@@ -55,7 +55,7 @@ func (s *ChildDevelopmentService) GetDevelopmentReports(ctx context.Context, use
 		return nil, err
 	}
 	for i := range reports {
-		status := determineKPSPStatus(reports[i].KPSPScore)
+		status := DetermineKPSPStatus(reports[i].KPSPScore)
 		reports[i].Status = &status
 	}
 	return reports, nil
@@ -70,7 +70,30 @@ func (s *ChildDevelopmentService) GetDevelopmentReportByID(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	status := determineKPSPStatus(report.KPSPScore)
+
+	// Find the domain with the lowest ratio
+	var worstNerve string
+	minRatio := float64(2.0)
+
+	for _, d := range report.Domains {
+		if d.TotalQuestion > 0 {
+			ratio := float64(d.TrueAnswer) / float64(d.TotalQuestion)
+			if ratio < minRatio {
+				minRatio = ratio
+				worstNerve = d.NerveName
+			}
+		}
+	}
+
+	// Fetch recommendations only for the worst nerve
+	if worstNerve != "" {
+		recs, err := s.repo.GetRecommendationsByNerveName(ctx, reportID, worstNerve)
+		if err == nil {
+			report.RecommendedActions = recs
+		}
+	}
+
+	status := DetermineKPSPStatus(report.KPSPScore)
 	report.Status = &status
 	return report, nil
 }
@@ -139,7 +162,7 @@ func (s *ChildDevelopmentService) UpdateDevelopmentReport(ctx context.Context, u
 	return s.repo.UpdateDevelopmentReport(ctx, reportID, input.ListAnswer, nextCheckDate)
 }
 
-// DeleteDevelopmentReport (Endpoint: 27)
+// DeleteDevelopmentReport (Endpoint: 28)
 func (s *ChildDevelopmentService) DeleteDevelopmentReport(ctx context.Context, userID string, childID uuid.UUID, reportID uuid.UUID) error {
 	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
 		return err
@@ -156,7 +179,7 @@ func (s *ChildDevelopmentService) GetChecklistMilestoneTasks(ctx context.Context
 	return s.repo.GetChecklistMilestoneTasks(ctx, childID, monthTarget)
 }
 
-// UpdateChecklistMilestone (Endpoint: 26)
+// UpdateChecklistMilestone (Endpoint: 27)
 func (s *ChildDevelopmentService) UpdateChecklistMilestone(ctx context.Context, userID string, childID uuid.UUID, taskIDs []uuid.UUID) error {
 	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
 		return err
@@ -164,6 +187,15 @@ func (s *ChildDevelopmentService) UpdateChecklistMilestone(ctx context.Context, 
 	return s.repo.UpdateChecklistMilestone(ctx, childID, taskIDs)
 }
 
+// GetRecommendations (Endpoint: 26)
+func (s *ChildDevelopmentService) GetRecommendations(ctx context.Context, userID string, childID uuid.UUID, reportID uuid.UUID) ([]child_dev.RecommendationItem, error) {
+	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
+		return nil, err
+	}
+	return s.repo.GetRecommendationsByReportID(ctx, reportID)
+}
+
+// ================================== HELPER FUNCTION ===================================
 // Calculate KPSP parameters (used for checking consistency and calculating next check date)
 var kpspPeriods = []int{3, 6, 9, 12, 15, 18, 21, 24, 30, 36, 42, 48, 54, 60}
 
@@ -213,11 +245,11 @@ func calculateKPSPParams(birthDate time.Time) (int, *time.Time) {
 }
 
 // Determine KPSP status based on score
-func determineKPSPStatus(score int) string {
+func DetermineKPSPStatus(score int) string {
 	if score >= 9 {
 		return "Sesuai Usia"
 	} else if score >= 7 {
-		return "Perkembangan meragukan"
+		return "Perkembangan Meragukan"
 	}
-	return "Kemungkinan penyimpangan"
+	return "Kemungkinan Penyimpangan"
 }

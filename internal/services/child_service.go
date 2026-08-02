@@ -22,10 +22,9 @@ func NewChildService(repo *repository.ChildRepository, motherRepo *repository.Mo
 
 // CreateChild creates a new child profile within a DB transaction (Endpoint: 7)
 func (s *ChildService) CreateChild(ctx context.Context, userID string, input *models.CreateChildInput) (uuid.UUID, error) {
-	// retrieve mother_profile_id from user_id
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if errors.Is(err, repository.ErrNotFound) {
-		return uuid.Nil, fmt.Errorf("%w: no mother profile associated with this account", ErrForbidden)
+		return uuid.Nil, fmt.Errorf("%w: no mother profile associated with this account", repository.ErrForbidden)
 	}
 	if err != nil {
 		return uuid.Nil, err
@@ -74,7 +73,7 @@ func (s *ChildService) GetChildrenByMother(ctx context.Context, userID string) (
 	// retrieve mother_profile_id from user_id
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, fmt.Errorf("%w: no mother profile associated with this account", ErrForbidden)
+		return nil, fmt.Errorf("%w: no mother profile associated with this account", repository.ErrForbidden)
 	}
 	if err != nil {
 		return nil, err

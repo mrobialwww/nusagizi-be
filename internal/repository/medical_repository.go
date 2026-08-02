@@ -37,13 +37,14 @@ func (r *MedicalRepository) GetMedicalNotes(ctx context.Context, motherProfileID
 			(SELECT COUNT(*) FROM medical_restrictions WHERE medical_note_id = m.id 
 				AND restriction_type = 'allergy') AS allergy_count
 		FROM medical_notes m
-		JOIN child c ON m.child_id = c.id
+		JOIN children c ON m.child_id = c.id
 		WHERE c.mother_profile_id = $1
 	`
 
-	if status == "active" {
+	switch status {
+	case "active":
 		query += ` AND m.valid_date >= CURRENT_DATE`
-	} else if status == "history" {
+	case "history":
 		query += ` AND m.valid_date < CURRENT_DATE`
 	}
 
@@ -108,7 +109,7 @@ func (r *MedicalRepository) GetMedicalNoteDetail(ctx context.Context, noteID uui
 			m.id, c.full_name, m.doctor_name, m.facility_location, 
 			m.recommendation, m.valid_date, m.created_at
 		FROM medical_notes m
-		JOIN child c ON m.child_id = c.id
+		JOIN children c ON m.child_id = c.id
 		WHERE m.id = $1
 	`
 	err := r.pool.QueryRow(ctx, queryNote, noteID).Scan(
@@ -135,9 +136,10 @@ func (r *MedicalRepository) GetMedicalNoteDetail(ctx context.Context, noteID uui
 		for rowsRest.Next() {
 			var rType, val string
 			if err := rowsRest.Scan(&rType, &val); err == nil {
-				if rType == "prohibition" {
+				switch rType {
+				case "prohibition":
 					detail.Prohibitions = append(detail.Prohibitions, val)
-				} else if rType == "allergy" {
+				case "allergy":
 					detail.Allergies = append(detail.Allergies, val)
 				}
 			}
@@ -204,7 +206,7 @@ func (r *MedicalRepository) CreateMedicalNote(ctx context.Context, input *medica
 	if len(input.DailyNutritionTargets) > 0 {
 		queryTarget := `
 			INSERT INTO daily_nutrition_targets (medical_note_id, nutrient_name, quantity) 
-			VALUES ($1, $2, $3)`
+			VALUES ($1, $2::nutrient_type, $3)`
 
 		for _, tgt := range input.DailyNutritionTargets {
 			_, err = tx.Exec(ctx, queryTarget, newID, tgt.NutrientName, tgt.Quantity)
@@ -292,7 +294,7 @@ func (r *MedicalRepository) UpdateMedicalNote(ctx context.Context, noteID uuid.U
 		// Insert daily nutrition targets
 		queryTarget := `
 			INSERT INTO daily_nutrition_targets (medical_note_id, nutrient_name, quantity) 
-			VALUES ($1, $2, $3)`
+			VALUES ($1, $2::nutrient_type, $3)`
 
 		for _, tgt := range *input.DailyNutritionTargets {
 			_, err = tx.Exec(ctx, queryTarget, noteID, tgt.NutrientName, tgt.Quantity)

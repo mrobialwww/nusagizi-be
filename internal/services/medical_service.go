@@ -28,13 +28,13 @@ func NewMedicalService(
 	}
 }
 
-// GetMedicalNotes (Endpoint: 30 & 31)
+// GetMedicalNotes (Endpoint: 60 & 61)
 func (s *MedicalService) GetMedicalNotes(ctx context.Context, userID string, status string, month *int) ([]medical.MedicalNoteResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if status != "active" && status != "history" {
 		return nil, fmt.Errorf("status must be active or history")
 	}
@@ -46,7 +46,7 @@ func (s *MedicalService) GetMedicalNotes(ctx context.Context, userID string, sta
 	return s.repo.GetMedicalNotes(ctx, motherProfileID, status, month)
 }
 
-// GetMedicalNoteDetail (Endpoint: 60)
+// GetMedicalNoteDetail (Endpoint: 62)
 func (s *MedicalService) GetMedicalNoteDetail(ctx context.Context, userID string, noteID uuid.UUID) (*medical.MedicalNoteDetailResponse, error) {
 	childID, err := s.repo.GetChildIDByNoteID(ctx, noteID)
 	if err != nil {
@@ -58,7 +58,7 @@ func (s *MedicalService) GetMedicalNoteDetail(ctx context.Context, userID string
 	return s.repo.GetMedicalNoteDetail(ctx, noteID)
 }
 
-// CreateMedicalNote (Endpoint: 61)
+// CreateMedicalNote (Endpoint: 63)
 func (s *MedicalService) CreateMedicalNote(ctx context.Context, userID string, input *medical.CreateMedicalNoteInput) (uuid.UUID, error) {
 	if err := checkMotherOwnership(ctx, userID, input.ChildID, s.motherRepo, s.childRepo); err != nil {
 		return uuid.Nil, err
@@ -72,7 +72,7 @@ func (s *MedicalService) CreateMedicalNote(ctx context.Context, userID string, i
 	return s.repo.CreateMedicalNote(ctx, input)
 }
 
-// UpdateMedicalNote (Endpoint: 62)
+// UpdateMedicalNote (Endpoint: 64)
 func (s *MedicalService) UpdateMedicalNote(ctx context.Context, userID string, noteID uuid.UUID, input *medical.UpdateMedicalNoteInput) error {
 	childID, err := s.repo.GetChildIDByNoteID(ctx, noteID)
 	if err != nil {
@@ -84,7 +84,7 @@ func (s *MedicalService) UpdateMedicalNote(ctx context.Context, userID string, n
 	return s.repo.UpdateMedicalNote(ctx, noteID, input)
 }
 
-// DeleteMedicalNote (Endpoint: 63)
+// DeleteMedicalNote (Endpoint: 65)
 func (s *MedicalService) DeleteMedicalNote(ctx context.Context, userID string, noteID uuid.UUID) error {
 	childID, err := s.repo.GetChildIDByNoteID(ctx, noteID)
 	if err != nil {

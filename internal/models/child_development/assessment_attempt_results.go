@@ -16,8 +16,6 @@ type RecommendedAction struct {
 	UpdatedAt                time.Time `json:"updated_at" db:"updated_at"`
 }
 
-
-
 type AssessmentKPSPQuestion struct {
 	ID          uuid.UUID       `json:"assessment_kpsp_question_id" db:"assessment_kpsp_question_id"`
 	Order       int             `json:"order" db:"order"`
@@ -27,4 +25,9 @@ type AssessmentKPSPQuestion struct {
 	Description string          `json:"description" db:"description"`
 	CreatedAt   time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at" db:"updated_at"`
+}
+
+type RecommendationItem struct {
+	NerveName  string `json:"nerve_name"`
+	ActionText string `json:"action_text"`
 }

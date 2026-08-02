@@ -109,7 +109,7 @@ func (r *CaregiverRepository) GetCaregiverEngagements(ctx context.Context, mothe
 			ce.caregiver_profile_id,
 			u.full_name AS caregiver_name,
 			u.phone_number AS phone_number
-		FROM child c
+		FROM children c
 		JOIN caregiver_engagements ce ON ce.child_id = c.id
 		JOIN caregiver_profiles cp ON cp.id = ce.caregiver_profile_id
 		JOIN users u ON u.id = cp.user_id
@@ -192,7 +192,7 @@ func (r *CaregiverRepository) GetCaregiverChildren(ctx context.Context, caregive
 	query := `
 		SELECT c.id, c.full_name, c.photo_url
 		FROM caregiver_engagements ce
-		JOIN child c ON c.id = ce.child_id
+		JOIN children c ON c.id = ce.child_id
 		WHERE ce.caregiver_profile_id = $1 
 			AND ce.deleted_at IS NULL
 	`

@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"math"
 
 	child_growth "nusagizi_be/internal/models/child_growth"
 	"nusagizi_be/internal/repository"
@@ -39,7 +38,7 @@ func (s *ChildGrowthService) GetLatestGrowthReport(ctx context.Context, userID s
 	if err != nil {
 		return nil, err
 	}
-	status, desc := computeOverallStatus(*raw)
+	status, desc := who.ComputeGrowthStatus(raw.Gender, raw.AgeMonths, raw.WeightKg, raw.HeightCm, raw.HeadCircumferenceCm)
 	return &child_growth.GrowthReportWithStatus{
 		ID:                  raw.ID,
 		MeasuredAt:          raw.MeasuredAt,
@@ -83,7 +82,6 @@ func (s *ChildGrowthService) GetGrowthAnalyses(ctx context.Context, userID strin
 		return nil, fmt.Errorf("invalid age_range, must be one of: 0-2, 0-6, 0-60")
 	}
 
-	// GetGrowthMeasurements returns:
 	// - measurements: list of raw data (height, weight, head circumference, and age in months) filtered by age_range.
 	// - gender: the child's gender ("male" or "female") used to determine the correct WHO reference table.
 	measurements, gender, err := s.repo.GetGrowthMeasurements(ctx, childID, bounds[0], bounds[1], analysisType)
@@ -100,90 +98,26 @@ func (s *ChildGrowthService) GetGrowthAnalyses(ctx context.Context, userID strin
 		return result, nil
 	}
 
-	// For the message, we only calculate Z-Score for the latest measurement
+	// Convert raw measurements into the who.Measurement input type
+	whoMeasurements := make([]who.Measurement, len(measurements))
 	for i, m := range measurements {
-		var x, y float64
-		var lms who.LMSRow
-		var found bool
-
-		isLatest := (i == len(measurements)-1)
-
-		switch analysisType {
-		case "weight_for_age":
-			x = float64(m.AgeMonths)
-			y = m.WeightKg
-			if gender == "male" {
-				lms, found = who.WFABoys[m.AgeMonths]
-			} else {
-				lms, found = who.WFAGirls[m.AgeMonths]
-			}
-
-		case "height_for_age":
-			x = float64(m.AgeMonths)
-			y = m.HeightCm
-			if gender == "male" {
-				lms, found = who.LHFABoys[m.AgeMonths]
-			} else {
-				lms, found = who.LHFAGirls[m.AgeMonths]
-			}
-
-		case "weight_for_height":
-			roundedHeight := math.Round(m.HeightCm*2) / 2
-			x = roundedHeight
-			y = m.WeightKg
-			if m.AgeMonths < 24 {
-				if gender == "male" {
-					lms, found = who.WFLBoys[roundedHeight]
-				} else {
-					lms, found = who.WFLGirls[roundedHeight]
-				}
-			} else {
-				if gender == "male" {
-					lms, found = who.WFHBoys[roundedHeight]
-				} else {
-					lms, found = who.WFHGirls[roundedHeight]
-				}
-			}
-
-		case "bmi_for_age":
-			x = float64(m.AgeMonths)
-			if m.HeightCm > 0 {
-				heightM := m.HeightCm / 100.0
-				y = m.WeightKg / (heightM * heightM)
-				if gender == "male" {
-					lms, found = who.BFABoys[m.AgeMonths]
-				} else {
-					lms, found = who.BFAGirls[m.AgeMonths]
-				}
-			}
-
-		case "head_circumference_for_age":
-			x = float64(m.AgeMonths)
-			y = m.HeadCircumferenceCm
-			if gender == "male" {
-				lms, found = who.HCFABoys[m.AgeMonths]
-			} else {
-				lms, found = who.HCFAGirls[m.AgeMonths]
-			}
+		whoMeasurements[i] = who.Measurement{
+			WeightKg:            m.WeightKg,
+			HeightCm:            m.HeightCm,
+			HeadCircumferenceCm: m.HeadCircumferenceCm,
+			AgeMonths:           m.AgeMonths,
 		}
+	}
 
-		// Only append data points if the measurement value is positive.
-		if y > 0 {
-			result.DataPoints = append(result.DataPoints, child_growth.GrowthDataPoint{
-				X: x,
-				Y: y,
-			})
+	// Delegate all WHO indicator logic to the who package
+	points, msg := who.BuildAnalysisPoints(gender, analysisType, whoMeasurements)
 
-			// Calculate Z-Score for the latest measurement
-			if isLatest && found {
-				latestZScore := who.CalculateZScore(y, lms.L, lms.M, lms.S)
-				title, desc := who.ClassifyZScore(latestZScore, "anak")
-				result.Message = &child_growth.GrowthMessage{
-					Title:       title,
-					Description: desc,
-				}
-			}
-		}
+	// Map results back to the domain model
+	for _, p := range points {
+		result.DataPoints = append(result.DataPoints, child_growth.GrowthDataPoint{X: p.X, Y: p.Y})
+	}
+	if msg != nil {
+		result.Message = &child_growth.GrowthMessage{Title: msg.Title, Description: msg.Description}
 	}
 
 	return result, nil
@@ -200,7 +134,7 @@ func (s *ChildGrowthService) GetGrowthReports(ctx context.Context, userID string
 	}
 	results := make([]child_growth.GrowthReportWithStatus, 0, len(raws))
 	for _, raw := range raws {
-		status, desc := computeOverallStatus(raw)
+		status, desc := who.ComputeGrowthStatus(raw.Gender, raw.AgeMonths, raw.WeightKg, raw.HeightCm, raw.HeadCircumferenceCm)
 		results = append(results, child_growth.GrowthReportWithStatus{
 			ID:                  raw.ID,
 			MeasuredAt:          raw.MeasuredAt,
@@ -264,88 +198,4 @@ func (s *ChildGrowthService) DeleteGrowthReport(ctx context.Context, userID stri
 	}
 
 	return s.repo.DeleteGrowthReport(ctx, reportID)
-}
-
-// computeOverallStatus calculates Z-Scores for all 5 WHO indicators from a single growth report
-func computeOverallStatus(raw child_growth.RawGrowthReportFull) (status, description string) {
-	var scores []float64
-
-	var lms who.LMSRow
-	var found bool
-
-	isMale := raw.Gender == "male"
-	age := raw.AgeMonths
-
-	if raw.WeightKg > 0 {
-		if isMale {
-			lms, found = who.WFABoys[age]
-		} else {
-			lms, found = who.WFAGirls[age]
-		}
-		if found {
-			scores = append(scores, who.CalculateZScore(raw.WeightKg, lms.L, lms.M, lms.S))
-		}
-	}
-
-	if raw.HeightCm > 0 {
-		if isMale {
-			lms, found = who.LHFABoys[age]
-		} else {
-			lms, found = who.LHFAGirls[age]
-		}
-		if found {
-			scores = append(scores, who.CalculateZScore(raw.HeightCm, lms.L, lms.M, lms.S))
-		}
-	}
-
-	if raw.WeightKg > 0 && raw.HeightCm > 0 {
-		roundedH := math.Round(raw.HeightCm*2) / 2 // round to nearest 0.5 cm
-		if age < 24 {
-			if isMale {
-				lms, found = who.WFLBoys[roundedH]
-			} else {
-				lms, found = who.WFLGirls[roundedH]
-			}
-		} else {
-			if isMale {
-				lms, found = who.WFHBoys[roundedH]
-			} else {
-				lms, found = who.WFHGirls[roundedH]
-			}
-		}
-		if found {
-			scores = append(scores, who.CalculateZScore(raw.WeightKg, lms.L, lms.M, lms.S))
-		}
-	}
-
-	if raw.WeightKg > 0 && raw.HeightCm > 0 {
-		heightM := raw.HeightCm / 100
-		bmi := raw.WeightKg / (heightM * heightM)
-		if isMale {
-			lms, found = who.BFABoys[age]
-		} else {
-			lms, found = who.BFAGirls[age]
-		}
-		if found {
-			scores = append(scores, who.CalculateZScore(bmi, lms.L, lms.M, lms.S))
-		}
-	}
-
-	if raw.HeadCircumferenceCm > 0 {
-		if isMale {
-			lms, found = who.HCFABoys[age]
-		} else {
-			lms, found = who.HCFAGirls[age]
-		}
-		if found {
-			scores = append(scores, who.CalculateZScore(raw.HeadCircumferenceCm, lms.L, lms.M, lms.S))
-		}
-	}
-
-	// If no indicator produced a score (e.g. age is outside all WHO table ranges),
-	// return a neutral fallback instead of panicking or returning a misleading status.
-	if len(scores) == 0 {
-		return "Tidak Tersedia", "Data pengukuran tidak mencukupi untuk menghitung status pertumbuhan."
-	}
-	return who.ClassifyOverallStatus(scores)
 }

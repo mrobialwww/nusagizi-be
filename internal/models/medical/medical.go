@@ -6,6 +6,15 @@ import (
 	"github.com/google/uuid"
 )
 
+type NutrientType string
+
+const (
+	NutrientCalories     NutrientType = "calories"
+	NutrientProtein      NutrientType = "protein"
+	NutrientFat          NutrientType = "fat"
+	NutrientCarbohydrate NutrientType = "carbohydrate"
+)
+
 type MedicalNoteResponse struct {
 	ID               uuid.UUID `json:"id"`
 	ChildName        string    `json:"child_name"`
@@ -17,8 +26,8 @@ type MedicalNoteResponse struct {
 }
 
 type DailyNutritionTarget struct {
-	NutrientName string  `json:"nutrient_name"`
-	Quantity     float64 `json:"quantity"`
+	NutrientName NutrientType `json:"nutrient_name"`
+	Quantity     float64      `json:"quantity"`
 }
 
 type MedicalNoteDetailResponse struct {

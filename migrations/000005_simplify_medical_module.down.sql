@@ -23,13 +23,13 @@ CREATE TRIGGER trg_doctor_profiles_updated_at BEFORE UPDATE ON doctor_profiles
 CREATE TABLE medical_relationships (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     doctor_profile_id   UUID NOT NULL REFERENCES doctor_profiles(id) ON DELETE CASCADE,
-    child_id            UUID NOT NULL REFERENCES child(id) ON DELETE CASCADE,
+    child_id            UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
     deleted_at          TIMESTAMPTZ,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_medical_relationships_doctor_id ON medical_relationships(doctor_profile_id);
-CREATE INDEX idx_medical_relationships_child_id ON medical_relationships(child_id);
+CREATE INDEX idx_medical_relationships_children_id ON medical_relationships(child_id);
 CREATE TRIGGER trg_medical_relationships_updated_at BEFORE UPDATE ON medical_relationships
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -63,7 +63,7 @@ CREATE TRIGGER trg_medical_restrictions_updated_at BEFORE UPDATE ON medical_rest
 CREATE TABLE daily_nutrition_targets (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     medical_note_id  UUID NOT NULL REFERENCES medical_notes(id) ON DELETE CASCADE,
-    nutrient_name    VARCHAR(100) NOT NULL,
+    nutrient_name    nutrient_type NOT NULL,
     quantity         NUMERIC(8,2) NOT NULL CHECK (quantity > 0),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()

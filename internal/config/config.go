@@ -21,6 +21,9 @@ type Config struct {
 	Auth0RoleIDMother    string
 	Auth0RoleIDCaregiver string
 	Auth0RoleIDDoctor    string
+
+	// AI Service
+	AIServiceBaseURL string
 }
 
 func Load() (*Config, error) {
@@ -42,6 +45,8 @@ func Load() (*Config, error) {
 		Auth0RoleIDMother:    os.Getenv("AUTH0_ROLE_ID_MOTHER"),
 		Auth0RoleIDCaregiver: os.Getenv("AUTH0_ROLE_ID_CAREGIVER"),
 		Auth0RoleIDDoctor:    os.Getenv("AUTH0_ROLE_ID_DOCTOR"),
+
+		AIServiceBaseURL: os.Getenv("AI_SERVICE_BASE_URL"),
 	}
 
 	return config, nil

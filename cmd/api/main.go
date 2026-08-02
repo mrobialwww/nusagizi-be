@@ -50,23 +50,47 @@ func main() {
 	motherRepo := repository.NewMotherProfileRepository(pool)
 	childRepo := repository.NewChildRepository(pool)
 	caregiverRepo := repository.NewCaregiverRepository(pool)
+	childDevRepo := repository.NewChildDevelopmentRepository(pool)
+	menuRepo := repository.NewMenuRepository(pool)
+	childNutriRepo := repository.NewChildNutritionRepository(pool)
+	childGrowthRepo := repository.NewChildGrowthRepository(pool)
+	dashboardRepo := repository.NewDashboardRepository(pool)
+	medicalRepo := repository.NewMedicalRepository(pool)
+	photosContactsRepo := repository.NewPhotosContactsRepository(pool)
+	notificationRepo := repository.NewNotificationRepository(pool)
 
 	// Services
 	userSvc := services.NewUserService(userRepo, motherRepo, caregiverRepo)
 	childSvc := services.NewChildService(childRepo, motherRepo, caregiverRepo)
+	childDevSvc := services.NewChildDevelopmentService(childDevRepo, childRepo, motherRepo)
+	menuSvc := services.NewMenuService(cfg, menuRepo, motherRepo, childRepo)
+	childNutriSvc := services.NewChildNutritionService(childNutriRepo, childRepo, motherRepo, caregiverRepo)
+	childGrowthSvc := services.NewChildGrowthService(childGrowthRepo, childRepo, motherRepo)
+	caregiverSvc := services.NewCaregiverService(caregiverRepo, motherRepo)
+	dashboardSvc := services.NewDashboardService(dashboardRepo, motherRepo)
+	medicalSvc := services.NewMedicalService(medicalRepo, motherRepo, childRepo)
+	photosContactsSvc := services.NewPhotosContactsService(photosContactsRepo, motherRepo, childRepo, caregiverRepo)
+	notificationSvc := services.NewNotificationService(notificationRepo)
 
 	// Handlers
 	onboardHandler := handlers.NewOnboardingHandler(userRepo, cfg)
 	userHandler := handlers.NewUserHandler(userSvc)
 	childHandler := handlers.NewChildHandler(childSvc)
+	childDevHandler := handlers.NewChildDevelopmentHandler(childDevSvc)
+	menuHandler := handlers.NewMenuHandler(menuSvc)
+	childNutriHandler := handlers.NewChildNutritionHandler(childNutriSvc)
+	childGrowthHandler := handlers.NewChildGrowthHandler(childGrowthSvc)
+	caregiverHandler := handlers.NewCaregiverHandler(caregiverSvc)
+	dashboardHandler := handlers.NewDashboardHandler(dashboardSvc)
+	medicalHandler := handlers.NewMedicalHandler(medicalSvc)
+	photosContactsHandler := handlers.NewPhotosContactsHandler(photosContactsSvc)
+	notificationHandler := handlers.NewNotificationHandler(notificationSvc)
 
-	// 6. Router Setup
-
-	// 7. Setup Gin
+	// 6. Setup Gin
 	var router *gin.Engine = gin.Default()
 	router.SetTrustedProxies(nil)
 
-	// 8. Public routes
+	// 7. Public routes
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message":  "NusaGizi API is running!",
@@ -75,27 +99,98 @@ func main() {
 		})
 	})
 
-	// 9. Protected routes (require valid Auth0 JWT)
+	// 8. Protected routes (require valid Auth0 JWT)
 	protected := router.Group("/")
-	// Note: GinMiddleware now requires userRepo instead of pool
 	protected.Use(middleware.GinMiddleware(jwtMiddleware, userRepo))
 	{
 		// Legacy — onboarding sets role in Auth0 + DB
 		protected.POST("/onboarding", onboardHandler.Handle)
 
 		// Modul 1: Auth & User Profile
-		protected.GET("/users", userHandler.Get)
-		protected.PATCH("/users", userHandler.Update)
-		protected.DELETE("/users", userHandler.Delete)
+		protected.GET("/users", userHandler.GetUserProfile)
+		protected.PATCH("/users", userHandler.UpdateUserProfile)
+		protected.DELETE("/users", userHandler.DeleteUserProfile)
+		
+		protected.POST("/mother-profiles", userHandler.CreateMotherProfile)
 		protected.GET("/mother-profiles", userHandler.GetMotherProfile)
+		
+		protected.POST("/caregiver-profiles", userHandler.CreateCaregiverProfile)
 		protected.GET("/caregiver-profiles", userHandler.GetCaregiverProfile)
 
 		// Modul 2: Child Profile
-		protected.POST("/children", childHandler.Create)
-		protected.GET("/children/:child_id", childHandler.Get)
-		protected.PATCH("/children/:child_id", childHandler.Update)
-		protected.DELETE("/children/:child_id", childHandler.Delete)
+		protected.POST("/children", childHandler.CreateChildProfile)
 		protected.GET("/children", childHandler.ListByMother)
+		protected.GET("/children/:child_id", childHandler.GetChildProfile)
+		protected.PATCH("/children/:child_id", childHandler.UpdateChildProfile)
+		protected.DELETE("/children/:child_id", childHandler.DeleteChildProfile)
+		protected.GET("/children/:child_id/simple", childHandler.GetChildSimple)
+
+		// Modul 3: Child Growth
+		protected.GET("/children/:child_id/growth-reports/latest", childGrowthHandler.GetLatestGrowthReport)
+		protected.GET("/children/:child_id/growth-analyses", childGrowthHandler.GetGrowthAnalyses)
+		protected.GET("/children/:child_id/growth-reports", childGrowthHandler.GetGrowthReports)
+		protected.POST("/children/:child_id/growth-reports", childGrowthHandler.CreateGrowthReport)
+		protected.PATCH("/growth-reports/:child_growth_report_id", childGrowthHandler.UpdateGrowthReport)
+		protected.DELETE("/growth-reports/:child_growth_report_id", childGrowthHandler.DeleteGrowthReport)
+
+		// Modul 4: Child Development (KPSP)
+		protected.GET("/children/:child_id/development-reports/latest", childDevHandler.GetLatestDevelopmentReport)
+		protected.GET("/children/:child_id/development-reports", childDevHandler.GetDevelopmentReports)
+		protected.GET("/development-reports/:child_development_report_id", childDevHandler.GetDevelopmentReportByID)
+		protected.GET("/assessment-kpsp-questions", childDevHandler.GetKPSPQuestions)
+		protected.POST("/children/:child_id/development-reports", childDevHandler.CreateDevelopmentReport)
+		protected.PATCH("/development-reports/:child_development_report_id", childDevHandler.UpdateDevelopmentReport)
+		protected.GET("/checklist-milestone-tasks", childDevHandler.GetChecklistMilestoneTasks)
+		protected.GET("/children/:child_id/development-reports/:report_id/recommendations", childDevHandler.GetRecommendations)
+		protected.PATCH("/children/:child_id/checklist-milestone-progress", childDevHandler.UpdateChecklistMilestone)
+		protected.DELETE("/development-reports/:child_development_report_id", childDevHandler.DeleteDevelopmentReport)
+
+		// Modul 5: Child Nutrition & Menu
+		protected.GET("/children/:child_id/nutrition/today", childNutriHandler.GetTodayNutritionReport)
+		protected.GET("/children/:child_id/daily-menus/today", childNutriHandler.GetTodayDailyMenu)
+		protected.PATCH("/recipes/:recipe_id/complete", childNutriHandler.UpdateRecipeCompleteStatus)
+		protected.PATCH("/recipes/:recipe_id/bookmark", childNutriHandler.UpdateRecipeBookmarkStatus)
+		protected.GET("/recipes/:recipe_id", childNutriHandler.GetRecipeDetail)
+		protected.PATCH("/recipes/:recipe_id/main-ingredients/priority", childNutriHandler.SwapMainIngredientPriority)
+		protected.GET("/children/:child_id/recipes/bookmarked", childNutriHandler.GetBookmarkedRecipes)
+		protected.GET("/children/:child_id/nutrition-reports", childNutriHandler.GetNutritionReportsByMonth)
+		protected.GET("/menu/daily-shop", childNutriHandler.GetDailyShopIngredients)
+		protected.GET("/children/:child_id/daily-menus/today/shopping", childNutriHandler.GetTodayMenuShopping)
+		protected.POST("/menu/generate", menuHandler.GenerateMenu)
+
+		// Modul 6: Photos & Contacts
+		protected.GET("/mother-profiles/contacts", photosContactsHandler.GetContacts)
+		protected.POST("/contacts", photosContactsHandler.AddContact)
+		protected.DELETE("/contacts/:contact_id", photosContactsHandler.DeleteContact)
+		protected.GET("/mother-profiles/child-photos", photosContactsHandler.GetMotherChildPhotos)
+		protected.GET("/contacts/:contact_id/child-photos", photosContactsHandler.GetContactChildPhotos)
+		protected.GET("/mother-profiles/child-photos/all", photosContactsHandler.GetAllChildPhotos)
+		protected.GET("/child-photos/:child_photo_id", photosContactsHandler.GetPhotoDetail)
+		protected.POST("/children/:child_id/photos/mother", photosContactsHandler.AddPhotoMother)
+		protected.POST("/children/:child_id/photos/caregiver", photosContactsHandler.AddPhotoCaregiver)
+		protected.PATCH("/child-photos/:child_photo_id", photosContactsHandler.UpdatePhoto)
+		protected.DELETE("/child-photos/:child_photo_id", photosContactsHandler.DeletePhoto)
+
+		// Modul 7: Caregiver
+		protected.POST("/children/:child_id/caregiver-engagements", caregiverHandler.AddCaregiverEngagement)
+		protected.GET("/mother-profiles/caregiver-engagements", caregiverHandler.GetCaregiverEngagements)
+		protected.GET("/mother-profiles/caregiver-engagements/revoked", caregiverHandler.GetCaregiverEngagementsRevoked)
+		protected.DELETE("/caregiver-engagements/:caregiver_engagement_id", caregiverHandler.DeleteCaregiverEngagement)
+		protected.GET("/caregiver-profiles/children", caregiverHandler.GetCaregiverChildren)
+
+		// Modul 8: Medical
+		protected.GET("/medical-notes", medicalHandler.GetMedicalNotes)
+		protected.GET("/medical-notes/:medical_note_id", medicalHandler.GetMedicalNoteDetail)
+		protected.POST("/medical-notes", medicalHandler.CreateMedicalNote)
+		protected.PATCH("/medical-notes/:medical_note_id", medicalHandler.UpdateMedicalNote)
+		protected.DELETE("/medical-notes/:medical_note_id", medicalHandler.DeleteMedicalNote)
+
+		// Modul 9: Dashboard
+		protected.GET("/dashboard/children", dashboardHandler.GetChildrenSummary)
+
+		// Modul 10: Notifications
+		protected.GET("/notifications", notificationHandler.GetNotifications)
+		protected.GET("/notifications/latest", notificationHandler.GetLatestNotification)
 	}
 
 	router.Run(":" + cfg.Port)

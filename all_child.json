@@ -1,0 +1,52 @@
+[
+    {
+        "id": "CH001",
+        "nama": "Budi",
+        "sex": "boys",
+        "usia_bulan": 8,
+        "berat_kg": 8.4,
+        "panjang_cm": 70.5,
+        "preferensi_harga": "seimbang",
+        "jumlah_protein_per_hari": 2,
+        "alergi": ["SOY"],
+        "kondisi": []
+    },
+    {
+        "id": "CH002",
+        "nama": "Rina",
+        "sex": "girls",
+        "usia_bulan": 36,
+        "berat_kg": 10.0,
+        "panjang_cm": 88.0,
+        "preferensi_harga": "seimbang",
+        "jumlah_protein_per_hari": 2,
+        "alergi": [],
+        "lingkar_kepala_cm": 47.0,
+        "riwayat_berat": [
+            [33, 10.2],
+            [34, 10.0],
+            [35, 9.8],
+            [36, 10.0]
+        ],
+        "resep_dokter": {
+            "tingkat": "B",
+            "nama_dokter": "Dr. Siti Nurhaliza, Sp.A",
+            "nomor_str": "9876543210",
+            "komposisi_per_kg": {
+                "energi_kkal": 150,
+                "protein_g": 3.0,
+                "natrium_mg_maks": 500
+            },
+            "catatan_tambahan": "Kejar tumbuh (catch-up growth). Berikan makan porsi kecil tapi sering. Maksimal 30 menit per sesi makan."
+        },
+        "kondisi": [
+            {
+                "id": "batuk_pilek",
+                "hari_ke": 2,
+                "sesak_napas": false,
+                "napas_cepat": false,
+                "demam_tinggi": false
+            }
+        ]
+    }
+]

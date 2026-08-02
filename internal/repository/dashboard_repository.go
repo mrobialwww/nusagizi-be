@@ -28,15 +28,17 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 			c.id, 
 			c.full_name, 
 			c.birth_date, 
+			c.gender,
 			c.upload_streak_days,
 			gr.height_cm, 
 			gr.weight_kg,
+			gr.head_circumference_cm,
 			dr.kpsp_score,
 			nr.protein, 
 			nr.target_protein
-		FROM child c
+		FROM children c
 		LEFT JOIN LATERAL (
-			SELECT height_cm, weight_kg 
+			SELECT height_cm, weight_kg, head_circumference_cm 
 			FROM child_growth_reports 
 			WHERE child_id = c.id 
 			ORDER BY measured_at DESC LIMIT 1
@@ -66,8 +68,8 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 		var res dashboard.ChildSummaryResponse
 		var birthDate time.Time
 		if err := rows.Scan(
-			&res.ID, &res.FullName, &birthDate, &res.Streak,
-			&res.HeightCm, &res.WeightKg,
+			&res.ID, &res.FullName, &birthDate, &res.Gender, &res.Streak,
+			&res.HeightCm, &res.WeightKg, &res.HeadCircumferenceCm,
 			&res.KpspScore,
 			&res.Protein, &res.TargetProtein,
 		); err != nil {

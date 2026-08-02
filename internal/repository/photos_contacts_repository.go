@@ -161,7 +161,7 @@ func (r *PhotosContactsRepository) GetMotherChildPhotos(ctx context.Context, mot
 	query := `
 		SELECT p.id, p.child_id, p.photo_url, p.is_review_required
 		FROM child_photos p
-		JOIN child c ON p.child_id = c.id
+		JOIN children c ON p.child_id = c.id
 		WHERE c.mother_profile_id = $1
 		ORDER BY p.created_at DESC
 	`
@@ -189,8 +189,8 @@ func (r *PhotosContactsRepository) GetContactChildPhotos(ctx context.Context, co
 	query := `
 		SELECT p.id, p.child_id, p.photo_url
 		FROM child_photos p
-		LEFT JOIN photo_shared_with psw ON psw.child_photo_id = p.id
-		JOIN child c ON p.child_id = c.id
+		LEFT JOIN photo_shares psw ON psw.child_photo_id = p.id
+		JOIN children c ON p.child_id = c.id
 		JOIN contacts ct ON ct.id = $1
 		WHERE 
 			c.mother_profile_id = ct.related_mother_profile_id
@@ -228,10 +228,10 @@ func (r *PhotosContactsRepository) GetAllChildPhotos(ctx context.Context, mother
 	query := `
 		SELECT DISTINCT p.id, p.child_id, p.photo_url, p.created_at
 		FROM child_photos p
-		JOIN child c ON p.child_id = c.id
+		JOIN children c ON p.child_id = c.id
 		LEFT JOIN contacts ct ON ct.related_mother_profile_id = c.mother_profile_id 
 			AND ct.mother_profile_id = $1
-		LEFT JOIN photo_shared_with psw ON psw.child_photo_id = p.id
+		LEFT JOIN photo_shares psw ON psw.child_photo_id = p.id
 		WHERE 
 			p.is_review_required = false
 			AND (
@@ -292,11 +292,11 @@ func (r *PhotosContactsRepository) CheckContactPhotoAccess(ctx context.Context, 
 		SELECT EXISTS(
 			SELECT 1
 			FROM child_photos p
-			JOIN child c ON p.child_id = c.id
+			JOIN children c ON p.child_id = c.id
 			JOIN mother_profiles mp_owner ON c.mother_profile_id = mp_owner.id
 			JOIN contacts ct ON ct.mother_profile_id = mp_owner.id
 			JOIN mother_profiles mp_viewer ON ct.related_mother_profile_id = mp_viewer.id
-			LEFT JOIN photo_shared_with psw ON psw.child_photo_id = p.id
+			LEFT JOIN photo_shares psw ON psw.child_photo_id = p.id
 			WHERE p.id = $1
 				AND mp_viewer.user_id = $2
 				AND p.is_review_required = false
@@ -336,7 +336,7 @@ func (r *PhotosContactsRepository) CreatePhoto(ctx context.Context, childID uuid
 	// Insert photo shared with
 	if input.Visibility == "only" && len(input.ListVisibility) > 0 {
 		queryShared := `
-			INSERT INTO photo_shared_with (child_photo_id, contact_id)
+			INSERT INTO photo_shares (child_photo_id, contact_id)
 			VALUES ($1, $2)
 		`
 		for _, contactID := range input.ListVisibility {
@@ -387,7 +387,7 @@ func (r *PhotosContactsRepository) UpdatePhoto(ctx context.Context, photoID uuid
 
 			// Delete all existing shared photos
 			queryDeleteAll := `
-				DELETE FROM photo_shared_with 
+				DELETE FROM photo_shares 
 				WHERE child_photo_id = $1`
 
 			_, err = tx.Exec(ctx, queryDeleteAll, photoID)
@@ -398,7 +398,7 @@ func (r *PhotosContactsRepository) UpdatePhoto(ctx context.Context, photoID uuid
 
 			// Delete all existing shared photos
 			queryDeleteUnchecked := `
-				DELETE FROM photo_shared_with 
+				DELETE FROM photo_shares 
 				WHERE child_photo_id = $1 
 					AND contact_id != ALL($2)
 			`
@@ -409,7 +409,7 @@ func (r *PhotosContactsRepository) UpdatePhoto(ctx context.Context, photoID uuid
 
 			// Insert shared photos
 			queryInsertShared := `
-				INSERT INTO photo_shared_with (child_photo_id, contact_id)
+				INSERT INTO photo_shares (child_photo_id, contact_id)
 				VALUES ($1, $2)
 				ON CONFLICT (child_photo_id, contact_id) DO NOTHING
 			`

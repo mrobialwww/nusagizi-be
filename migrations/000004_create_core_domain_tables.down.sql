@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------
 -- create notification
 -- ---------------------------------------------------------------------
-DROP TABLE IF EXISTS notification;
+DROP TABLE IF EXISTS notifications;
 
 -- ---------------------------------------------------------------------
 -- create medical
@@ -19,15 +19,15 @@ DROP TABLE IF EXISTS caregiver_engagements;
 -- ---------------------------------------------------------------------
 -- create photos and contacts
 -- ---------------------------------------------------------------------
-DROP TABLE IF EXISTS photo_shared_with;
+DROP TABLE IF EXISTS photo_shares;
 DROP TABLE IF EXISTS contacts;
 DROP TABLE IF EXISTS child_photos;
 
 -- ---------------------------------------------------------------------
 -- create child nutrition
 -- ---------------------------------------------------------------------
-DROP TABLE IF EXISTS ingredient_shopping_items;
-DROP TABLE IF EXISTS daily_shoppings;
+
+DROP TABLE IF EXISTS recipe_spices;
 DROP TABLE IF EXISTS cooking_steps;
 DROP TABLE IF EXISTS main_ingredients;
 DROP TABLE IF EXISTS ingredients;
@@ -54,12 +54,12 @@ DROP TABLE IF EXISTS child_growth_reports;
 -- ---------------------------------------------------------------------
 -- create child core
 -- ---------------------------------------------------------------------
-DROP TABLE IF EXISTS child_allergy_profile;
-DROP TABLE IF EXISTS child_chronic_disease_profile;
-DROP TABLE IF EXISTS child_diet_profile;
-DROP TABLE IF EXISTS favorite_texture_profile;
-DROP TABLE IF EXISTS favorite_food_profile;
-DROP TABLE IF EXISTS child;
+DROP TABLE IF EXISTS child_allergy_profiles;
+DROP TABLE IF EXISTS child_chronic_disease_profiles;
+DROP TABLE IF EXISTS child_diet_profiles;
+DROP TABLE IF EXISTS favorite_texture_profiles;
+DROP TABLE IF EXISTS favorite_food_profiles;
+DROP TABLE IF EXISTS children;
 
 -- ---------------------------------------------------------------------
 -- create users and profiles
@@ -87,6 +87,7 @@ DROP TYPE IF EXISTS nerve_name;
 DROP TYPE IF EXISTS child_allergy_category;
 DROP TYPE IF EXISTS notification_type;
 DROP TYPE IF EXISTS gender_type;
+DROP TYPE IF EXISTS nutrient_type;
 
 
 -- ---------------------------------------------------------------------

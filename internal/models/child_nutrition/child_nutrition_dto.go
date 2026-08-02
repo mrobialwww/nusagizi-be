@@ -6,58 +6,61 @@ import (
 	"github.com/google/uuid"
 )
 
-type ShoppingItemResponse struct {
-	ID             uuid.UUID `json:"id"`
-	IngredientName string    `json:"ingredient_name"`
-	Quantity       float64   `json:"quantity"`
-	Unit           string    `json:"unit"`
-}
-
-type ShoppingResponse struct {
-	ID          uuid.UUID              `json:"id"`
-	IsCompleted bool                   `json:"is_completed"`
-	Items       []ShoppingItemResponse `json:"items"`
-}
-
 type RecipeResponse struct {
 	ID           uuid.UUID `json:"id"`
 	Name         string    `json:"name"`
 	MealTime     string    `json:"meal_time"`
 	MealTexture  string    `json:"meal_texture"`
-	IsAlergen    bool      `json:"is_alergen"`
-	Calories     int       `json:"calories"`
-	Protein      int       `json:"protein"`
-	IsCompleted  bool      `json:"is_completed,omitempty"`
-	IsBookmarked bool      `json:"is_bookmarked,omitempty"`
+	Calories         int       `json:"calories"`
+	Protein          int       `json:"protein"`
+	PortionsConsumed float64   `json:"portions_consumed"`
+	IsBookmarked     bool      `json:"is_bookmarked,omitempty"`
 }
 
 type MenuResponse struct {
-	ID      uuid.UUID        `json:"id"`
-	Recipes []RecipeResponse `json:"recipes"`
+	ID        uuid.UUID        `json:"id"`
+	CreatedAt time.Time        `json:"created_at"`
+	Recipes   []RecipeResponse `json:"recipes"`
+}
+
+type ShoppingListItem struct {
+	Name         string `json:"name"`
+	IngredientID string `json:"ingredient_id"`
+	Unit         string `json:"unit"`
+}
+
+type MenuShoppingResponse struct {
+	Menu         MenuResponse       `json:"menu"`
+	ShoppingList []ShoppingListItem `json:"shopping_list"`
 }
 
 type TodayNutritionReportResponse struct {
-	ID                 uuid.UUID        `json:"id"`
-	Calories           int              `json:"calories"`
-	TargetCalories     int              `json:"target_calories"`
-	Protein            int              `json:"protein"`
-	TargetProtein      int              `json:"target_protein"`
-	Fat                int              `json:"fat"`
-	TargetFat          int              `json:"target_fat"`
-	Carbohydrate       int              `json:"carbohydrate"`
-	TargetCarbohydrate int              `json:"target_carbohydrate"`
-	Shopping           ShoppingResponse `json:"shopping"`
-	Menu               MenuResponse     `json:"menu"`
+	ID                 uuid.UUID          `json:"id"`
+	Calories           int                `json:"calories"`
+	TargetCalories     int                `json:"target_calories"`
+	Protein            int                `json:"protein"`
+	TargetProtein      int                `json:"target_protein"`
+	Fat                int                `json:"fat"`
+	TargetFat          int                `json:"target_fat"`
+	Carbohydrate       int                `json:"carbohydrate"`
+	TargetCarbohydrate int                `json:"target_carbohydrate"`
+	Menu               MenuResponse       `json:"menu"`
+	ShoppingList       []ShoppingListItem `json:"shopping_list"`
 }
 
 type MainIngredientResponse struct {
 	ID         uuid.UUID  `json:"id"`
 	RecipeID   uuid.UUID  `json:"recipe_id"`
 	Ingredient Ingredient `json:"ingredient"`
-	Quantity   float64    `json:"quantity"`
 	Unit       string     `json:"unit"`
 	Priority   int        `json:"priority"`
 	Slot       string     `json:"slot"`
+}
+
+type RecipeSpice struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	Unit string    `json:"unit"`
 }
 
 type RecipeDetailResponse struct {
@@ -65,10 +68,11 @@ type RecipeDetailResponse struct {
 	Name            string                   `json:"name"`
 	MealTime        string                   `json:"meal_time"`
 	MealTexture     string                   `json:"meal_texture"`
-	IsAlergen       bool                     `json:"is_alergen"`
+	CookingTime     string                   `json:"cooking_time"`
 	Calories        int                      `json:"calories"`
 	Protein         int                      `json:"protein"`
 	MainIngredients []MainIngredientResponse `json:"main_ingredients"`
+	RecipeSpices    []RecipeSpice            `json:"recipe_spices"`
 	CookingSteps    []CookingStep            `json:"cooking_steps"`
 }
 
@@ -82,17 +86,24 @@ type NutritionReportSummaryResponse struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-type ShoppingItemInput struct {
-	IngredientID string  `json:"ingredient_id"`
-	Quantity     float64 `json:"quantity"`
-	Unit         string  `json:"unit"`
-}
-
-type UpdateShoppingItemInput struct {
-	Quantity *float64 `json:"quantity"`
-	Unit     *string  `json:"unit"`
-}
-
 type SwapIngredientPriorityInput struct {
 	Slot string `json:"slot" binding:"required,max=25"`
+}
+
+type DailyShopSubstitute struct {
+	Name         string `json:"name"`
+	IngredientID string `json:"ingredient_id"`
+	Unit         string `json:"unit"`
+	Priority     int    `json:"priority"`
+}
+
+type DailyShopIngredient struct {
+	Name         string                `json:"name"`
+	IngredientID string                `json:"ingredient_id"`
+	Unit         string                `json:"unit"`
+	Priority     int                   `json:"priority"`
+	Slot         string                `json:"slot"`
+	RecipeID     uuid.UUID             `json:"recipe_id"`
+	ChildName    string                `json:"child_name"`
+	Pengganti    []DailyShopSubstitute `json:"pengganti"`
 }
