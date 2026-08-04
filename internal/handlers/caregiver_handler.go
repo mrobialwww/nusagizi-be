@@ -22,41 +22,7 @@ func NewCaregiverHandler(service *services.CaregiverService) *CaregiverHandler {
 	return &CaregiverHandler{service: service}
 }
 
-// AddCaregiverEngagement (Endpoint: 54)
-func (h *CaregiverHandler) AddCaregiverEngagement(c *gin.Context) {
-	v, exists := c.Get("user")
-	requester, ok := v.(*models.User)
-	if !exists || !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
-		return
-	}
-
-	childID, err := uuid.Parse(c.Param("child_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
-		return
-	}
-
-	engagementID, err := h.service.CreateCaregiverEngagement(c.Request.Context(), requester.ID, childID)
-	if err != nil {
-		switch {
-		case errors.Is(err, repository.ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have a caregiver profile"}})
-		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "child not found"}})
-		case errors.Is(err, repository.ErrConflict):
-			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "CONFLICT", "message": "active engagement already exists"}})
-		default:
-			slog.Error("AddCaregiverEngagement failed", "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
-		}
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{"id": engagementID})
-}
-
-// GetMotherCaregiverEngagements (Endpoint: 55)
+// GetMotherCaregiverEngagements (endpoint: 51)
 func (h *CaregiverHandler) GetCaregiverEngagements(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -83,7 +49,7 @@ func (h *CaregiverHandler) GetCaregiverEngagements(c *gin.Context) {
 	c.JSON(http.StatusOK, engagements)
 }
 
-// GetMotherCaregiverEngagementsRevoked (Endpoint: 56)
+// GetMotherCaregiverEngagementsRevoked (endpoint: 52)
 func (h *CaregiverHandler) GetCaregiverEngagementsRevoked(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -110,7 +76,7 @@ func (h *CaregiverHandler) GetCaregiverEngagementsRevoked(c *gin.Context) {
 	c.JSON(http.StatusOK, engagements)
 }
 
-// DeleteCaregiverEngagement (Endpoint: 57)
+// DeleteCaregiverEngagement (endpoint: 53)
 func (h *CaregiverHandler) DeleteCaregiverEngagement(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -142,7 +108,7 @@ func (h *CaregiverHandler) DeleteCaregiverEngagement(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// GetCaregiverChildren (Endpoint: 59)
+// GetCaregiverChildren (endpoint: 55)
 func (h *CaregiverHandler) GetCaregiverChildren(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)

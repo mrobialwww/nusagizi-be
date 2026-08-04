@@ -39,7 +39,7 @@ func NewMenuService(cfg *config.Config, menuRepo *repository.MenuRepository, mot
 	}
 }
 
-// GenerateMenu generates and saves today's menu for all children of a mother.
+// GenerateMenu (Endpoint: 39) generates and saves today's menu for all children of a mother.
 func (s *MenuService) GenerateMenu(ctx context.Context, userID string) error {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {

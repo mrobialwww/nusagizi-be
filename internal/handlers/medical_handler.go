@@ -25,7 +25,7 @@ func NewMedicalHandler(service *services.MedicalService) *MedicalHandler {
 	return &MedicalHandler{service: service}
 }
 
-// GetMedicalNotes (Endpoint: 60, 61)
+// GetMedicalNotes (endpoint: 56, 57)
 func (h *MedicalHandler) GetMedicalNotes(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -75,7 +75,7 @@ func (h *MedicalHandler) GetMedicalNotes(c *gin.Context) {
 	c.JSON(http.StatusOK, notes)
 }
 
-// GetMedicalNoteDetail (Endpoint: 62)
+// GetMedicalNoteDetail (endpoint: 58)
 func (h *MedicalHandler) GetMedicalNoteDetail(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -107,7 +107,7 @@ func (h *MedicalHandler) GetMedicalNoteDetail(c *gin.Context) {
 	c.JSON(http.StatusOK, note)
 }
 
-// CreateMedicalNote (Endpoint: 63)
+// CreateMedicalNote (endpoint: 59)
 func (h *MedicalHandler) CreateMedicalNote(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -167,7 +167,7 @@ func (h *MedicalHandler) CreateMedicalNote(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": noteID})
 }
 
-// UpdateMedicalNote (Endpoint: 64)
+// UpdateMedicalNote (endpoint: 60)
 func (h *MedicalHandler) UpdateMedicalNote(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -229,7 +229,7 @@ func (h *MedicalHandler) UpdateMedicalNote(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// DeleteMedicalNote (Endpoint: 65)
+// DeleteMedicalNote (endpoint: 61)
 func (h *MedicalHandler) DeleteMedicalNote(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)

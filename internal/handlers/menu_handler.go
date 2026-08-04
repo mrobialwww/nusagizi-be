@@ -18,7 +18,7 @@ func NewMenuHandler(menuService *services.MenuService) *MenuHandler {
 	return &MenuHandler{menuService: menuService}
 }
 
-// GenerateMenu (Endpoint 42)
+// GenerateMenu (Endpoint: 39)
 func (h *MenuHandler) GenerateMenu(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)

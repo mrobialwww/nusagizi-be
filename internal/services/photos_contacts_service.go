@@ -31,7 +31,7 @@ func NewPhotosContactsService(
 	}
 }
 
-// GetContacts (Endpoint: 43)
+// GetContacts (Endpoint: 40)
 func (s *PhotosContactsService) GetContacts(ctx context.Context, userID string) ([]photos_contacts.ContactResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -40,7 +40,7 @@ func (s *PhotosContactsService) GetContacts(ctx context.Context, userID string) 
 	return s.repo.GetContacts(ctx, motherProfileID)
 }
 
-// AddContact (Endpoint: 51)
+// AddContact (endpoint: 48)
 func (s *PhotosContactsService) AddContact(ctx context.Context, userID string, relatedMotherProfileID uuid.UUID) (uuid.UUID, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -52,7 +52,7 @@ func (s *PhotosContactsService) AddContact(ctx context.Context, userID string, r
 	return s.repo.CreateContact(ctx, motherProfileID, relatedMotherProfileID)
 }
 
-// DeleteContact (Endpoint: 44)
+// DeleteContact (Endpoint: 41)
 func (s *PhotosContactsService) DeleteContact(ctx context.Context, userID string, contactID uuid.UUID) error {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -62,7 +62,7 @@ func (s *PhotosContactsService) DeleteContact(ctx context.Context, userID string
 	return s.repo.DeleteContact(ctx, contactID, motherProfileID)
 }
 
-// GetMotherChildPhotos (Endpoint: 45)
+// GetMotherChildPhotos (Endpoint: 42)
 func (s *PhotosContactsService) GetMotherChildPhotos(ctx context.Context, userID string) ([]photos_contacts.ChildPhotoResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -71,7 +71,7 @@ func (s *PhotosContactsService) GetMotherChildPhotos(ctx context.Context, userID
 	return s.repo.GetMotherChildPhotos(ctx, motherProfileID)
 }
 
-// GetContactChildPhotos (Endpoint: 46)
+// GetContactChildPhotos (Endpoint: 43)
 func (s *PhotosContactsService) GetContactChildPhotos(ctx context.Context, userID string, contactID uuid.UUID) ([]photos_contacts.ChildPhotoResponse, error) {
 	// The caller must own the contact.
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
@@ -99,7 +99,7 @@ func (s *PhotosContactsService) GetContactChildPhotos(ctx context.Context, userI
 	return s.repo.GetContactChildPhotos(ctx, contactID)
 }
 
-// GetAllChildPhotos (Endpoint: 47)
+// GetAllChildPhotos (Endpoint: 44)
 func (s *PhotosContactsService) GetAllChildPhotos(ctx context.Context, userID string) ([]photos_contacts.ChildPhotoResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -108,7 +108,7 @@ func (s *PhotosContactsService) GetAllChildPhotos(ctx context.Context, userID st
 	return s.repo.GetAllChildPhotos(ctx, motherProfileID)
 }
 
-// GetPhotoDetail (Endpoint: 48)
+// GetPhotoDetail (Endpoint: 45)
 func (s *PhotosContactsService) GetPhotoDetail(ctx context.Context, userID string, photoID uuid.UUID) (*photos_contacts.ChildPhotoResponse, error) {
 	// 1. Get the photo to know the childID
 	photo, err := s.repo.GetPhotoDetail(ctx, photoID)
@@ -138,7 +138,7 @@ func (s *PhotosContactsService) GetPhotoDetail(ctx context.Context, userID strin
 	return photo, nil
 }
 
-// AddPhotoMother (Endpoint: 49)
+// AddPhotoMother (Endpoint: 46)
 func (s *PhotosContactsService) AddPhotoMother(ctx context.Context, userID string, childID uuid.UUID, input *photos_contacts.CreatePhotoInput) (uuid.UUID, error) {
 	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
 		return uuid.Nil, err
@@ -158,7 +158,7 @@ func (s *PhotosContactsService) AddPhotoMother(ctx context.Context, userID strin
 	return s.repo.CreatePhoto(ctx, childID, input)
 }
 
-// AddPhotoCaregiver (Endpoint: 50)
+// AddPhotoCaregiver (Endpoint: 47)
 func (s *PhotosContactsService) AddPhotoCaregiver(ctx context.Context, userID string, childID uuid.UUID, input *photos_contacts.CreatePhotoInput) (uuid.UUID, error) {
 	if err := checkCaregiverAccess(ctx, userID, childID, s.caregiverRepo); err != nil {
 		return uuid.Nil, err
@@ -173,7 +173,7 @@ func (s *PhotosContactsService) AddPhotoCaregiver(ctx context.Context, userID st
 	return s.repo.CreatePhoto(ctx, childID, input)
 }
 
-// UpdatePhoto (Endpoint: 52)
+// UpdatePhoto (endpoint: 49)
 func (s *PhotosContactsService) UpdatePhoto(ctx context.Context, userID string, photoID uuid.UUID, input *photos_contacts.UpdatePhotoInput) error {
 	// Access control: photo must belong to mother's child
 	// Fetch photo to get childID
@@ -194,7 +194,7 @@ func (s *PhotosContactsService) UpdatePhoto(ctx context.Context, userID string, 
 	return s.repo.UpdatePhoto(ctx, photoID, input)
 }
 
-// DeletePhoto (Endpoint: 53)
+// DeletePhoto (endpoint: 50)
 func (s *PhotosContactsService) DeletePhoto(ctx context.Context, userID string, photoID uuid.UUID) error {
 	photo, err := s.repo.GetPhotoDetail(ctx, photoID)
 	if err != nil {

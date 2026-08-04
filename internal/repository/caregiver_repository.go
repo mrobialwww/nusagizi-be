@@ -58,44 +58,6 @@ func (r *CaregiverRepository) GetByUserID(ctx context.Context, userID string) (u
 	return profileID, nil
 }
 
-// CreateCaregiverEngagement creates a new active engagement.
-func (r *CaregiverRepository) CreateCaregiverEngagement(ctx context.Context, childID, caregiverProfileID uuid.UUID) (uuid.UUID, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	// Check if active engagement already exists
-	var exists bool
-	queryCheck := `
-		SELECT EXISTS(
-			SELECT 1 
-			FROM caregiver_engagements 
-			WHERE child_id = $1 
-				AND caregiver_profile_id = $2 
-				AND deleted_at IS NULL
-		)
-	`
-	err := r.pool.QueryRow(ctx, queryCheck, childID, caregiverProfileID).Scan(&exists)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if exists {
-		return uuid.Nil, fmt.Errorf("active engagement already exists")
-	}
-
-	// Create engagement
-	newID := uuid.New()
-	queryInsert := `
-		INSERT INTO caregiver_engagements (id, child_id, caregiver_profile_id)
-		VALUES ($1, $2, $3)
-	`
-	_, err = r.pool.Exec(ctx, queryInsert, newID, childID, caregiverProfileID)
-	if err != nil {
-		return uuid.Nil, err
-	}
-
-	return newID, nil
-}
-
 // GetCaregiverEngagements gets a list of engagements (active or revoked).
 func (r *CaregiverRepository) GetCaregiverEngagements(ctx context.Context, motherProfileID uuid.UUID, isRevoked bool) ([]caregiver.CaregiverEngagementResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

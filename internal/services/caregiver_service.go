@@ -25,18 +25,7 @@ func NewCaregiverService(
 	}
 }
 
-// CreateCaregiverEngagement (Endpoint: 54)
-func (s *CaregiverService) CreateCaregiverEngagement(ctx context.Context, userID string, childID uuid.UUID) (uuid.UUID, error) {
-	// The user calling this is a caregiver
-	caregiverProfileID, err := s.repo.GetByUserID(ctx, userID)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("%w: caregiver profile not found", repository.ErrForbidden)
-	}
-
-	return s.repo.CreateCaregiverEngagement(ctx, childID, caregiverProfileID)
-}
-
-// GetCaregiverEngagements (Endpoint: 55)
+// GetCaregiverEngagements (endpoint: 51)
 func (s *CaregiverService) GetCaregiverEngagements(ctx context.Context, userID string) ([]caregiver.CaregiverEngagementResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -45,7 +34,7 @@ func (s *CaregiverService) GetCaregiverEngagements(ctx context.Context, userID s
 	return s.repo.GetCaregiverEngagements(ctx, motherProfileID, false)
 }
 
-// GetRevokedEngagements (Endpoint: 56)
+// GetRevokedEngagements (endpoint: 52)
 func (s *CaregiverService) GetRevokedEngagements(ctx context.Context, userID string) ([]caregiver.CaregiverEngagementResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -54,7 +43,7 @@ func (s *CaregiverService) GetRevokedEngagements(ctx context.Context, userID str
 	return s.repo.GetCaregiverEngagements(ctx, motherProfileID, true)
 }
 
-// DeleteCaregiverEngagement (Endpoint: 57)
+// DeleteCaregiverEngagement (endpoint: 53)
 func (s *CaregiverService) DeleteCaregiverEngagement(ctx context.Context, userID string, engagementID uuid.UUID) error {
 	// Must verify if engagement belongs to this mother's children
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
@@ -82,7 +71,7 @@ func (s *CaregiverService) DeleteCaregiverEngagement(ctx context.Context, userID
 	return s.repo.DeleteCaregiverEngagement(ctx, engagementID)
 }
 
-// GetCaregiverChildren (Endpoint: 59)
+// GetCaregiverChildren (endpoint: 55)
 func (s *CaregiverService) GetCaregiverChildren(ctx context.Context, userID string) ([]caregiver.ChildSimpleResponse, error) {
 	// Automatically resolve caregiver profile from the logged-in user
 	caregiverProfileID, err := s.repo.GetByUserID(ctx, userID)

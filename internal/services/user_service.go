@@ -68,7 +68,7 @@ func (s *UserService) GetMotherProfile(ctx context.Context, userID string) (*mod
 	}, nil
 }
 
-// GetCaregiverProfile returns the caregiver profile (Endpoint: 58)
+// GetCaregiverProfile returns the caregiver profile (endpoint: 54)
 func (s *UserService) GetCaregiverProfile(ctx context.Context, userID string) (*models.CaregiverProfileResponse, error) {
 	// 1. Validate ownership & get ID
 	actualCaregiverID, err := s.caregiverRepo.GetByUserID(ctx, userID)

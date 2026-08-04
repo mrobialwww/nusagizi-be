@@ -58,6 +58,7 @@ func main() {
 	medicalRepo := repository.NewMedicalRepository(pool)
 	photosContactsRepo := repository.NewPhotosContactsRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)
+	checkinRepo := repository.NewCheckinRepository(pool)
 
 	// Services
 	userSvc := services.NewUserService(userRepo, motherRepo, caregiverRepo)
@@ -71,6 +72,7 @@ func main() {
 	medicalSvc := services.NewMedicalService(medicalRepo, motherRepo, childRepo)
 	photosContactsSvc := services.NewPhotosContactsService(photosContactsRepo, motherRepo, childRepo, caregiverRepo)
 	notificationSvc := services.NewNotificationService(notificationRepo)
+	checkinSvc := services.NewCheckinService(checkinRepo, caregiverRepo)
 
 	// Handlers
 	onboardHandler := handlers.NewOnboardingHandler(userRepo, cfg)
@@ -85,6 +87,7 @@ func main() {
 	medicalHandler := handlers.NewMedicalHandler(medicalSvc)
 	photosContactsHandler := handlers.NewPhotosContactsHandler(photosContactsSvc)
 	notificationHandler := handlers.NewNotificationHandler(notificationSvc)
+	checkinHandler := handlers.NewCheckinHandler(checkinSvc)
 
 	// 6. Setup Gin
 	var router *gin.Engine = gin.Default()
@@ -110,12 +113,16 @@ func main() {
 		protected.GET("/users", userHandler.GetUserProfile)
 		protected.PATCH("/users", userHandler.UpdateUserProfile)
 		protected.DELETE("/users", userHandler.DeleteUserProfile)
-		
+
 		protected.POST("/mother-profiles", userHandler.CreateMotherProfile)
 		protected.GET("/mother-profiles", userHandler.GetMotherProfile)
-		
+
 		protected.POST("/caregiver-profiles", userHandler.CreateCaregiverProfile)
 		protected.GET("/caregiver-profiles", userHandler.GetCaregiverProfile)
+
+		// Modul 11: Checkin
+		protected.POST("/checkin/generate", checkinHandler.Generate)
+		protected.POST("/checkin/validate", checkinHandler.Validate)
 
 		// Modul 2: Child Profile
 		protected.POST("/children", childHandler.CreateChildProfile)
@@ -172,7 +179,6 @@ func main() {
 		protected.DELETE("/child-photos/:child_photo_id", photosContactsHandler.DeletePhoto)
 
 		// Modul 7: Caregiver
-		protected.POST("/children/:child_id/caregiver-engagements", caregiverHandler.AddCaregiverEngagement)
 		protected.GET("/mother-profiles/caregiver-engagements", caregiverHandler.GetCaregiverEngagements)
 		protected.GET("/mother-profiles/caregiver-engagements/revoked", caregiverHandler.GetCaregiverEngagementsRevoked)
 		protected.DELETE("/caregiver-engagements/:caregiver_engagement_id", caregiverHandler.DeleteCaregiverEngagement)
@@ -186,7 +192,7 @@ func main() {
 		protected.DELETE("/medical-notes/:medical_note_id", medicalHandler.DeleteMedicalNote)
 
 		// Modul 9: Dashboard
-		protected.GET("/dashboard/children", dashboardHandler.GetChildrenSummary)
+		protected.GET("/dashboard/children", dashboardHandler.GetDashboardSummary)
 
 		// Modul 10: Notifications
 		protected.GET("/notifications", notificationHandler.GetNotifications)

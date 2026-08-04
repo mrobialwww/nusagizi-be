@@ -5,5 +5,5 @@ type Ingredient struct {
 	Name     string   `json:"name" db:"name"`
 	ImageURL string   `json:"image_url" db:"image_url"`
 	Category *string  `json:"category" db:"category"`
-	Price    *float64 `json:"price" db:"price"`
+	Price    *string  `json:"price" db:"price"`
 }

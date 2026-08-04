@@ -28,7 +28,7 @@ func NewMedicalService(
 	}
 }
 
-// GetMedicalNotes (Endpoint: 60 & 61)
+// GetMedicalNotes (endpoint: 56 & 57)
 func (s *MedicalService) GetMedicalNotes(ctx context.Context, userID string, status string, month *int) ([]medical.MedicalNoteResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -46,7 +46,7 @@ func (s *MedicalService) GetMedicalNotes(ctx context.Context, userID string, sta
 	return s.repo.GetMedicalNotes(ctx, motherProfileID, status, month)
 }
 
-// GetMedicalNoteDetail (Endpoint: 62)
+// GetMedicalNoteDetail (endpoint: 58)
 func (s *MedicalService) GetMedicalNoteDetail(ctx context.Context, userID string, noteID uuid.UUID) (*medical.MedicalNoteDetailResponse, error) {
 	childID, err := s.repo.GetChildIDByNoteID(ctx, noteID)
 	if err != nil {
@@ -58,7 +58,7 @@ func (s *MedicalService) GetMedicalNoteDetail(ctx context.Context, userID string
 	return s.repo.GetMedicalNoteDetail(ctx, noteID)
 }
 
-// CreateMedicalNote (Endpoint: 63)
+// CreateMedicalNote (endpoint: 59)
 func (s *MedicalService) CreateMedicalNote(ctx context.Context, userID string, input *medical.CreateMedicalNoteInput) (uuid.UUID, error) {
 	if err := checkMotherOwnership(ctx, userID, input.ChildID, s.motherRepo, s.childRepo); err != nil {
 		return uuid.Nil, err
@@ -72,7 +72,7 @@ func (s *MedicalService) CreateMedicalNote(ctx context.Context, userID string, i
 	return s.repo.CreateMedicalNote(ctx, input)
 }
 
-// UpdateMedicalNote (Endpoint: 64)
+// UpdateMedicalNote (endpoint: 60)
 func (s *MedicalService) UpdateMedicalNote(ctx context.Context, userID string, noteID uuid.UUID, input *medical.UpdateMedicalNoteInput) error {
 	childID, err := s.repo.GetChildIDByNoteID(ctx, noteID)
 	if err != nil {
@@ -84,7 +84,7 @@ func (s *MedicalService) UpdateMedicalNote(ctx context.Context, userID string, n
 	return s.repo.UpdateMedicalNote(ctx, noteID, input)
 }
 
-// DeleteMedicalNote (Endpoint: 65)
+// DeleteMedicalNote (endpoint: 61)
 func (s *MedicalService) DeleteMedicalNote(ctx context.Context, userID string, noteID uuid.UUID) error {
 	childID, err := s.repo.GetChildIDByNoteID(ctx, noteID)
 	if err != nil {

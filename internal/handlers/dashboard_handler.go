@@ -21,8 +21,8 @@ func NewDashboardHandler(service *services.DashboardService) *DashboardHandler {
 	return &DashboardHandler{service: service}
 }
 
-// GetChildrenSummary (Endpoint: 68)
-func (h *DashboardHandler) GetChildrenSummary(c *gin.Context) {
+// GetDashboardSummary (endpoint: 64)
+func (h *DashboardHandler) GetDashboardSummary(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
 	if !exists || !ok {
@@ -36,7 +36,7 @@ func (h *DashboardHandler) GetChildrenSummary(c *gin.Context) {
 		case errors.Is(err, repository.ErrForbidden):
 			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have a mother profile"}})
 		default:
-			slog.Error("GetChildrenSummary failed", "error", err)
+			slog.Error("GetDashboardSummary failed", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return

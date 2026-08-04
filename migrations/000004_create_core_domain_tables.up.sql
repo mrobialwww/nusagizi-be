@@ -348,9 +348,9 @@ CREATE TRIGGER trg_recipes_updated_at BEFORE UPDATE ON recipes
 CREATE TABLE ingredients (
     id          VARCHAR(100) PRIMARY KEY,
     name        VARCHAR(150) NOT NULL UNIQUE,
-    image_url   TEXT NOT NULL,
+    image_url   TEXT,
     category    VARCHAR(100),
-    price       NUMERIC(10,2),
+    price       VARCHAR(10),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -386,6 +386,7 @@ CREATE TABLE cooking_steps (
     UNIQUE (recipe_id, step_number)
 );
 CREATE INDEX idx_cooking_steps_recipe_id ON cooking_steps(recipe_id);
+CREATE TRIGGER trg_cooking_steps_updated_at BEFORE UPDATE ON cooking_steps
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- recipes -> recipe_spices (1:N)
@@ -531,3 +532,20 @@ CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE TRIGGER trg_notifications_updated_at BEFORE UPDATE ON notifications
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- ---------------------------------------------------------------------
+-- create checkin QR module
+-- ---------------------------------------------------------------------
+CREATE TABLE checkin_tokens (
+    token VARCHAR(255) PRIMARY KEY,
+    child_id UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE checkin_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    token VARCHAR(255) NOT NULL,
+    child_id UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+    caregiver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    checked_in_at TIMESTAMPTZ DEFAULT NOW()
+);

@@ -160,7 +160,7 @@ func (h *UserHandler) GetMotherProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetCaregiverProfile (Endpoint: 58)
+// GetCaregiverProfile (endpoint: 54)
 func (h *UserHandler) GetCaregiverProfile(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)

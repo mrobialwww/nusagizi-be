@@ -21,7 +21,7 @@ func NewNotificationHandler(service *services.NotificationService) *Notification
 	return &NotificationHandler{service: service}
 }
 
-// GetNotifications (Endpoint: 66)
+// GetNotifications (endpoint: 62)
 func (h *NotificationHandler) GetNotifications(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -48,7 +48,7 @@ func (h *NotificationHandler) GetNotifications(c *gin.Context) {
 	c.JSON(http.StatusOK, notifications)
 }
 
-// GetLatestNotification (Endpoint: 67)
+// GetLatestNotification (Endpoint: 63)
 func (h *NotificationHandler) GetLatestNotification(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)

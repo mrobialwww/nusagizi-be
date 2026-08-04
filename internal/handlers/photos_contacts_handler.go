@@ -23,7 +23,7 @@ func NewPhotosContactsHandler(service *services.PhotosContactsService) *PhotosCo
 	return &PhotosContactsHandler{service: service}
 }
 
-// GetContacts (Endpoint: 43)
+// GetContacts (Endpoint: 40)
 func (h *PhotosContactsHandler) GetContacts(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -47,7 +47,7 @@ func (h *PhotosContactsHandler) GetContacts(c *gin.Context) {
 	c.JSON(http.StatusOK, contacts)
 }
 
-// AddContact (Endpoint: 51)
+// AddContact (endpoint: 48)
 func (h *PhotosContactsHandler) AddContact(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -91,7 +91,7 @@ func (h *PhotosContactsHandler) AddContact(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": contactID})
 }
 
-// DeleteContact (Endpoint: 44)
+// DeleteContact (Endpoint: 41)
 func (h *PhotosContactsHandler) DeleteContact(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -123,7 +123,7 @@ func (h *PhotosContactsHandler) DeleteContact(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// GetMotherChildPhotos (Endpoint: 45)
+// GetMotherChildPhotos (Endpoint: 42)
 func (h *PhotosContactsHandler) GetMotherChildPhotos(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -150,7 +150,7 @@ func (h *PhotosContactsHandler) GetMotherChildPhotos(c *gin.Context) {
 	c.JSON(http.StatusOK, photos)
 }
 
-// GetContactChildPhotos (Endpoint: 46)
+// GetContactChildPhotos (Endpoint: 43)
 func (h *PhotosContactsHandler) GetContactChildPhotos(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -183,7 +183,7 @@ func (h *PhotosContactsHandler) GetContactChildPhotos(c *gin.Context) {
 	c.JSON(http.StatusOK, photos)
 }
 
-// GetAllChildPhotos (Endpoint: 47)
+// GetAllChildPhotos (Endpoint: 44)
 func (h *PhotosContactsHandler) GetAllChildPhotos(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -210,7 +210,7 @@ func (h *PhotosContactsHandler) GetAllChildPhotos(c *gin.Context) {
 	c.JSON(http.StatusOK, photos)
 }
 
-// GetPhotoDetail (Endpoint: 48)
+// GetPhotoDetail (Endpoint: 45)
 func (h *PhotosContactsHandler) GetPhotoDetail(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -242,7 +242,7 @@ func (h *PhotosContactsHandler) GetPhotoDetail(c *gin.Context) {
 	c.JSON(http.StatusOK, photo)
 }
 
-// AddPhotoMother (Endpoint: 49)
+// AddPhotoMother (Endpoint: 46)
 func (h *PhotosContactsHandler) AddPhotoMother(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -306,7 +306,7 @@ func (h *PhotosContactsHandler) AddPhotoMother(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": photoID})
 }
 
-// AddPhotoCaregiver (Endpoint: 50)
+// AddPhotoCaregiver (Endpoint: 47)
 func (h *PhotosContactsHandler) AddPhotoCaregiver(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -356,7 +356,7 @@ func (h *PhotosContactsHandler) AddPhotoCaregiver(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": photoID})
 }
 
-// UpdatePhoto (Endpoint: 52)
+// UpdatePhoto (endpoint: 49)
 func (h *PhotosContactsHandler) UpdatePhoto(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -412,7 +412,7 @@ func (h *PhotosContactsHandler) UpdatePhoto(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// DeletePhoto (Endpoint: 53)
+// DeletePhoto (endpoint: 50)
 func (h *PhotosContactsHandler) DeletePhoto(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
