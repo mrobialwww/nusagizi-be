@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 type CheckinHandler struct {
@@ -60,15 +59,20 @@ func (h *CheckinHandler) Validate(c *gin.Context) {
 	}
 
 	// Validate token, record log, and automatically create engagement in CheckinService
-	engagementID, err := h.service.ValidateToken(c.Request.Context(), req.Token, requester.ID)
+	result, err := h.service.ValidateToken(c.Request.Context(), req.Token, requester.ID)
 
 	if err != nil {
-		if errors.Is(err, repository.ErrConflict) {
+		if errors.Is(err, repository.ErrConflict) && result != nil {
 			// Engagement already exists, it is fine, this is still counted as a successful check-in
+			// Add a custom message to the result or just return the enriched result with a message.
 			c.JSON(http.StatusOK, gin.H{
-				"valid":       true,
-				"message":     "active engagement already exists",
-				"checkedInAt": time.Now().Format(time.RFC3339),
+				"valid":        true,
+				"message":      "active engagement already exists",
+				"engagementId": result.EngagementID,
+				"checkedInAt":  result.CheckedInAt.Format(time.RFC3339),
+				"childName":    result.ChildName,
+				"childAge":     result.ChildAge,
+				"motherName":   result.MotherName,
 			})
 			return
 		}
@@ -87,15 +91,6 @@ func (h *CheckinHandler) Validate(c *gin.Context) {
 		return
 	}
 
-	// Success, engagementID could be uuid.Nil if a non-fatal error occurred
-	var engagement string
-	if engagementID != uuid.Nil {
-		engagement = engagementID.String()
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"valid":        true,
-		"engagementId": engagement,
-		"checkedInAt":  time.Now().Format(time.RFC3339),
-	})
+	// Success
+	c.JSON(http.StatusOK, result)
 }

@@ -28,3 +28,18 @@ type ValidateReq struct {
 	Token       string    `json:"token" binding:"required"`
 	CaregiverID uuid.UUID `json:"caregiverId" binding:"required"`
 }
+
+type ValidateResult struct {
+	Valid        bool      `json:"valid"`
+	EngagementID string    `json:"engagementId"`
+	CheckedInAt  time.Time `json:"checkedInAt"`
+	ChildName    string    `json:"childName"`
+	ChildAge     string    `json:"childAge"`
+	MotherName   string    `json:"motherName"`
+}
+
+type ChildCheckinInfo struct {
+	ChildName  string
+	BirthDate  time.Time
+	MotherName string
+}

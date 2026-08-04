@@ -74,8 +74,11 @@ func GinMiddleware(jwtMiddleware *jwtmiddleware.JWTMiddleware, userRepo *reposit
 		})).ServeHTTP(c.Writer, c.Request)
 
 		if !handled {
-			// Cegah pengiriman 200 OK jika request dihentikan paksa (misal gagal GetUserBySub)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user authentication. Please try again."})
+			// Prevent sending 200 OK if the request is forcefully aborted
+			// and ensure jwtMiddleware hasn't written a response (e.g., 401 Unauthorized)
+			if !c.Writer.Written() {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user authentication. Please try again."})
+			}
 			c.Abort()
 			return
 		}

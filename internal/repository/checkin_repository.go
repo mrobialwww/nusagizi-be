@@ -119,3 +119,35 @@ func (r *CheckinRepository) CreateCaregiverEngagement(ctx context.Context, child
 
 	return newID, nil
 }
+
+// GetChildInfo fetches the child's name, birth date, and mother's name.
+func (r *CheckinRepository) GetChildInfo(ctx context.Context, childID uuid.UUID) (*checkin.ChildCheckinInfo, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT 
+			c.full_name AS child_name, 
+			c.birth_date, 
+			u.full_name AS mother_name
+		FROM children c
+		JOIN mother_profiles mp ON c.mother_profile_id = mp.id
+		JOIN users u ON mp.user_id = u.id
+		WHERE c.id = $1`
+
+	var info checkin.ChildCheckinInfo
+	err := r.pool.QueryRow(ctx, query, childID).Scan(
+		&info.ChildName,
+		&info.BirthDate,
+		&info.MotherName,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return &info, nil
+}
