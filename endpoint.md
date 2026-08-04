@@ -2482,7 +2482,7 @@ WHERE ce.caregiver_profile_id = ?
 | 403    | `token expired` (token kedaluwarsa)   |
 | 403    | User tidak punya profile caregiver  |
 
-> **Catatan**: Jika `active engagement already exists`, API sekarang akan mereturn status **200 OK** beserta response yang diperkaya (lengkap dengan data anak dan ibu), karena secara bisnis ini tetap dianggap sebagai check-in yang sukses.
+> **Catatan**: Jika `active engagement already exists`, API tetap akan mengembalikan status **200 OK** (karena secara bisnis ini tetap dianggap sebagai check-in yang sukses) namun tanpa ID *engagement* baru.
 
 ---
 
