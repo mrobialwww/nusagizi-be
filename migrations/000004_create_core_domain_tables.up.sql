@@ -456,6 +456,7 @@ CREATE TABLE caregiver_engagements (
 );
 CREATE INDEX idx_caregiver_engagements_caregiver_id ON caregiver_engagements(caregiver_profile_id);
 CREATE INDEX idx_caregiver_engagements_child_id ON caregiver_engagements(child_id);
+CREATE UNIQUE INDEX unique_active_engagement ON caregiver_engagements (child_id, caregiver_profile_id) WHERE deleted_at IS NULL;
 CREATE TRIGGER trg_caregiver_engagements_updated_at BEFORE UPDATE ON caregiver_engagements
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 

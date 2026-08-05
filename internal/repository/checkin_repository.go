@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"nusagizi_be/internal/models/checkin"
 	"time"
 
@@ -88,22 +87,19 @@ func (r *CheckinRepository) CreateCaregiverEngagement(ctx context.Context, child
 	defer cancel()
 
 	// Check if active engagement already exists
-	var exists bool
+	var existingID uuid.UUID
 	queryCheck := `
-		SELECT EXISTS(
-			SELECT 1 
-			FROM caregiver_engagements 
-			WHERE child_id = $1 
-				AND caregiver_profile_id = $2 
-				AND deleted_at IS NULL
-		)
+		SELECT id 
+		FROM caregiver_engagements 
+		WHERE child_id = $1 
+			AND caregiver_profile_id = $2 
+			AND deleted_at IS NULL
 	`
-	err := r.pool.QueryRow(ctx, queryCheck, childID, caregiverProfileID).Scan(&exists)
-	if err != nil {
+	err := r.pool.QueryRow(ctx, queryCheck, childID, caregiverProfileID).Scan(&existingID)
+	if err == nil {
+		return existingID, ErrConflict
+	} else if err != pgx.ErrNoRows {
 		return uuid.Nil, err
-	}
-	if exists {
-		return uuid.Nil, fmt.Errorf("active engagement already exists")
 	}
 
 	// Create engagement

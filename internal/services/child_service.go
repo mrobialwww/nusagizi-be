@@ -61,10 +61,6 @@ func (s *ChildService) GetChildDetail(ctx context.Context, userID string, childI
 
 // GetChildSimple returns the simple child detail (Endpoint: 12 - Get profil anak versi ringan)
 func (s *ChildService) GetChildSimple(ctx context.Context, userID string, childID uuid.UUID) (*models.ChildSimpleResponse, error) {
-	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.repo); err != nil {
-		return nil, err
-	}
-
 	return s.repo.GetSimpleByID(ctx, childID)
 }
 

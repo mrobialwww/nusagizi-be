@@ -82,9 +82,9 @@ func (s *CheckinService) ValidateToken(ctx context.Context, token string, userID
 	// 5. Add Caregiver Engagement
 	engagementID, err := s.repo.CreateCaregiverEngagement(ctx, data.ChildID, caregiverProfileID)
 	if err != nil {
-		// If fails due to conflict (already engaged), it's fine. Return empty UUID
-		if errors.Is(err, repository.ErrConflict) || err.Error() == "active engagement already exists" {
-			return uuid.Nil, repository.ErrConflict
+		// If fails due to conflict (already engaged), return the existing ID and ErrConflict
+		if errors.Is(err, repository.ErrConflict) {
+			return engagementID, repository.ErrConflict
 		}
 		return uuid.Nil, err
 	}

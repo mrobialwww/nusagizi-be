@@ -398,13 +398,14 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 ]
 ```
 
-| Field      | Type           | Keterangan |
-| ---------- | -------------- | ---------- |
-| id         | UUID           |            |
-| full_name  | string         |            |
-| birth_date | date           |            |
-| gender     | enum           |            |
-| photo_url  | string \| null |            |
+| Field       | Type           | Keterangan |
+| ----------- | -------------- | ---------- |
+| id          | UUID           |            |
+| full_name   | string         |            |
+| birth_date  | date           |            |
+| gender      | enum           |            |
+| photo_url   | string \| null |            |
+| mother_name | string         |            |
 
 - **Response Error**:
 
@@ -417,7 +418,7 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 ### 12. [BARU] Get profil anak (ringan)
 
 - **Method & Path**: `GET /children/{child_id}/simple`
-- **Authorization**: pastikan `child.mother_profile_id` milik `user_id` yang login (mother) atau ada `caregiver_engagements` aktif untuk `child_id` ini (caregiver)
+- **Authorization**: Bebas (selama token valid) — tidak ada cek ownership / engagement (agar caregiver bisa melihat profil anak saat validasi QR checkin)
 - **Path Params**:
 
 | Field    | Type | Keterangan |
@@ -435,7 +436,8 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
     "birth_date": "22-07-2026",
     "gender": "male",
     "photo_url": "https://docs.google.com/",
-    "upload_streak_days": 12
+    "upload_streak_days": 12,
+    "mother_name": "Siti Rahayu"
 }
 ```
 
@@ -2279,55 +2281,15 @@ WHERE ce.caregiver_profile_id = ?
 }
 ```
 
-    "doctor_name": "dr. Tirta",
-    "facility_location": "RSSA",
-    "recommendation": "Berikan makanan bertekstur lembut dan tinggi kalori...",
-    "daily_nutrition_targets": [
-        { "nutrient_name": "calories", "quantity": 10 }
-    ],
-    "prohibitions": ["Makanan Keras"],
-    "allergies": ["Kacang Tanah"],
-    "valid_date": "22-07-2026"
-}
-```
-
-| Field                   | Type            | Wajib | Keterangan                                                        |
-| ----------------------- | --------------- | ----- | ----------------------------------------------------------------- |
-| doctor_name             | string          | Tidak | maks 150 karakter                                                 |
-| facility_location       | string          | Tidak | maks 150 karakter                                                 |
-| recommendation          | string          | Tidak |                                                                   |
-| daily_nutrition_targets | array\<object\> | Tidak | replace-all — kirim seluruh daftar baru, bukan hanya yang berubah |
-| prohibitions            | array\<string\> | Tidak | replace-all                                                       |
-| allergies               | array\<string\> | Tidak | replace-all                                                       |
-| valid_date              | date            | Tidak | `DD-MM-YYYY`                                                      |
-
-- **Response Body (200)**: `-` (body kosong)
 - **Response Error**:
 
-| Status | Kasus                       |
-| ------ | --------------------------- |
-| 403    | bukan milik user yang login |
-| 404    | tidak ditemukan             |
-| 422    | field yang diisi kosong     |
+| Status | Kasus                                 |
+| ------ | ------------------------------------- |
+| 404    | `token not found` / `child not found` |
+| 403    | `token expired` (token kedaluwarsa)   |
+| 403    | User tidak punya profile caregiver    |
 
-- **Catatan**: `child_id` tidak bisa diubah lewat endpoint ini (catatan medis tidak bisa dipindah ke anak lain — kalau salah anak, hapus lalu buat ulang lewat endpoint 61). Untuk `daily_nutrition_targets`/`prohibitions`/`allergies`, strategi update replace-all (sama seperti pola di endpoint 8). Celah dari v2 — sebelumnya hanya bisa create (33), tidak bisa edit kalau ada salah input (mis. salah ketik `valid_date`).
-
-### 61. [BARU] Hapus catatan dokter
-
-- **Method & Path**: `DELETE /medical-notes/{medical_note_id}`
-- **Authorization**: sama seperti endpoint 60
-- **Path Params**: `medical_note_id` (UUID)
-- **Query Params**: `-` (tidak ada)
-- **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: `-` (body kosong)
-- **Response Error**:
-
-| Status | Kasus                       |
-| ------ | --------------------------- |
-| 403    | bukan milik user yang login |
-| 404    | tidak ditemukan             |
-
-- **Catatan**: hard delete (`medical_notes` tidak punya `deleted_at`). `medical_restrictions` & `daily_nutrition_targets` terkait ikut terhapus lewat `ON DELETE CASCADE`.
+> **Catatan**: Jika `active engagement already exists`, API tetap akan mengembalikan status **200 OK** (karena secara bisnis ini tetap dianggap sebagai check-in yang sukses) namun tanpa ID _engagement_ baru.
 
 ---
 
@@ -2430,7 +2392,7 @@ WHERE ce.caregiver_profile_id = ?
 ### 65. Generate Checkin QR Token (POV Ibu)
 
 - **Method & Path [BARU]**: `POST /checkin/generate`
-- **Authorization**: `Bearer <token>` (Ibu)
+- **Authorization**: `mother_profile_id` di-deduce dari `user_id` yang login
 - **Path Params**: `-` (tidak ada)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**:
@@ -2453,7 +2415,7 @@ WHERE ce.caregiver_profile_id = ?
 ### 66. Validate Checkin QR (POV Caregiver)
 
 - **Method & Path [BARU]**: `POST /checkin/validate`
-- **Authorization**: `Bearer <token>` (Caregiver)
+- **Authorization**: `caregiver_profile_id` di-deduce dari `user_id` yang login
 - **Path Params**: `-` (tidak ada)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**:
@@ -2468,91 +2430,91 @@ WHERE ce.caregiver_profile_id = ?
 
 ```json
 {
-    "valid": true,
     "engagementId": "...",
+    "isNewEngagement": true,
     "checkedInAt": "2026-08-04T12:02:00Z"
 }
 ```
 
 - **Response Error**:
 
-| Status | Kasus                               |
-| ------ | ----------------------------------- |
+| Status | Kasus                                 |
+| ------ | ------------------------------------- |
 | 404    | `token not found` / `child not found` |
 | 403    | `token expired` (token kedaluwarsa)   |
-| 403    | User tidak punya profile caregiver  |
+| 403    | User tidak punya profile caregiver    |
 
-> **Catatan**: Jika `active engagement already exists`, API tetap akan mengembalikan status **200 OK** (karena secara bisnis ini tetap dianggap sebagai check-in yang sukses) namun tanpa ID *engagement* baru.
+> **Catatan**: Jika `active engagement already exists`, API tetap akan mengembalikan status **200 OK** (karena secara bisnis ini tetap dianggap sebagai check-in yang sukses) namun tanpa ID _engagement_ baru.
 
 ---
 
 ## Ringkasan Semua Endpoint (1-66)
 
-| # | Modul | Method & Path | Ringkasan |
-|---|-------|---------------|-----------|
-| 1 | Auth & User Profile | `PATCH /users` | Update profil user |
-| 2 | Auth & User Profile | `DELETE /users` | Hapus user (soft delete) |
-| 3 | Auth & User Profile | `GET /users` | [BARU] Get profil user sendiri |
-| 4 | Auth & User Profile | `POST /mother-profiles` | [BARU] Daftar sebagai mother (pilih role) |
-| 5 | Auth & User Profile | `POST /caregiver-profiles` | [BARU] Daftar sebagai caregiver (pilih role) |
-| 6 | Auth & User Profile | `GET /mother-profiles` | [BARU] Get profil mother sendiri |
-| 7 | Child Profile | `POST /children` | Tambah profil anak |
-| 8 | Child Profile | `PATCH /children/{child_id}` | Update profil anak |
-| 9 | Child Profile | `DELETE /children/{child_id}` | [BARU] Hapus profil anak (soft delete) |
-| 10 | Child Profile | `GET /children/{child_id}` | [BARU] Get detail profil anak |
-| 11 | Child Profile | `GET /children` | [BARU] Get list anak milik mother (ringan) |
-| 12 | Child Profile | `GET /children/{child_id}/simple` | [BARU] Get profil anak (ringan) |
-| 13 | Child Growth | `GET /children/{child_id}/growth-reports/latest` | Get child_growth_reports terbaru |
-| 14 | Child Growth | `GET /children/{child_id}/growth-analyses` | Get child_growth_analyses (filter age-range & analysis_type) [FIX] |
-| 15 | Child Growth | `GET /children/{child_id}/growth-reports` | Get riwayat child_growth_reports |
-| 16 | Child Growth | `POST /children/{child_id}/growth-reports` | Tambah child_growth_reports |
-| 17 | Child Growth | `PATCH /growth-reports/{child_growth_report_id}` | [BARU] Edit child_growth_reports |
-| 18 | Child Growth | `DELETE /growth-reports/{child_growth_report_id}` | [BARU] Hapus child_growth_reports |
-| 19 | Child Development (KPSP) | `GET /children/{child_id}/development-reports/latest` | Get child_development_reports terbaru + 4 domain |
-| 20 | Child Development (KPSP) | `GET /children/{child_id}/development-reports` | Get riwayat asesmen KPSP |
-| 21 | Child Development (KPSP) | `GET /development-reports/{child_development_report_id}` | Get detail hasil asesmen KPSP |
-| 22 | Child Development (KPSP) | `GET /assessment-kpsp-questions` | Get pertanyaan assessment_kpsp_questions |
-| 23 | Child Development (KPSP) | `POST /children/{child_id}/development-reports` | Simpan hasil asesmen KPSP (create) |
-| 24 | Child Development (KPSP) | `PATCH /development-reports/{child_development_report_id}` | Update hasil asesmen KPSP terbaru |
-| 25 | Child Development (KPSP) | `GET /checklist-milestone-tasks` | Get checklist_milestone_tasks |
-| 26 | Child Development (KPSP) | `GET /children/{child_id}/development-reports/{report_id}/recommendations` | Get rekomendasi aksi KPSP berdasarkan hasil asesmen |
-| 27 | Child Development (KPSP) | `PATCH /children/{child_id}/checklist-milestone-progress` | Tandai checklist milestone (Sync / UPSERT) |
-| 28 | Child Development (KPSP) | `DELETE /development-reports/{child_development_report_id}` | [BARU] Hapus development-report (salah input) |
-| 29 | Child Nutrition | `GET /children/{child_id}/nutrition/today` | Get nutrition report + menu hari ini + shopping list (POV mother) |
-| 30 | Child Nutrition | `GET /children/{child_id}/daily-menus/today` | Get menu hari ini |
-| 31 | Child Nutrition | `PATCH /recipes/{recipe_id}/complete` | Update status selesai recipe |
-| 32 | Child Nutrition | `PATCH /recipes/{recipe_id}/bookmark` | [BARU] Update bookmark recipe |
-| 33 | Child Nutrition | `GET /recipes/{recipe_id}` | Get detail recipe |
-| 34 | Child Nutrition | `PATCH /recipes/{recipe_id}/main-ingredients/{main_ingredient_id}` | Tukar prioritas main_ingredients |
-| 35 | Child Nutrition | `GET /children/{child_id}/recipes/bookmarked` | Get bookmark menu |
-| 36 | Child Nutrition | `GET /children/{child_id}/nutrition-reports` | [BARU] Get riwayat nutrition report per bulan |
-| 37 | Child Nutrition | `GET /menu/daily-shop` | [BARU] Get list ingredient untuk daily shop (POV Mother & Caregiver) |
-| 38 | Child Nutrition | `GET /children/{child_id}/daily-menus/today/shopping` | [BARU] Get menu hari ini + shopping list (POV caregiver) |
-| 39 | Child Nutrition | `POST /menu/generate` | [BARU] Generate menu dari AI (Food Engine) |
-| 40 | Photos & Contacts | `GET /mother-profiles/contacts` | Get list teman (contacts) |
-| 41 | Photos & Contacts | `DELETE /contacts/{contact_id}` | Hapus teman |
-| 42 | Photos & Contacts | `GET /mother-profiles/child-photos` | Get semua foto anak milik mother |
-| 43 | Photos & Contacts | `GET /contacts/{contact_id}/child-photos` | Get foto anak dari suatu contact |
-| 44 | Photos & Contacts | `GET /mother-profiles/child-photos/all` | Get semua foto (gabungan 39+40) |
-| 45 | Photos & Contacts | `GET /child-photos/{child_photo_id}` | Get detail foto |
-| 46 | Photos & Contacts | `POST /children/{child_id}/photos` | Tambah foto (POV mother) |
-| 47 | Photos & Contacts | `POST /children/{child_id}/photos` | Tambah foto (POV caregiver) |
-| 48 | Photos & Contacts | `POST /mother-profiles/contacts` | [BARU] Tambah contact/teman |
-| 49 | Photos & Contacts | `PATCH /child-photos/{child_photo_id}` | [BARU] Edit foto |
-| 50 | Photos & Contacts | `DELETE /child-photos/{child_photo_id}` | [BARU] Hapus foto |
-| 51 | Caregiver | `GET /mother-profiles/caregiver-engagements` | Get list akses caregiver (POV mother) |
-| 52 | Caregiver | `GET /mother-profiles/caregiver-engagements/revoked` | [BARU] Get riwayat akses caregiver yang sudah dicabut (POV mother) |
-| 53 | Caregiver | `DELETE /caregiver-engagements/{caregiver_engagement_id}` | Hapus akses caregiver |
-| 54 | Caregiver | `GET /caregiver-profiles` | Get profil caregiver [FIX] |
-| 55 | Caregiver | `GET /caregiver-profiles/children` | Get list child dari caregiver_engagement |
-| 56 | Medical | `GET /mother-profiles/medical-notes` | Get list medical_notes aktif per anak [FIX] |
-| 57 | Medical | `GET /mother-profiles/medical-notes` | Get riwayat medical_notes (sudah tidak aktif) [FIX] |
-| 58 | Medical | `GET /medical-notes/{medical_note_id}` | Get rincian medical_notes |
-| 59 | Medical | `POST /medical-notes` | Tambah catatan dokter |
-| 60 | Medical | `PATCH /medical-notes/{medical_note_id}` | [BARU] Edit catatan dokter |
-| 61 | Medical | `DELETE /medical-notes/{medical_note_id}` | [BARU] Hapus catatan dokter |
-| 62 | Notification | `GET /notifications` | Get seluruh notifikasi [FIX] |
-| 63 | Notification | `GET /notifications/latest` | Get notifikasi terbaru |
-| 64 | Dashboard (gabungan) | `GET /mother-profiles/children/summary` | Get seluruh anak + tinggi, berat, skor KPSP, protein |
-| 65 | Checkin | `POST /checkin/generate` | Generate Checkin QR Token (POV Ibu) |
-| 66 | Checkin | `POST /checkin/validate` | Validate Checkin QR (POV Caregiver) |
+| #   | Modul                    | Method & Path                                                              | Ringkasan                                                            |
+| --- | ------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 1   | Auth & User Profile      | `PATCH /users`                                                             | Update profil user                                                   |
+| 2   | Auth & User Profile      | `DELETE /users`                                                            | Hapus user (soft delete)                                             |
+| 3   | Auth & User Profile      | `GET /users`                                                               | [BARU] Get profil user sendiri                                       |
+| 4   | Auth & User Profile      | `POST /mother-profiles`                                                    | [BARU] Daftar sebagai mother (pilih role)                            |
+| 5   | Auth & User Profile      | `POST /caregiver-profiles`                                                 | [BARU] Daftar sebagai caregiver (pilih role)                         |
+| 6   | Auth & User Profile      | `GET /mother-profiles`                                                     | [BARU] Get profil mother sendiri                                     |
+| 7   | Child Profile            | `POST /children`                                                           | Tambah profil anak                                                   |
+| 8   | Child Profile            | `PATCH /children/{child_id}`                                               | Update profil anak                                                   |
+| 9   | Child Profile            | `DELETE /children/{child_id}`                                              | [BARU] Hapus profil anak (soft delete)                               |
+| 10  | Child Profile            | `GET /children/{child_id}`                                                 | [BARU] Get detail profil anak                                        |
+| 11  | Child Profile            | `GET /children`                                                            | [BARU] Get list anak milik mother (ringan)                           |
+| 12  | Child Profile            | `GET /children/{child_id}/simple`                                          | [BARU] Get profil anak (ringan)                                      |
+| 13  | Child Growth             | `GET /children/{child_id}/growth-reports/latest`                           | Get child_growth_reports terbaru                                     |
+| 14  | Child Growth             | `GET /children/{child_id}/growth-analyses`                                 | Get child_growth_analyses (filter age-range & analysis_type) [FIX]   |
+| 15  | Child Growth             | `GET /children/{child_id}/growth-reports`                                  | Get riwayat child_growth_reports                                     |
+| 16  | Child Growth             | `POST /children/{child_id}/growth-reports`                                 | Tambah child_growth_reports                                          |
+| 17  | Child Growth             | `PATCH /growth-reports/{child_growth_report_id}`                           | [BARU] Edit child_growth_reports                                     |
+| 18  | Child Growth             | `DELETE /growth-reports/{child_growth_report_id}`                          | [BARU] Hapus child_growth_reports                                    |
+| 19  | Child Development (KPSP) | `GET /children/{child_id}/development-reports/latest`                      | Get child_development_reports terbaru + 4 domain                     |
+| 20  | Child Development (KPSP) | `GET /children/{child_id}/development-reports`                             | Get riwayat asesmen KPSP                                             |
+| 21  | Child Development (KPSP) | `GET /development-reports/{child_development_report_id}`                   | Get detail hasil asesmen KPSP                                        |
+| 22  | Child Development (KPSP) | `GET /assessment-kpsp-questions`                                           | Get pertanyaan assessment_kpsp_questions                             |
+| 23  | Child Development (KPSP) | `POST /children/{child_id}/development-reports`                            | Simpan hasil asesmen KPSP (create)                                   |
+| 24  | Child Development (KPSP) | `PATCH /development-reports/{child_development_report_id}`                 | Update hasil asesmen KPSP terbaru                                    |
+| 25  | Child Development (KPSP) | `GET /checklist-milestone-tasks`                                           | Get checklist_milestone_tasks                                        |
+| 26  | Child Development (KPSP) | `GET /children/{child_id}/development-reports/{report_id}/recommendations` | Get rekomendasi aksi KPSP berdasarkan hasil asesmen                  |
+| 27  | Child Development (KPSP) | `PATCH /children/{child_id}/checklist-milestone-progress`                  | Tandai checklist milestone (Sync / UPSERT)                           |
+| 28  | Child Development (KPSP) | `DELETE /development-reports/{child_development_report_id}`                | [BARU] Hapus development-report (salah input)                        |
+| 29  | Child Nutrition          | `GET /children/{child_id}/nutrition/today`                                 | Get nutrition report + menu hari ini + shopping list (POV mother)    |
+| 30  | Child Nutrition          | `GET /children/{child_id}/daily-menus/today`                               | Get menu hari ini                                                    |
+| 31  | Child Nutrition          | `PATCH /recipes/{recipe_id}/complete`                                      | Update status selesai recipe                                         |
+| 32  | Child Nutrition          | `PATCH /recipes/{recipe_id}/bookmark`                                      | [BARU] Update bookmark recipe                                        |
+| 33  | Child Nutrition          | `GET /recipes/{recipe_id}`                                                 | Get detail recipe                                                    |
+| 34  | Child Nutrition          | `PATCH /recipes/{recipe_id}/main-ingredients/{main_ingredient_id}`         | Tukar prioritas main_ingredients                                     |
+| 35  | Child Nutrition          | `GET /children/{child_id}/recipes/bookmarked`                              | Get bookmark menu                                                    |
+| 36  | Child Nutrition          | `GET /children/{child_id}/nutrition-reports`                               | [BARU] Get riwayat nutrition report per bulan                        |
+| 37  | Child Nutrition          | `GET /menu/daily-shop`                                                     | [BARU] Get list ingredient untuk daily shop (POV Mother & Caregiver) |
+| 38  | Child Nutrition          | `GET /children/{child_id}/daily-menus/today/shopping`                      | [BARU] Get menu hari ini + shopping list (POV caregiver)             |
+| 39  | Child Nutrition          | `POST /menu/generate`                                                      | [BARU] Generate menu dari AI (Food Engine)                           |
+| 40  | Photos & Contacts        | `GET /mother-profiles/contacts`                                            | Get list teman (contacts)                                            |
+| 41  | Photos & Contacts        | `DELETE /contacts/{contact_id}`                                            | Hapus teman                                                          |
+| 42  | Photos & Contacts        | `GET /mother-profiles/child-photos`                                        | Get semua foto anak milik mother                                     |
+| 43  | Photos & Contacts        | `GET /contacts/{contact_id}/child-photos`                                  | Get foto anak dari suatu contact                                     |
+| 44  | Photos & Contacts        | `GET /mother-profiles/child-photos/all`                                    | Get semua foto (gabungan 39+40)                                      |
+| 45  | Photos & Contacts        | `GET /child-photos/{child_photo_id}`                                       | Get detail foto                                                      |
+| 46  | Photos & Contacts        | `POST /children/{child_id}/photos`                                         | Tambah foto (POV mother)                                             |
+| 47  | Photos & Contacts        | `POST /children/{child_id}/photos`                                         | Tambah foto (POV caregiver)                                          |
+| 48  | Photos & Contacts        | `POST /mother-profiles/contacts`                                           | [BARU] Tambah contact/teman                                          |
+| 49  | Photos & Contacts        | `PATCH /child-photos/{child_photo_id}`                                     | [BARU] Edit foto                                                     |
+| 50  | Photos & Contacts        | `DELETE /child-photos/{child_photo_id}`                                    | [BARU] Hapus foto                                                    |
+| 51  | Caregiver                | `GET /mother-profiles/caregiver-engagements`                               | Get list akses caregiver (POV mother)                                |
+| 52  | Caregiver                | `GET /mother-profiles/caregiver-engagements/revoked`                       | [BARU] Get riwayat akses caregiver yang sudah dicabut (POV mother)   |
+| 53  | Caregiver                | `DELETE /caregiver-engagements/{caregiver_engagement_id}`                  | Hapus akses caregiver                                                |
+| 54  | Caregiver                | `GET /caregiver-profiles`                                                  | Get profil caregiver [FIX]                                           |
+| 55  | Caregiver                | `GET /caregiver-profiles/children`                                         | Get list child dari caregiver_engagement                             |
+| 56  | Medical                  | `GET /mother-profiles/medical-notes`                                       | Get list medical_notes aktif per anak [FIX]                          |
+| 57  | Medical                  | `GET /mother-profiles/medical-notes`                                       | Get riwayat medical_notes (sudah tidak aktif) [FIX]                  |
+| 58  | Medical                  | `GET /medical-notes/{medical_note_id}`                                     | Get rincian medical_notes                                            |
+| 59  | Medical                  | `POST /medical-notes`                                                      | Tambah catatan dokter                                                |
+| 60  | Medical                  | `PATCH /medical-notes/{medical_note_id}`                                   | [BARU] Edit catatan dokter                                           |
+| 61  | Medical                  | `DELETE /medical-notes/{medical_note_id}`                                  | [BARU] Hapus catatan dokter                                          |
+| 62  | Notification             | `GET /notifications`                                                       | Get seluruh notifikasi [FIX]                                         |
+| 63  | Notification             | `GET /notifications/latest`                                                | Get notifikasi terbaru                                               |
+| 64  | Dashboard (gabungan)     | `GET /mother-profiles/children/summary`                                    | Get seluruh anak + tinggi, berat, skor KPSP, protein                 |
+| 65  | Checkin                  | `POST /checkin/generate`                                                   | Generate Checkin QR Token (POV Ibu)                                  |
+| 66  | Checkin                  | `POST /checkin/validate`                                                   | Validate Checkin QR (POV Caregiver)                                  |

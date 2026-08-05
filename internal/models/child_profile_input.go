@@ -48,6 +48,7 @@ type ChildSimpleResponse struct {
 	Gender           string  `json:"gender"`
 	PhotoURL         *string `json:"photo_url"`
 	UploadStreakDays int     `json:"upload_streak_days"`
+	MotherName       string  `json:"mother_name"`
 }
 
 // ChildDetailResponse is the response body

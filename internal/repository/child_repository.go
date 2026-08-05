@@ -359,9 +359,11 @@ func (r *ChildRepository) GetSimpleByID(ctx context.Context, childID uuid.UUID) 
 
 	query := `
 		SELECT 
-			id, full_name, birth_date, gender, photo_url, upload_streak_days
-		FROM children
-		WHERE id = $1 AND deleted_at IS NULL
+			c.id, c.full_name, c.birth_date, c.gender, c.photo_url, c.upload_streak_days, u.full_name
+		FROM children c
+		JOIN mother_profiles mp ON c.mother_profile_id = mp.id
+		JOIN users u ON mp.user_id = u.id
+		WHERE c.id = $1 AND c.deleted_at IS NULL
 	`
 
 	err := r.pool.QueryRow(ctx, query, childID).Scan(
@@ -371,6 +373,7 @@ func (r *ChildRepository) GetSimpleByID(ctx context.Context, childID uuid.UUID) 
 		&child.Gender,
 		&child.PhotoURL,
 		&child.UploadStreakDays,
+		&child.MotherName,
 	)
 
 	if errors.Is(err, pgx.ErrNoRows) {

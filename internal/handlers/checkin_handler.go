@@ -62,17 +62,15 @@ func (h *CheckinHandler) Validate(c *gin.Context) {
 	// Validate token, record log, and automatically create engagement in CheckinService
 	engagementID, err := h.service.ValidateToken(c.Request.Context(), req.Token, requester.ID)
 
+	isNewEngagement := true
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			// Engagement already exists, it is fine, this is still counted as a successful check-in
-			c.JSON(http.StatusOK, gin.H{
-				"valid":       true,
-				"message":     "active engagement already exists",
-				"checkedInAt": time.Now().Format(time.RFC3339),
-			})
-			return
+			isNewEngagement = false
+			err = nil // Clear error since we consider this a success
 		}
+	}
 
+	if err != nil {
 		status := http.StatusInternalServerError
 		code := "INTERNAL_ERROR"
 		if errors.Is(err, repository.ErrNotFound) {
@@ -87,15 +85,15 @@ func (h *CheckinHandler) Validate(c *gin.Context) {
 		return
 	}
 
-	// Success, engagementID could be uuid.Nil if a non-fatal error occurred
+	// Success, either new engagement or conflict (active engagement already exists)
 	var engagement string
 	if engagementID != uuid.Nil {
 		engagement = engagementID.String()
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"valid":        true,
-		"engagementId": engagement,
-		"checkedInAt":  time.Now().Format(time.RFC3339),
+		"engagementId":    engagement,
+		"isNewEngagement": isNewEngagement,
+		"checkedInAt":     time.Now().Format(time.RFC3339),
 	})
 }
