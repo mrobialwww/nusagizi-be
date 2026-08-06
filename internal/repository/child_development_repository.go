@@ -198,7 +198,7 @@ func (r *ChildDevelopmentRepository) GetKPSPQuestions(ctx context.Context, month
 	defer cancel()
 
 	query := `
-		SELECT id, "order", developmental_domain, month_target, question, description, created_at, updated_at
+		SELECT id, "order", developmental_domain, month_target, question, created_at, updated_at
 		FROM assessment_kpsp_questions
 		WHERE month_target = $1
 		ORDER BY "order" ASC`
@@ -213,8 +213,8 @@ func (r *ChildDevelopmentRepository) GetKPSPQuestions(ctx context.Context, month
 	for rows.Next() {
 		var q child_dev.AssessmentKPSPQuestion
 		if err := rows.Scan(
-			&q.ID, &q.Order, &q.DevelopmentalDomain, &q.MonthTarget,
-			&q.Question, &q.Description,
+			&q.ID, &q.Order, &q.DevelopmentalDomain, &q.MonthTarget, 
+			&q.Question, &q.CreatedAt, &q.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

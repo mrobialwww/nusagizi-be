@@ -554,9 +554,8 @@ _(Semua indikator juga membutuhkan parameter Jenis Kelamin untuk memilih tabel)_
 | height_cm             | number |                                                                                           |
 | head_circumference_cm | number |                                                                                           |
 | status                | string | Hasil agregat terburuk dari 5 indikator WHO: `Normal`, `Berisiko`, `Gangguan Pertumbuhan` |
-| description           | string | Deskripsi singkat dan saran terkait status pertumbuhan saat ini (hardcoded per status)    |
 
-- **Catatan [FIX v5]**: Field `status` dan `description` dihitung on-the-fly menggunakan Z-Score WHO LMS dari 5 indikator sekaligus. Status yang dikembalikan adalah yang terburuk (_worst-case_) di antara semua indikator:
+- **Catatan [FIX v5]**: Field `status` dihitung on-the-fly menggunakan Z-Score WHO LMS dari 5 indikator sekaligus. Status yang dikembalikan adalah yang terburuk (_worst-case_) di antara semua indikator:
     - **`Gangguan Pertumbuhan`**: Jika terdapat _minimal satu_ indikator dengan Z-Score < -3 atau > +3.
     - **`Berisiko`**: Jika terdapat _minimal satu_ indikator dengan Z-Score berada di rentang [-3, -2) atau (2, 3].
     - **`Normal`**: Jika _semua_ indikator memiliki Z-Score di dalam rentang aman [-2, +2].
@@ -931,8 +930,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
         "id": "...",
         "month_target": 3,
         "developmental_domain": "Gross motor skills",
-        "question_text": "...",
-        "description": "..."
+        "question_text": "..."
     }
 ]
 ```

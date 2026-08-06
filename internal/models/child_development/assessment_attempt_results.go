@@ -22,7 +22,8 @@ type AssessmentKPSPQuestion struct {
 	DevelopmentalDomain DevelopmentalDomainEnum `json:"developmental_domain" db:"developmental_domain"`
 	MonthTarget         MonthTargetEnum         `json:"month_target" db:"month_target"`
 	Question            string                  `json:"question" db:"question"`
-	Description         string                  `json:"description" db:"description"`
+	CreatedAt           time.Time               `json:"created_at" db:"created_at"`
+	UpdatedAt           time.Time               `json:"updated_at" db:"updated_at"`
 }
 
 type RecommendationItem struct {

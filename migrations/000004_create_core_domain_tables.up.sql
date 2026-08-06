@@ -215,7 +215,6 @@ CREATE TABLE assessment_kpsp_questions (
     month_target            INTEGER NOT NULL CHECK (month_target IN (3,6,9,12,15,18,21,24,30,36,42,48,54,60)),
     developmental_domain    developmental_domain NOT NULL,
     question_text           TEXT NOT NULL,
-    description             TEXT NOT NULL,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
