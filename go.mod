@@ -5,6 +5,8 @@ go 1.25.0
 require github.com/golang-jwt/jwt v3.2.2+incompatible
 
 require (
+	github.com/MicahParks/jwkset v0.11.1 // indirect
+	github.com/MicahParks/keyfunc/v3 v3.8.1 // indirect
 	github.com/PuerkitoBio/rehttp v1.4.0 // indirect
 	github.com/auth0/go-auth0 v1.41.0 // indirect
 	github.com/auth0/go-jwt-middleware/v2 v2.3.1 // indirect
@@ -61,5 +63,6 @@ require (
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

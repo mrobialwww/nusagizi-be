@@ -14,6 +14,7 @@ type Config struct {
 	Auth0Audience string
 
 	// Auth0 M2M credentials (untuk Management API)
+	// To Validate claim "aud" in ID Token from app
 	Auth0ClientID     string
 	Auth0ClientSecret string
 
@@ -24,6 +25,10 @@ type Config struct {
 
 	// AI Service
 	AIServiceBaseURL string
+
+	// To Communicate with Auth0 APIs
+	M2MClientID     string
+	M2MClientSecret string
 }
 
 func Load() (*Config, error) {
@@ -47,6 +52,9 @@ func Load() (*Config, error) {
 		Auth0RoleIDDoctor:    os.Getenv("AUTH0_ROLE_ID_DOCTOR"),
 
 		AIServiceBaseURL: os.Getenv("AI_SERVICE_BASE_URL"),
+
+		M2MClientID:     os.Getenv("AUTH0_M2M_CLIENT_ID"),
+		M2MClientSecret: os.Getenv("AUTH0_M2M_CLIENT_SECRET"),
 	}
 
 	return config, nil

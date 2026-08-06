@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"log"
 	"nusagizi_be/internal/auth"
+	"nusagizi_be/internal/auth/auth0client"
 	"nusagizi_be/internal/config"
 	"nusagizi_be/internal/database"
 	"nusagizi_be/internal/handlers"
@@ -43,6 +45,13 @@ func main() {
 		log.Fatal("Failed to create JWT middleware:", err)
 	}
 
+	// Auth0 Clients for OTP
+	idTokenVerifier, err := auth0client.NewIDTokenVerifier(context.Background(), cfg.Auth0Domain, cfg.Auth0ClientID)
+	if err != nil {
+		log.Fatal("Failed to create IDTokenVerifier:", err)
+	}
+	managementClient := auth0client.NewManagementClient(cfg.Auth0Domain, cfg.M2MClientID, cfg.M2MClientSecret)
+
 	// 5. DI Wiring: Repositories -> Services -> Handlers
 
 	// Repositories
@@ -61,6 +70,7 @@ func main() {
 	checkinRepo := repository.NewCheckinRepository(pool)
 
 	// Services
+	emailOTPSvc := services.NewEmailOTPService(idTokenVerifier, managementClient)
 	userSvc := services.NewUserService(userRepo, motherRepo, caregiverRepo)
 	childSvc := services.NewChildService(childRepo, motherRepo, caregiverRepo)
 	childDevSvc := services.NewChildDevelopmentService(childDevRepo, childRepo, motherRepo)
@@ -75,6 +85,7 @@ func main() {
 	checkinSvc := services.NewCheckinService(checkinRepo, caregiverRepo)
 
 	// Handlers
+	emailOTPHandler := handlers.NewConfirmEmailHandler(emailOTPSvc)
 	onboardHandler := handlers.NewOnboardingHandler(userRepo, cfg)
 	userHandler := handlers.NewUserHandler(userSvc)
 	childHandler := handlers.NewChildHandler(childSvc)
@@ -101,6 +112,7 @@ func main() {
 			"database": "connected",
 		})
 	})
+	router.POST("/confirm-email", emailOTPHandler.Handle)
 
 	// 8. Protected routes (require valid Auth0 JWT)
 	protected := router.Group("/")

@@ -54,6 +54,41 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 
 > Alur singkat: user signup/login via Auth0 → row `users` tersedia (di luar cakupan) → aplikasi tanya "Anda ibu atau caregiver?" → panggil endpoint 4 atau 48 untuk membuat profile sesuai role.
 
+### 0. Konfirmasi Email (OTP) **[BARU]**
+
+- **Method & Path**: `POST /confirm-email`
+- **Authorization**: Tanpa token (public endpoint)
+- **Path Params**: `-` (tidak ada)
+- **Query Params**: `-` (tidak ada)
+- **Request Body**: Wajib menyertakan `id_token` dari Auth0
+
+```json
+{
+    "id_token": "eyJhbGciOiJ..."
+}
+```
+
+| Field      | Type   | Wajib | Keterangan                                          |
+| ---------- | ------ | ----- | --------------------------------------------------- |
+| id_token   | string | Ya    | ID Token dari flow Passwordless OTP Auth0           |
+
+- **Response Body (200)**:
+
+```json
+{
+    "status": "verified"
+}
+```
+
+- **Response Error**:
+
+| Status | Kasus                                               |
+| ------ | --------------------------------------------------- |
+| 400    | `id_token` wajib diisi atau klaim email tidak ada   |
+| 401    | `id_token` tidak valid atau email belum diverifikasi|
+| 404    | akun database untuk email ini tidak ditemukan       |
+| 500    | gagal memperbarui status verifikasi email           |
+
 ### 1. Update profil user
 
 - **Method & Path**: `PATCH /users`
