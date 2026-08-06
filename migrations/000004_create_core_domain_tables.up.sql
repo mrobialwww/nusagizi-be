@@ -14,37 +14,36 @@ $$ LANGUAGE plpgsql;
 CREATE TYPE gender_type AS ENUM ('male', 'female');
 
 -- ENUM: child_allergy_profile.category
-CREATE TYPE child_allergy_category AS ENUM ('food', 'medicine', 'animal', 'others');
+CREATE TYPE child_allergy_type AS ENUM ('food', 'medicine', 'animal', 'other');
 
--- ENUM: medical_notes.nutrient_name
-CREATE TYPE nutrient_type AS ENUM ('calories', 'protein', 'fat', 'carbohydrate');
+-- ENUM: medical_notes.nutrient
+CREATE TYPE nutrient_type AS ENUM ('calorie', 'protein', 'fat', 'carbohydrate');
 
--- ENUM: nerve_name (aspek tumbuh kembang KPSP)
--- ASUMSI: dipakai di assessment_kpsp_questions.nerve_name dan checklist_milestone_tasks.nerve_name
-CREATE TYPE nerve_name AS ENUM (
-    'Gross motor skills',
-    'Fine motor skills',
-    'Speech and language',
-    'Socialization'
+-- ENUM: developmental_domain
+CREATE TYPE developmental_domain AS ENUM (
+    'gross_motor_skills',
+    'fine_motor_skills',
+    'speech_and_language',
+    'socialization'
 );
 
 -- ENUM: recipes.meal_time
-CREATE TYPE recipe_meal_time AS ENUM (
-    'sarapan',
-    'makan siang',
-    'makan malam',
-    'selingan siang',
-    'selingan sore'
+CREATE TYPE meal_time_type AS ENUM (
+    'breakfast',
+    'lunch',
+    'dinner',
+    'morning_snack',
+    'afternoon_snack'
 );
 
 -- ENUM: child_photos.visibility
-CREATE TYPE child_photo_visibility AS ENUM ('all', 'private', 'only');
+CREATE TYPE child_photo_visibility AS ENUM ('all', 'private', 'selected_only');
 
 -- ENUM: medical_restrictions.type
 CREATE TYPE medical_restriction_type AS ENUM ('prohibition', 'allergy');
 
 -- ENUM: notification.type
-CREATE TYPE notification_type AS ENUM ('meal_reminder', 'growth_development_reminder', 'doctor_activity', 'photos_activity', 'shop_activity', 'invitation_activity', 'new_menu_reminder', 'achievement');
+CREATE TYPE notification_type AS ENUM ('meal_reminder', 'growth_development_reminder', 'doctor_activity', 'photo_activity', 'shop_activity', 'invitation_activity', 'new_menu_reminder', 'achievement');
 
 -- users (already created in 000001)
 ALTER TABLE users 
@@ -100,7 +99,7 @@ CREATE TABLE children (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     mother_profile_id       UUID NOT NULL REFERENCES mother_profiles(id) ON DELETE CASCADE,
     full_name               VARCHAR(150) NOT NULL,
-    gender                  VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female')),
+    gender                  gender_type NOT NULL,
     birth_date              DATE NOT NULL,
     photo_url               TEXT,
     notes_profile           TEXT,
@@ -165,7 +164,7 @@ CREATE TRIGGER trg_child_chronic_disease_profiles_updated_at BEFORE UPDATE ON ch
 CREATE TABLE child_allergy_profiles (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     child_id       UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
-    category       child_allergy_category NOT NULL,
+    category       child_allergy_type NOT NULL,
     allergen_name  VARCHAR(150) NOT NULL,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -212,13 +211,13 @@ CREATE TRIGGER trg_child_development_reports_updated_at BEFORE UPDATE ON child_d
 
 -- Master pertanyaan KPSP per kelompok umur & aspek (nerve_name)
 CREATE TABLE assessment_kpsp_questions (
-    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    month_target   INTEGER NOT NULL CHECK (month_target IN (3,6,9,12,15,18,21,24,30,36,42,48,54,60)),
-    nerve_name     nerve_name NOT NULL,
-    question_text  TEXT NOT NULL,
-    description    TEXT NOT NULL,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    month_target            INTEGER NOT NULL CHECK (month_target IN (3,6,9,12,15,18,21,24,30,36,42,48,54,60)),
+    developmental_domain    developmental_domain NOT NULL,
+    question_text           TEXT NOT NULL,
+    description             TEXT NOT NULL,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_assessment_kpsp_questions_month_target ON assessment_kpsp_questions(month_target);
 CREATE TRIGGER trg_assessment_kpsp_questions_updated_at BEFORE UPDATE ON assessment_kpsp_questions
@@ -254,20 +253,20 @@ CREATE TRIGGER trg_recommended_actions_updated_at BEFORE UPDATE ON recommended_a
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Junction N:M: child_development_reports <-> recommended_actions
-CREATE TABLE assessment_attempt_recomendations (
+CREATE TABLE development_report_recommendations (
     child_development_report_id   UUID NOT NULL REFERENCES child_development_reports(id) ON DELETE CASCADE,
     recommended_action_id         UUID NOT NULL REFERENCES recommended_actions(id) ON DELETE CASCADE,
     created_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (child_development_report_id, recommended_action_id)
 );
-CREATE INDEX idx_attempt_recomendations_report_id ON assessment_attempt_recomendations(child_development_report_id);
-CREATE INDEX idx_attempt_recomendations_action_id ON assessment_attempt_recomendations(recommended_action_id);
+CREATE INDEX idx_attempt_recomendations_report_id ON development_report_recommendations(child_development_report_id);
+CREATE INDEX idx_attempt_recomendations_action_id ON development_report_recommendations(recommended_action_id);
 
 -- Master task milestone per kelompok umur & aspek (nerve_name)
 CREATE TABLE checklist_milestone_tasks (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     month_target     INTEGER NOT NULL CHECK (month_target IN (3,6,9,12,15,18,21,24,30,36,42,48,54,60)),
-    nerve_name       nerve_name NOT NULL,
+    developmental_domain       developmental_domain NOT NULL,
     task_description TEXT NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -327,7 +326,7 @@ CREATE TABLE recipes (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     daily_menu_id       UUID NOT NULL REFERENCES daily_menus(id) ON DELETE CASCADE,
     name                VARCHAR(150) NOT NULL,
-    meal_time           recipe_meal_time NOT NULL,
+    meal_time           meal_time_type NOT NULL,
     meal_texture        VARCHAR(25) NOT NULL,
     calories            INTEGER NOT NULL CHECK (calories >= 0),
     protein             INTEGER NOT NULL CHECK (protein >= 0),
@@ -482,7 +481,7 @@ CREATE TABLE medical_notes (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     medical_relationship_id     UUID NOT NULL REFERENCES medical_relationships(id) ON DELETE CASCADE,
     recommendation              TEXT NOT NULL,
-    valid_date                  DATE NOT NULL,
+    valid_until                  DATE NOT NULL,
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -495,7 +494,7 @@ CREATE TABLE medical_restrictions (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     medical_note_id  UUID NOT NULL REFERENCES medical_notes(id) ON DELETE CASCADE,
     type             medical_restriction_type NOT NULL,
-    substance_name   TEXT NOT NULL,
+    item_name   TEXT NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -507,7 +506,7 @@ CREATE TRIGGER trg_medical_restrictions_updated_at BEFORE UPDATE ON medical_rest
 CREATE TABLE daily_nutrition_targets (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     medical_note_id  UUID NOT NULL REFERENCES medical_notes(id) ON DELETE CASCADE,
-    nutrient_name    nutrient_type NOT NULL,
+    nutrient         nutrient_type NOT NULL,
     quantity         NUMERIC(8,2) NOT NULL CHECK (quantity > 0),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -536,14 +535,14 @@ CREATE TRIGGER trg_notifications_updated_at BEFORE UPDATE ON notifications
 -- ---------------------------------------------------------------------
 -- create checkin QR module
 -- ---------------------------------------------------------------------
-CREATE TABLE checkin_tokens (
+CREATE TABLE qr_tokens (
     token VARCHAR(255) PRIMARY KEY,
     child_id UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE checkin_logs (
+CREATE TABLE qr_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     token VARCHAR(255) NOT NULL,
     child_id UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,

@@ -23,7 +23,7 @@ func (r *CheckinRepository) SaveToken(ctx context.Context, token string, childID
 	defer cancel()
 
 	query := `
-		INSERT INTO checkin_tokens (token, child_id, expires_at) 
+		INSERT INTO qr_tokens (token, child_id, expires_at) 
 		VALUES ($1, $2, $3)`
 
 	_, err := r.pool.Exec(ctx, query, token, childID, expiresAt)
@@ -37,7 +37,7 @@ func (r *CheckinRepository) DeleteExpiredTokens(ctx context.Context) error {
 
 	query := `
 		DELETE 
-		FROM checkin_tokens 
+		FROM qr_tokens 
 		WHERE expires_at < NOW()`
 	_, err := r.pool.Exec(ctx, query)
 	return err
@@ -49,7 +49,7 @@ func (r *CheckinRepository) GetToken(ctx context.Context, token string) (*checki
 
 	query := `
 		SELECT token, child_id, expires_at 
-		FROM checkin_tokens 
+		FROM qr_tokens 
 		WHERE token = $1`
 
 	var data checkin.TokenData
@@ -74,7 +74,7 @@ func (r *CheckinRepository) SaveLog(ctx context.Context, token string, childID, 
 	defer cancel()
 
 	query := `
-		INSERT INTO checkin_logs (token, child_id, caregiver_id) 
+		INSERT INTO qr_logs (token, child_id, caregiver_id) 
 		VALUES ($1, $2, $3)`
 
 	_, err := r.pool.Exec(ctx, query, token, childID, caregiverID)

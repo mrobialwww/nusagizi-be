@@ -59,13 +59,13 @@ func (r *ChildDevelopmentRepository) GetLatestDevelopmentReport(ctx context.Cont
 	// Fetch domains aggregation
 	queryDomains := `
 		SELECT 
-			q.nerve_name,
+			q.developmental_domain,
 			COUNT(q.id) as total_question,
 			COUNT(a.id) FILTER (WHERE a.assessment_kpsp_answer = true) as true_answer
 		FROM assessment_kpsp_answers a
 		JOIN assessment_kpsp_questions q ON a.assessment_kpsp_question_id = q.id
 		WHERE a.child_development_report_id = $1
-		GROUP BY q.nerve_name
+		GROUP BY q.developmental_domain
 	`
 	rows, err := r.pool.Query(ctx, queryDomains, reportID)
 	if err != nil {
@@ -75,7 +75,7 @@ func (r *ChildDevelopmentRepository) GetLatestDevelopmentReport(ctx context.Cont
 
 	for rows.Next() {
 		var d child_dev.DomainAggregate
-		if err := rows.Scan(&d.NerveName, &d.TotalQuestion, &d.TrueAnswer); err != nil {
+		if err := rows.Scan(&d.DevelopmentalDomain, &d.TotalQuestion, &d.TrueAnswer); err != nil {
 			return nil, err
 		}
 		report.Domains = append(report.Domains, d)
@@ -141,20 +141,20 @@ func (r *ChildDevelopmentRepository) GetDevelopmentReportByID(ctx context.Contex
 	// Fetch domains
 	queryDomains := `
 		SELECT 
-			q.nerve_name,
+			q.developmental_domain,
 			COUNT(q.id) as total_question,
 			COUNT(a.id) FILTER (WHERE a.assessment_kpsp_answer = true) as true_answer
 		FROM assessment_kpsp_answers a
 		JOIN assessment_kpsp_questions q ON a.assessment_kpsp_question_id = q.id
 		WHERE a.child_development_report_id = $1
-		GROUP BY q.nerve_name
+		GROUP BY q.developmental_domain
 	`
 	rows, err := r.pool.Query(ctx, queryDomains, reportID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var d child_dev.DomainAggregate
-			if err := rows.Scan(&d.NerveName, &d.TotalQuestion, &d.TrueAnswer); err != nil {
+			if err := rows.Scan(&d.DevelopmentalDomain, &d.TotalQuestion, &d.TrueAnswer); err != nil {
 				return nil, err
 			}
 			report.Domains = append(report.Domains, d)
@@ -164,26 +164,27 @@ func (r *ChildDevelopmentRepository) GetDevelopmentReportByID(ctx context.Contex
 	return &report, nil
 }
 
-// GetRecommendationsByNerveName fetches recommended actions for a given nerve name
-func (r *ChildDevelopmentRepository) GetRecommendationsByNerveName(ctx context.Context, reportID uuid.UUID, nerveName string) ([]child_dev.RecommendedAction, error) {
+// GetRecommendationsByDevelopmentalDomain fetches recommended actions for a given domain
+func (r *ChildDevelopmentRepository) GetRecommendationsByDevelopmentalDomain(ctx context.Context, reportID uuid.UUID, domain string) ([]child_dev.RecommendedAction, error) {
 	var recs []child_dev.RecommendedAction
 
 	queryRecs := `
 		SELECT ra.id, ra.assessment_kpsp_question_id, ra.title, ra.action_text
-		FROM assessment_attempt_recomendations aar
+		FROM development_report_recommendations aar
 		JOIN recommended_actions ra ON aar.recommended_action_id = ra.id
-		JOIN assessment_kpsp_questions akq ON ra.assessment_kpsp_question_id = akq.id
-		WHERE aar.child_development_report_id = $1 AND akq.nerve_name = $2
+		JOIN assessment_kpsp_questions q ON ra.assessment_kpsp_question_id = q.id
+		WHERE aar.child_development_report_id = $1 AND q.developmental_domain = $2
 	`
-	rowsRec, err := r.pool.Query(ctx, queryRecs, reportID, nerveName)
+
+	rows, err := r.pool.Query(ctx, queryRecs, reportID, domain)
 	if err != nil {
 		return nil, err
 	}
-	defer rowsRec.Close()
+	defer rows.Close()
 
-	for rowsRec.Next() {
+	for rows.Next() {
 		var rec child_dev.RecommendedAction
-		if err := rowsRec.Scan(&rec.ID, &rec.AssessmentKPSPQuestionID, &rec.Title, &rec.ActionText); err != nil {
+		if err := rows.Scan(&rec.ID, &rec.AssessmentKPSPQuestionID, &rec.Title, &rec.ActionText); err != nil {
 			return nil, err
 		}
 		recs = append(recs, rec)
@@ -197,11 +198,11 @@ func (r *ChildDevelopmentRepository) GetKPSPQuestions(ctx context.Context, month
 	defer cancel()
 
 	query := `
-		SELECT id, "order", nerve_name, month_target, question, description
+		SELECT id, "order", developmental_domain, month_target, question, description, created_at, updated_at
 		FROM assessment_kpsp_questions
 		WHERE month_target = $1
-		ORDER BY "order" ASC
-	`
+		ORDER BY "order" ASC`
+
 	rows, err := r.pool.Query(ctx, query, monthTarget)
 	if err != nil {
 		return nil, err
@@ -211,7 +212,10 @@ func (r *ChildDevelopmentRepository) GetKPSPQuestions(ctx context.Context, month
 	var questions []child_dev.AssessmentKPSPQuestion
 	for rows.Next() {
 		var q child_dev.AssessmentKPSPQuestion
-		if err := rows.Scan(&q.ID, &q.Order, &q.NerveName, &q.MonthTarget, &q.Question, &q.Description); err != nil {
+		if err := rows.Scan(
+			&q.ID, &q.Order, &q.DevelopmentalDomain, &q.MonthTarget,
+			&q.Question, &q.Description,
+		); err != nil {
 			return nil, err
 		}
 		questions = append(questions, q)
@@ -259,9 +263,8 @@ func (r *ChildDevelopmentRepository) CreateDevelopmentReport(
 		WHERE assessment_kpsp_question_id = $1
 	`
 	queryRecInsert := `
-		INSERT INTO assessment_attempt_recomendations (child_development_report_id, recommended_action_id)
-		VALUES ($1, $2)
-	`
+		INSERT INTO development_report_recommendations (child_development_report_id, recommended_action_id)
+		VALUES ($1, $2)`
 
 	for _, ans := range answers {
 		ansID := uuid.New()
@@ -338,7 +341,7 @@ func (r *ChildDevelopmentRepository) UpdateDevelopmentReport(
 
 	// Delete all existing recommendations for this report to regenerate them
 	queryDeleteRecs := `
-		DELETE FROM assessment_attempt_recomendations 
+		DELETE FROM development_report_recommendations 
 		WHERE child_development_report_id = $1
 	`
 	_, err = tx.Exec(ctx, queryDeleteRecs, reportID)
@@ -373,7 +376,7 @@ func (r *ChildDevelopmentRepository) UpdateDevelopmentReport(
 		WHERE assessment_kpsp_question_id = $1
 	`
 	queryRecInsert := `
-		INSERT INTO assessment_attempt_recomendations (child_development_report_id, recommended_action_id) 
+		INSERT INTO development_report_recommendations (child_development_report_id, recommended_action_id) 
 		VALUES ($1, $2)
 	`
 
@@ -428,8 +431,8 @@ func (r *ChildDevelopmentRepository) GetChecklistMilestoneTasks(ctx context.Cont
 
 	query := `
 		SELECT 
-			t.id, t.nerve_name, t.checked_description,
-			CASE WHEN p.id IS NOT NULL THEN true ELSE false END as is_checked
+			t.id, t.developmental_domain, t.task_description,
+			CASE WHEN p.checklist_milestone_task_id IS NOT NULL THEN true ELSE false END as is_checked
 		FROM checklist_milestone_tasks t
 		LEFT JOIN checklist_milestone_progress p 
 			ON t.id = p.checklist_milestone_task_id 
@@ -445,7 +448,9 @@ func (r *ChildDevelopmentRepository) GetChecklistMilestoneTasks(ctx context.Cont
 	var tasks []child_dev.ChecklistMilestoneTaskResponse
 	for rows.Next() {
 		var t child_dev.ChecklistMilestoneTaskResponse
-		if err := rows.Scan(&t.ID, &t.NerveName, &t.TaskDescription, &t.IsChecked); err != nil {
+		if err := rows.Scan(
+			&t.ID, &t.DevelopmentalDomain, &t.TaskDescription, &t.IsChecked,
+		); err != nil {
 			return nil, err
 		}
 		tasks = append(tasks, t)
@@ -510,15 +515,15 @@ func (r *ChildDevelopmentRepository) GetRecommendationsByReportID(ctx context.Co
 
 	query := `
 		SELECT
-			akq.nerve_name,
+			akq.developmental_domain,
 			ra.action_text
-		FROM assessment_attempt_recomendations aar
+		FROM development_report_recommendations aar
 		JOIN recommended_actions ra
 			ON ra.id = aar.recommended_action_id
 		JOIN assessment_kpsp_questions akq
 			ON akq.id = ra.assessment_kpsp_question_id
 		WHERE aar.child_development_report_id = $1
-		ORDER BY akq.nerve_name
+		ORDER BY akq.developmental_domain
 	`
 
 	rows, err := r.pool.Query(ctx, query, reportID)
@@ -530,7 +535,7 @@ func (r *ChildDevelopmentRepository) GetRecommendationsByReportID(ctx context.Co
 	var results []child_dev.RecommendationItem
 	for rows.Next() {
 		var item child_dev.RecommendationItem
-		if err := rows.Scan(&item.NerveName, &item.ActionText); err != nil {
+		if err := rows.Scan(&item.DevelopmentalDomain, &item.ActionText); err != nil {
 			return nil, err
 		}
 		results = append(results, item)

@@ -7,11 +7,10 @@ import (
 )
 
 type DomainAggregate struct {
-	NerveName     string `json:"nerve_name"`
-	TotalQuestion int    `json:"total_question"`
-	TrueAnswer    int    `json:"true_answer"`
+	DevelopmentalDomain string `json:"developmental_domain"`
+	TotalQuestion       int    `json:"total_question"`
+	TrueAnswer          int    `json:"true_answer"`
 }
-
 
 type DevelopmentReportResponse struct {
 	ID                 uuid.UUID           `json:"id"`

@@ -70,8 +70,10 @@ func (r *MenuRepository) ReplaceTodayMenu(
 		return fmt.Errorf("failed to insert daily menu: %w", err)
 	}
 
-	// Insert recipes (sarapan, makan siang, makan malam)
+	// Insert recipes (breakfast, lunch, dinner)
 	for mealTime, sesi := range menuData.Sesi {
+		// Map AI keys (sarapan, makan siang, dll) to DB ENUM if needed, assuming AI keys are updated to breakfast, lunch, dinner
+		dbMealTime := mapMealTime(mealTime)
 		waktuMasak := sesi.PanduanMasak.WaktuMasak
 		cal, pro, fat, car := 0.0, 0.0, 0.0, 0.0
 		if m, ok := sesi.Makro["energi"]; ok {
@@ -94,7 +96,7 @@ func (r *MenuRepository) ReplaceTodayMenu(
 
 		var recipeID uuid.UUID
 		err = tx.QueryRow(ctx, recipeQuery,
-			dailyMenuID, sesi.PanduanMasak.ResepNama, sesi.PanduanMasak.Catatan, mealTime, sesi.PanduanMasak.Tekstur, waktuMasak,
+			dailyMenuID, sesi.PanduanMasak.ResepNama, sesi.PanduanMasak.Catatan, dbMealTime, sesi.PanduanMasak.Tekstur, waktuMasak,
 			cal, pro, fat, car,
 		).Scan(&recipeID)
 		if err != nil {
@@ -106,8 +108,9 @@ func (r *MenuRepository) ReplaceTodayMenu(
 		}
 	}
 
-	// Insert recipes (selingan_1, selingan_2)
+	// Insert recipes (morning_snack, afternoon_snack)
 	for mealTime, selingan := range menuData.Selingan {
+		dbMealTime := mapMealTime(mealTime)
 		desc := ""
 		if len(selingan.Pesan) > 0 {
 			desc = selingan.Pesan[0]
@@ -120,7 +123,7 @@ func (r *MenuRepository) ReplaceTodayMenu(
 
 		var recipeID uuid.UUID
 		err = tx.QueryRow(ctx, selinganRecipeQuery,
-			dailyMenuID, selingan.Resep.Nama, desc, mealTime,
+			dailyMenuID, selingan.Resep.Nama, desc, dbMealTime,
 			selingan.Makro.Energi, selingan.Makro.Protein, selingan.Makro.Lemak, selingan.Makro.Karbo,
 		).Scan(&recipeID)
 		if err != nil {
@@ -138,6 +141,24 @@ func (r *MenuRepository) ReplaceTodayMenu(
 }
 
 // ================================== HELPER FUNCTION ===================================
+// mapMealTime maps the AI response meal time keys to the database ENUM values.
+func mapMealTime(aiKey string) string {
+	switch aiKey {
+	case "sarapan", "breakfast":
+		return "breakfast"
+	case "makan siang", "lunch":
+		return "lunch"
+	case "makan malam", "dinner":
+		return "dinner"
+	case "selingan_1", "selingan_siang", "morning_snack":
+		return "morning_snack"
+	case "selingan_2", "selingan_sore", "afternoon_snack":
+		return "afternoon_snack"
+	default:
+		return aiKey // Fallback to raw key
+	}
+}
+
 // insertRecipeDetails inserts the "sesi" ingredients and their substitutes for a recipe.
 func insertRecipeDetails(ctx context.Context, tx pgx.Tx, recipeID uuid.UUID, bahan []menu.FoodEngineBahan, panduan menu.FoodEnginePanduanMasak) error {
 	const queryPriority = `

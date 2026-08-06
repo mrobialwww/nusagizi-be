@@ -140,13 +140,13 @@ func (h *MedicalHandler) CreateMedicalNote(c *gin.Context) {
 		return
 	}
 
-	// Validate input valid_date
-	if strings.TrimSpace(input.ValidDate) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "valid_date cannot be empty"}})
+	// Validate input valid_until
+	if strings.TrimSpace(input.ValidUntil) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "valid_until cannot be empty"}})
 		return
 	}
-	if _, err := time.Parse(models.DateLayout, input.ValidDate); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid valid_date format, must be DD-MM-YYYY"}})
+	if _, err := time.Parse(models.DateLayout, input.ValidUntil); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid valid_until format, must be DD-MM-YYYY"}})
 		return
 	}
 
@@ -200,14 +200,14 @@ func (h *MedicalHandler) UpdateMedicalNote(c *gin.Context) {
 		return
 	}
 
-	// Validate input valid_date
-	if input.ValidDate != nil {
-		if strings.TrimSpace(*input.ValidDate) == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "valid_date cannot be empty"}})
+	// Validate input valid_until
+	if input.ValidUntil != nil {
+		if strings.TrimSpace(*input.ValidUntil) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "valid_until cannot be empty"}})
 			return
 		}
-		if _, err := time.Parse(models.DateLayout, *input.ValidDate); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid valid_date format, must be DD-MM-YYYY"}})
+		if _, err := time.Parse(models.DateLayout, *input.ValidUntil); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid valid_until format, must be DD-MM-YYYY"}})
 			return
 		}
 	}

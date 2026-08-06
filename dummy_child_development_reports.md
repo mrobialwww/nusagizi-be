@@ -9,22 +9,22 @@
     "created_at": "2026-08-25T10:00:00Z",
     "domains": [
         {
-            "nerve_name": "Gross motor skills",
+            "developmental_domain": "gross_motor_skills",
             "total_question": 2,
             "true_answer": 2
         },
         {
-            "nerve_name": "Fine motor skills",
+            "developmental_domain": "fine_motor_skills",
             "total_question": 3,
             "true_answer": 3
         },
         {
-            "nerve_name": "Speech and language",
+            "developmental_domain": "speech_and_language",
             "total_question": 3,
             "true_answer": 2
         },
         {
-            "nerve_name": "Socialization",
+            "developmental_domain": "socialization",
             "total_question": 2,
             "true_answer": 2
         }
@@ -43,22 +43,22 @@
     "created_at": "2026-08-25T10:15:00Z",
     "domains": [
         {
-            "nerve_name": "Gross motor skills",
+            "developmental_domain": "gross_motor_skills",
             "total_question": 3,
             "true_answer": 2
         },
         {
-            "nerve_name": "Fine motor skills",
+            "developmental_domain": "fine_motor_skills",
             "total_question": 2,
             "true_answer": 1
         },
         {
-            "nerve_name": "Speech and language",
+            "developmental_domain": "speech_and_language",
             "total_question": 3,
             "true_answer": 2
         },
         {
-            "nerve_name": "Socialization",
+            "developmental_domain": "socialization",
             "total_question": 2,
             "true_answer": 2
         }

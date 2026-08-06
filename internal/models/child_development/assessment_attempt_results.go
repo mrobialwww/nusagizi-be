@@ -17,17 +17,15 @@ type RecommendedAction struct {
 }
 
 type AssessmentKPSPQuestion struct {
-	ID          uuid.UUID       `json:"assessment_kpsp_question_id" db:"assessment_kpsp_question_id"`
-	Order       int             `json:"order" db:"order"`
-	NerveName   NerveNameEnum   `json:"nerve_name" db:"nerve_name"`
-	MonthTarget MonthTargetEnum `json:"month_target" db:"month_target"`
-	Question    string          `json:"question" db:"question"`
-	Description string          `json:"description" db:"description"`
-	CreatedAt   time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at" db:"updated_at"`
+	ID                  uuid.UUID               `json:"assessment_kpsp_question_id" db:"assessment_kpsp_question_id"`
+	Order               int                     `json:"order" db:"order"`
+	DevelopmentalDomain DevelopmentalDomainEnum `json:"developmental_domain" db:"developmental_domain"`
+	MonthTarget         MonthTargetEnum         `json:"month_target" db:"month_target"`
+	Question            string                  `json:"question" db:"question"`
+	Description         string                  `json:"description" db:"description"`
 }
 
 type RecommendationItem struct {
-	NerveName  string `json:"nerve_name"`
-	ActionText string `json:"action_text"`
+	DevelopmentalDomain string `json:"developmental_domain"`
+	ActionText          string `json:"action_text"`
 }

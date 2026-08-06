@@ -1,8 +1,8 @@
 -- ---------------------------------------------------------------------
 -- drop checkin QR module
 -- ---------------------------------------------------------------------
-DROP TABLE IF EXISTS checkin_logs;
-DROP TABLE IF EXISTS checkin_tokens;
+DROP TABLE IF EXISTS qr_logs;
+DROP TABLE IF EXISTS qr_tokens;
 
 -- ---------------------------------------------------------------------
 -- create notification
@@ -46,7 +46,7 @@ DROP TABLE IF EXISTS child_nutrition_reports;
 -- ---------------------------------------------------------------------
 DROP TABLE IF EXISTS checklist_milestone_progress;
 DROP TABLE IF EXISTS checklist_milestone_tasks;
-DROP TABLE IF EXISTS assessment_attempt_recomendations;
+DROP TABLE IF EXISTS development_report_recommendations;
 DROP TABLE IF EXISTS recommended_actions;
 DROP TABLE IF EXISTS assessment_kpsp_answers;
 DROP TABLE IF EXISTS assessment_kpsp_questions;
@@ -88,9 +88,9 @@ ALTER TABLE users
 -- ---------------------------------------------------------------------
 DROP TYPE IF EXISTS medical_restriction_type;
 DROP TYPE IF EXISTS child_photo_visibility;
-DROP TYPE IF EXISTS recipe_meal_time;
-DROP TYPE IF EXISTS nerve_name;
-DROP TYPE IF EXISTS child_allergy_category;
+DROP TYPE IF EXISTS meal_time_type;
+DROP TYPE IF EXISTS developmental_domain;
+DROP TYPE IF EXISTS child_allergy_type;
 DROP TYPE IF EXISTS notification_type;
 DROP TYPE IF EXISTS gender_type;
 DROP TYPE IF EXISTS nutrient_type;

@@ -80,14 +80,14 @@ func (s *ChildDevelopmentService) GetDevelopmentReportByID(ctx context.Context, 
 			ratio := float64(d.TrueAnswer) / float64(d.TotalQuestion)
 			if ratio < minRatio {
 				minRatio = ratio
-				worstNerve = d.NerveName
+				worstNerve = d.DevelopmentalDomain
 			}
 		}
 	}
 
 	// Fetch recommendations only for the worst nerve
 	if worstNerve != "" {
-		recs, err := s.repo.GetRecommendationsByNerveName(ctx, reportID, worstNerve)
+		recs, err := s.repo.GetRecommendationsByDevelopmentalDomain(ctx, reportID, worstNerve)
 		if err == nil {
 			report.RecommendedActions = recs
 		}

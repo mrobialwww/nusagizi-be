@@ -65,8 +65,8 @@ func (s *MedicalService) CreateMedicalNote(ctx context.Context, userID string, i
 	}
 
 	// Required fields validation
-	if input.DoctorName == "" || input.Recommendation == "" || input.ValidDate == "" {
-		return uuid.Nil, fmt.Errorf("doctor_name, recommendation, valid_date are required")
+	if input.DoctorName == "" || input.Recommendation == "" || input.ValidUntil == "" {
+		return uuid.Nil, fmt.Errorf("doctor_name, recommendation, valid_until are required")
 	}
 
 	return s.repo.CreateMedicalNote(ctx, input)

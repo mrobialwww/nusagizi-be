@@ -15,7 +15,7 @@ Nomor endpoint asli dari v1/v2 dipertahankan agar mudah dibandingkan; endpoint y
 - **Auth**: ditangani provider eksternal (Auth0). Setiap request terautentikasi membawa `user_id` dari token. Role (mother/caregiver) ditentukan dari ada-tidaknya row terkait di `mother_profiles`/`caregiver_profiles` untuk `user_id` tsb.
 - **Di luar cakupan dokumen ini**: login, register, refresh token, logout (semua ditangani Auth0). Pembuatan row `users` diasumsikan terjadi otomatis (mis. via Auth0 Action/webhook) saat signup pertama kali — dokumen ini mulai dari endpoint pertama yang dipanggil aplikasi **setelah** row `users` ada, yaitu pemilihan role (lihat endpoint 4/48 di bawah).
 - **Format ID**: semua ID adalah UUID (string), termasuk di request body — bukan integer.
-- **Format tanggal** (`date`, contoh kolom `birth_date`, `measured_at`, `valid_date`): `DD-MM-YYYY` (contoh: `25-07-2026`).
+- **Format tanggal** (`date`, contoh kolom `birth_date`, `measured_at`, `valid_until`): `DD-MM-YYYY` (contoh: `25-07-2026`).
 - **Format timestamp** (`datetime`, contoh kolom `created_at`, `updated_at`): ISO 8601 UTC (contoh: `2026-07-25T09:30:00Z`).
 - **Penamaan field**: English snake_case, mengikuti nama kolom database (contoh: `full_name`, `birth_date`).
 - **Soft delete**: hanya untuk tabel yang punya kolom `deleted_at` (`users`, `children`, `caregiver_engagements`) — endpoint DELETE terkait melakukan `UPDATE ... SET deleted_at = now()`. Tabel lain (`child_growth_reports`, `child_development_reports`, `child_photos`, `medical_notes`, `contacts`, `notifications`, `ingredient_shopping_items`, dst) **tidak** punya `deleted_at`, sehingga endpoint DELETE-nya melakukan hard delete (baris benar-benar dihapus).
@@ -780,21 +780,21 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     "created_at": "...",
     "domains": [
         {
-            "nerve_name": "Gross motor skills",
+            "developmental_domain": "Gross motor skills",
             "total_question": 3,
             "true_answer": 2
         },
         {
-            "nerve_name": "Fine motor skills",
+            "developmental_domain": "Fine motor skills",
             "total_question": 3,
             "true_answer": 2
         },
         {
-            "nerve_name": "Speech and language",
+            "developmental_domain": "Speech and language",
             "total_question": 3,
             "true_answer": 2
         },
-        { "nerve_name": "Socialization", "total_question": 3, "true_answer": 2 }
+        { "developmental_domain": "Socialization", "total_question": 3, "true_answer": 2 }
     ]
 }
 ```
@@ -806,7 +806,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | next_check_date          | date \| "done" |                                                                                            |
 | status                   | string         | "Sesuai Usia", "Perkembangan meragukan", atau "Kemungkinan penyimpangan"                   |
 | created_at               | datetime       |                                                                                            |
-| domains[].nerve_name     | enum           | 4 aspek: `Gross motor skills`, `Fine motor skills`, `Speech and language`, `Socialization` |
+| domains[].developmental_domain     | enum           | 4 aspek: `Gross motor skills`, `Fine motor skills`, `Speech and language`, `Socialization` |
 | domains[].total_question | integer        | jumlah pertanyaan di domain ini untuk `month_target` ybs                                   |
 | domains[].true_answer    | integer        | jumlah jawaban `true` di domain ini                                                        |
 
@@ -817,7 +817,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | `child_id` bukan milik user yang login            |
 | 404    | belum ada `child_development_reports` sama sekali |
 
-- **Catatan [FIX v4]**: v3 mengembalikan raw list jawaban per domain lalu FE yang menghitung `total_question`/`true_answer`. Diubah jadi agregasi di query (`GROUP BY nerve_name`, `COUNT(*)` untuk `total_question`, `COUNT(*) FILTER (WHERE answer = true)` untuk `true_answer`) — lebih baik dari sisi performa karena payload jauh lebih kecil dan logic agregasi cukup ditulis sekali di backend, tidak diulang di tiap platform client (mobile/web).
+- **Catatan [FIX v4]**: v3 mengembalikan raw list jawaban per domain lalu FE yang menghitung `total_question`/`true_answer`. Diubah jadi agregasi di query (`GROUP BY developmental_domain`, `COUNT(*)` untuk `total_question`, `COUNT(*) FILTER (WHERE answer = true)` untuk `true_answer`) — lebih baik dari sisi performa karena payload jauh lebih kecil dan logic agregasi cukup ditulis sekali di backend, tidak diulang di tiap platform client (mobile/web).
 
 ### 20. Get riwayat asesmen KPSP
 
@@ -875,21 +875,21 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     ],
     "domains": [
         {
-            "nerve_name": "Gross motor skills",
+            "developmental_domain": "Gross motor skills",
             "total_question": 3,
             "true_answer": 2
         },
         {
-            "nerve_name": "Fine motor skills",
+            "developmental_domain": "Fine motor skills",
             "total_question": 3,
             "true_answer": 2
         },
         {
-            "nerve_name": "Speech and language",
+            "developmental_domain": "Speech and language",
             "total_question": 3,
             "true_answer": 2
         },
-        { "nerve_name": "Socialization", "total_question": 3, "true_answer": 2 }
+        { "developmental_domain": "Socialization", "total_question": 3, "true_answer": 2 }
     ]
 }
 ```
@@ -901,7 +901,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | month_target                                    | integer              | **[FIX v4]** menggantikan `next_check_date` (dihapus — tidak relevan di halaman detail hasil) |
 | status                                          | string               | "Sesuai Usia", "Perkembangan meragukan", atau "Kemungkinan penyimpangan"                      |
 | recommended_actions[].id/title/action_text      | UUID/string/string   |                                                                                               |
-| domains[].nerve_name/total_question/true_answer | enum/integer/integer | **[FIX v4]** disamakan dengan format agregat endpoint 19                                      |
+| domains[].developmental_domain/total_question/true_answer | enum/integer/integer | **[FIX v4]** disamakan dengan format agregat endpoint 19                                      |
 
 - **Response Error**:
 
@@ -910,7 +910,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | bukan milik user yang login |
 | 404    | tidak ditemukan             |
 
-- **Catatan [FIX v4]**: `recommended_actions` yang tampil **hanya rekomendasi aksi untuk domain (`nerve_name`) yang memiliki performa terburuk** (yaitu domain dengan rasio `true_answer / total_question` paling kecil). Jika sebelumnya mengambil semua rekomendasi, kini difilter secara spesifik untuk domain yang paling butuh stimulasi.
+- **Catatan [FIX v4]**: `recommended_actions` yang tampil **hanya rekomendasi aksi untuk domain (`developmental_domain`) yang memiliki performa terburuk** (yaitu domain dengan rasio `true_answer / total_question` paling kecil). Jika sebelumnya mengambil semua rekomendasi, kini difilter secara spesifik untuk domain yang paling butuh stimulasi.
 
 ### 22. Get pertanyaan assessment_kpsp_questions
 
@@ -930,7 +930,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     {
         "id": "...",
         "month_target": 3,
-        "nerve_name": "Gross motor skills",
+        "developmental_domain": "Gross motor skills",
         "question_text": "...",
         "description": "..."
     }
@@ -981,7 +981,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 422    | `list_answer` bukan 10 item, atau ada `assessment_kpsp_question_id` yang tidak match periode `month_target` anak saat ini |
 | 403    | `child_id` bukan milik user yang login                                                                                    |
 
-- **Catatan [FIX v4]**: `month_target` dikirim oleh client di body request, lalu divalidasi terhadap `child.birth_date` memakai algoritma di atas modul ini; `kpsp_score` & `next_check_date` tetap dihitung 100% di server. Alur pembuatan ID: server men-generate UUID baru untuk `child_development_report_id` **sebelum** proses insert, lalu UUID yang sama itu dipakai sebagai foreign key `child_development_report_id` di setiap row `assessment_kpsp_answers` yang diinsert dalam satu transaksi — jadi client tidak perlu (dan tidak boleh) generate/kirim ID ini. Setelah semua 10 soal dijawab, sistem juga insert ke `assessment_attempt_recomendations` untuk tiap pertanyaan yang dijawab `false`.
+- **Catatan [FIX v4]**: `month_target` dikirim oleh client di body request, lalu divalidasi terhadap `child.birth_date` memakai algoritma di atas modul ini; `kpsp_score` & `next_check_date` tetap dihitung 100% di server. Alur pembuatan ID: server men-generate UUID baru untuk `child_development_report_id` **sebelum** proses insert, lalu UUID yang sama itu dipakai sebagai foreign key `child_development_report_id` di setiap row `assessment_kpsp_answers` yang diinsert dalam satu transaksi — jadi client tidak perlu (dan tidak boleh) generate/kirim ID ini. Setelah semua 10 soal dijawab, sistem juga insert ke `development_report_recommendations` untuk tiap pertanyaan yang dijawab `false`.
 
 ### 24. Update hasil asesmen KPSP terbaru
 
@@ -1013,7 +1013,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | bukan milik user yang login                   |
 | 404    | `child_development_report_id` tidak ditemukan |
 
-- **Catatan**: `kpsp_score`, `next_check_date`, dan `assessment_attempt_recomendations` dihitung ulang. Dipanggil saat mother mengulangi asesmen.
+- **Catatan**: `kpsp_score`, `next_check_date`, dan `development_report_recommendations` dihitung ulang. Dipanggil saat mother mengulangi asesmen.
 
 ### 25. Get checklist_milestone_tasks
 
@@ -1033,7 +1033,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 [
     {
         "id": "...",
-        "nerve_name": "Gross motor skills",
+        "developmental_domain": "Gross motor skills",
         "task_description": "...",
         "is_checked": false
     }
@@ -1067,11 +1067,11 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 ```json
 [
     {
-        "nerve_name": "Gross motor skills",
+        "developmental_domain": "Gross motor skills",
         "action_text": "Perlu latihan lebih sering untuk menyusun 3-4 balok mainan."
     },
     {
-        "nerve_name": "Speech and language",
+        "developmental_domain": "Speech and language",
         "action_text": "Perlu latihan lebih sering untuk mencoret kertas menggunakan krayon/pensil."
     }
 ]
@@ -1079,7 +1079,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 | Field       | Type   | Keterangan                                                          |
 | ----------- | ------ | ------------------------------------------------------------------- |
-| nerve_name  | string | Aspek perkembangan: `Gross motor skills`, `Fine motor skills`, dll. |
+| developmental_domain  | string | Aspek perkembangan: `Gross motor skills`, `Fine motor skills`, dll. |
 | action_text | string | Teks rekomendasi latihan yang harus dilakukan orang tua             |
 
 - **Response Error**:
@@ -1089,7 +1089,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | `child_id` bukan milik user yang login |
 | 404    | `report_id` tidak ditemukan            |
 
-- **Catatan**: Data diambil dari junction table `assessment_attempt_recomendations`, di-join ke `recommended_actions` dan `assessment_kpsp_questions` (alias `akq`) untuk mendapatkan `nerve_name` dan `action_text`. Hanya pertanyaan yang dijawab `false` yang menghasilkan rekomendasi.
+- **Catatan**: Data diambil dari junction table `development_report_recommendations`, di-join ke `recommended_actions` dan `assessment_kpsp_questions` (alias `akq`) untuk mendapatkan `developmental_domain` dan `action_text`. Hanya pertanyaan yang dijawab `false` yang menghasilkan rekomendasi.
 
 ### 27. Tandai checklist milestone (Sync / UPSERT)
 
@@ -1137,7 +1137,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | bukan milik user yang login |
 | 404    | tidak ditemukan             |
 
-- **Catatan**: hard delete (`child_development_reports` tidak punya `deleted_at`). `assessment_kpsp_answers` & `assessment_attempt_recomendations` terkait ikut terhapus lewat `ON DELETE CASCADE`. Berbeda dari endpoint 24 (edit jawaban) — ini untuk kasus asesmen dibuat keliru sama sekali (mis. salah pilih anak).
+- **Catatan**: hard delete (`child_development_reports` tidak punya `deleted_at`). `assessment_kpsp_answers` & `development_report_recommendations` terkait ikut terhapus lewat `ON DELETE CASCADE`. Berbeda dari endpoint 24 (edit jawaban) — ini untuk kasus asesmen dibuat keliru sama sekali (mis. salah pilih anak).
 
 ---
 
@@ -1171,7 +1171,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
             {
                 "id": "...",
                 "name": "...",
-                "meal_time": "sarapan",
+                "meal_time": "breakfast",
                 "meal_texture": "...",
                 "calories": 0,
                 "protein": 0
@@ -1221,7 +1221,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
         {
             "id": "...",
             "name": "...",
-            "meal_time": "sarapan",
+            "meal_time": "breakfast",
             "meal_texture": "...",
             "calories": 0,
             "protein": 0
@@ -1337,7 +1337,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     {
         "id": "...",
         "name": "...",
-        "meal_time": "sarapan",
+        "meal_time": "breakfast",
         "meal_texture": "...",
         "calories": 0,
         "protein": 0
@@ -1375,7 +1375,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
         "protein": 20,
         "fat": 15,
         "carbohydrate": 100,
-        "meal_times": ["sarapan", "makan_siang"]
+        "meal_times": ["breakfast", "lunch"]
     }
 ]
 ```
@@ -1463,7 +1463,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
             {
                 "id": "...",
                 "name": "...",
-                "meal_time": "sarapan",
+                "meal_time": "breakfast",
                 "meal_texture": "...",
                 "calories": 0,
                 "protein": 0
@@ -1664,7 +1664,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 ```json
 {
     "url": "https://example.com",
-    "caption": "razky sarapan telur pagi ini",
+    "caption": "razky breakfast telur pagi ini",
     "visibility": "only",
     "list_visibility": ["<contact_id_1>", "<contact_id_2>", "<contact_id_3>"],
     "is_review_required": false
@@ -1752,7 +1752,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 ```json
 {
-    "caption": "razky sarapan telur pagi ini",
+    "caption": "razky breakfast telur pagi ini",
     "visibility": "only",
     "list_visibility": ["<contact_id_1>"],
     "is_review_required": false
@@ -1959,8 +1959,8 @@ WHERE ce.caregiver_profile_id = ?
 
 | Field  | Type    | Wajib              | Keterangan                                                                                                                                                                                                             |
 | ------ | ------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| status | enum    | Ya                 | `active` (default filter `valid_date >= now()`)                                                                                                                                                                        |
-| month  | integer | Tidak **[FIX v4]** | 1-12. Default: bulan berjalan. Filter berdasarkan **nomor bulan saja** (`EXTRACT(MONTH FROM valid_date) = month`) — tidak peduli tahun, jadi mother bisa lihat "semua catatan bulan Juli" dari tahun manapun sekaligus |
+| status | enum    | Ya                 | `active` (default filter `valid_until >= now()`)                                                                                                                                                                        |
+| month  | integer | Tidak **[FIX v4]** | 1-12. Default: bulan berjalan. Filter berdasarkan **nomor bulan saja** (`EXTRACT(MONTH FROM valid_until) = month`) — tidak peduli tahun, jadi mother bisa lihat "semua catatan bulan Juli" dari tahun manapun sekaligus |
 
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**: Array dari `medical_notes` aktif
@@ -1969,7 +1969,7 @@ WHERE ce.caregiver_profile_id = ?
 [
     {
         "id": "...",
-        "valid_date": "22-07-2026",
+        "valid_until": "22-07-2026",
         "recommendation": "...",
         "created_at": "...",
         "child_name": "...",
@@ -1996,7 +1996,7 @@ WHERE ce.caregiver_profile_id = ?
 
 | Field  | Type    | Wajib              | Keterangan                                                                                            |
 | ------ | ------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
-| status | enum    | Ya                 | `history` (filter `valid_date < now()`)                                                               |
+| status | enum    | Ya                 | `history` (filter `valid_until < now()`)                                                               |
 | month  | integer | Tidak **[FIX v4]** | 1-12. Default: bulan berjalan. Sama seperti endpoint 58 — filter nomor bulan saja, tidak peduli tahun |
 
 - **Request Body**: `-` (tidak ada)
@@ -2032,7 +2032,7 @@ WHERE ce.caregiver_profile_id = ?
 {
     "id": "...",
     "doctor_name": "...",
-    "facility_location": "...",
+    "facility_name": "...",
     "recommendation": "...",
     "valid_date": "22-07-2026",
     "created_at": "...",
@@ -2040,7 +2040,7 @@ WHERE ce.caregiver_profile_id = ?
     "daily_nutrition_targets": [
         {
             "id": "...",
-            "nutrient_name": "calories",
+            "nutrient": "calories",
             "quantity": 10
         }
     ],
@@ -2066,19 +2066,19 @@ WHERE ce.caregiver_profile_id = ?
 - **Method & Path [FIX v4]**: `POST /medical-notes`
 - **Path Params [FIX v4]**: `-` (tidak ada — `child_id` sekarang dikirim di body, bukan di path)
 - **Query Params**: `-` (tidak ada)
-- **Request Body [FIX v4: tambah `child_id`, `facility_location` jadi opsional]**:
+- **Request Body [FIX v4: tambah `child_id`, `facility_name` jadi opsional]**:
 
 ```json
 {
     "child_id": "2c8c5e18-0eca-4bf8-9ef0-831dbc3358cb",
     "doctor_name": "dr. Tirta",
-    "facility_location": "RSSA",
+    "facility_name": "RSSA",
     "recommendation": "Berikan makanan bertekstur lembut dan tinggi kalori...",
     "daily_nutrition_targets": [
-        { "nutrient_name": "calories", "quantity": 10 },
-        { "nutrient_name": "protein", "quantity": 15 },
-        { "nutrient_name": "fat", "quantity": 20 },
-        { "nutrient_name": "carbohydrate", "quantity": 80 }
+        { "nutrient": "calories", "quantity": 10 },
+        { "nutrient": "protein", "quantity": 15 },
+        { "nutrient": "fat", "quantity": 20 },
+        { "nutrient": "carbohydrate", "quantity": 80 }
     ],
     "prohibitions": ["Makanan Keras", "Serat Tinggi"],
     "allergies": ["Kacang Tanah", "Susu Sapi"],
@@ -2090,10 +2090,10 @@ WHERE ce.caregiver_profile_id = ?
 | ----------------------------------------- | --------------- | ------------------ | ------------------------------------------------------------------------- |
 | child_id                                  | UUID            | Ya **[FIX v4]**    | anak yang dituju catatan ini                                              |
 | doctor_name                               | string          | Ya                 | maks 150 karakter, teks bebas (bukan FK)                                  |
-| facility_location                         | string          | Tidak **[FIX v4]** | maks 150 karakter                                                         |
+| facility_name                         | string          | Tidak **[FIX v4]** | maks 150 karakter                                                         |
 | recommendation                            | string          | Ya                 |                                                                           |
 | daily_nutrition_targets[].medical_note_id | string (uuid)   | Ya                 | ID rujukan ke _medical note_                                              |
-| daily_nutrition_targets[].nutrient_name   | string (enum)   | Ya                 | Hanya diperbolehkan: `"calories"`, `"protein"`, `"fat"`, `"carbohydrate"` |
+| daily_nutrition_targets[].nutrient   | string (enum)   | Ya                 | Hanya diperbolehkan: `"calories"`, `"protein"`, `"fat"`, `"carbohydrate"` |
 | daily_nutrition_targets[].quantity        | float           | Ya                 | Jumlah target nutrisi per hari (misal 150.5)                              |
 | prohibitions                              | array\<string\> | Tidak              | -> row `medical_restrictions` dengan `type='prohibition'`                 |
 | allergies                                 | array\<string\> | Tidak              | -> row `medical_restrictions` dengan `type='allergy'`                     |
@@ -2122,10 +2122,10 @@ WHERE ce.caregiver_profile_id = ?
 ```json
 {
     "doctor_name": "dr. Tirta",
-    "facility_location": "RSSA",
+    "facility_name": "RSSA",
     "recommendation": "Berikan makanan bertekstur lembut dan tinggi kalori...",
     "daily_nutrition_targets": [
-        { "nutrient_name": "calories", "quantity": 10 }
+        { "nutrient": "calories", "quantity": 10 }
     ],
     "prohibitions": ["Makanan Keras"],
     "allergies": ["Kacang Tanah"],
@@ -2136,7 +2136,7 @@ WHERE ce.caregiver_profile_id = ?
 | Field                   | Type            | Wajib | Keterangan                                                        |
 | ----------------------- | --------------- | ----- | ----------------------------------------------------------------- |
 | doctor_name             | string          | Tidak | maks 150 karakter                                                 |
-| facility_location       | string          | Tidak | maks 150 karakter                                                 |
+| facility_name       | string          | Tidak | maks 150 karakter                                                 |
 | recommendation          | string          | Tidak |                                                                   |
 | daily_nutrition_targets | array\<object\> | Tidak | replace-all — kirim seluruh daftar baru, bukan hanya yang berubah |
 | prohibitions            | array\<string\> | Tidak | replace-all                                                       |

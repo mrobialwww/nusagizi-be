@@ -30,7 +30,7 @@ func (r *MedicalRepository) GetMedicalNotes(ctx context.Context, motherProfileID
 			m.id, 
 			c.full_name AS child_name, 
 			m.recommendation, 
-			m.valid_date, 
+			m.valid_until, 
 			m.created_at,
 			(SELECT COUNT(*) FROM medical_restrictions WHERE medical_note_id = m.id 
 				AND restriction_type = 'prohibition') AS prohibition_count,
@@ -43,16 +43,16 @@ func (r *MedicalRepository) GetMedicalNotes(ctx context.Context, motherProfileID
 
 	switch status {
 	case "active":
-		query += ` AND m.valid_date >= CURRENT_DATE`
+		query += ` AND m.valid_until >= CURRENT_DATE`
 	case "history":
-		query += ` AND m.valid_date < CURRENT_DATE`
+		query += ` AND m.valid_until < CURRENT_DATE`
 	}
 
 	if month != nil {
-		query += fmt.Sprintf(` AND EXTRACT(MONTH FROM m.valid_date) = %d`, *month)
+		query += fmt.Sprintf(` AND EXTRACT(MONTH FROM m.valid_until) = %d`, *month)
 	}
 
-	query += ` ORDER BY m.valid_date DESC`
+	query += ` ORDER BY m.valid_until DESC`
 
 	rows, err := r.pool.Query(ctx, query, motherProfileID)
 	if err != nil {
@@ -69,7 +69,7 @@ func (r *MedicalRepository) GetMedicalNotes(ctx context.Context, motherProfileID
 		); err != nil {
 			return nil, err
 		}
-		res.ValidDate = validDate.Format(models.DateLayout)
+		res.ValidUntil = validDate.Format(models.DateLayout)
 		results = append(results, res)
 	}
 	return results, rows.Err()
@@ -106,14 +106,14 @@ func (r *MedicalRepository) GetMedicalNoteDetail(ctx context.Context, noteID uui
 	// Get medical note details
 	queryNote := `
 		SELECT 
-			m.id, c.full_name, m.doctor_name, m.facility_location, 
-			m.recommendation, m.valid_date, m.created_at
+			m.id, c.full_name, m.doctor_name, m.facility_name, 
+			m.recommendation, m.valid_until, m.created_at
 		FROM medical_notes m
 		JOIN children c ON m.child_id = c.id
 		WHERE m.id = $1
 	`
 	err := r.pool.QueryRow(ctx, queryNote, noteID).Scan(
-		&detail.ID, &detail.ChildName, &detail.DoctorName, &detail.FacilityLocation,
+		&detail.ID, &detail.ChildName, &detail.DoctorName, &detail.FacilityName,
 		&detail.Recommendation, &validDate, &detail.CreatedAt,
 	)
 	if err != nil {
@@ -122,7 +122,7 @@ func (r *MedicalRepository) GetMedicalNoteDetail(ctx context.Context, noteID uui
 		}
 		return nil, err
 	}
-	detail.ValidDate = validDate.Format(models.DateLayout)
+	detail.ValidUntil = validDate.Format(models.DateLayout)
 
 	// Get medical restrictions (Prohibitions and Allergies)
 	queryRestrictions := `
@@ -154,7 +154,7 @@ func (r *MedicalRepository) GetMedicalNoteDetail(ctx context.Context, noteID uui
 
 	// Get daily nutrition targets
 	queryTargets := `
-		SELECT nutrient_name, quantity 
+		SELECT nutrient, quantity 
 		FROM daily_nutrition_targets 
 		WHERE medical_note_id = $1`
 
@@ -163,7 +163,7 @@ func (r *MedicalRepository) GetMedicalNoteDetail(ctx context.Context, noteID uui
 		defer rowsTgt.Close()
 		for rowsTgt.Next() {
 			var tgt medical.DailyNutritionTarget
-			if err := rowsTgt.Scan(&tgt.NutrientName, &tgt.Quantity); err == nil {
+			if err := rowsTgt.Scan(&tgt.Nutrient, &tgt.Quantity); err == nil {
 				detail.DailyNutritionTargets = append(detail.DailyNutritionTargets, tgt)
 			}
 		}
@@ -186,7 +186,7 @@ func (r *MedicalRepository) CreateMedicalNote(ctx context.Context, input *medica
 	defer tx.Rollback(ctx)
 
 	// Parse valid date
-	validDate, err := time.Parse(models.DateLayout, input.ValidDate)
+	validDate, err := time.Parse(models.DateLayout, input.ValidUntil)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -194,10 +194,10 @@ func (r *MedicalRepository) CreateMedicalNote(ctx context.Context, input *medica
 	// Insert medical note
 	newID := uuid.New()
 	queryInsertNote := `
-		INSERT INTO medical_notes (id, child_id, doctor_name, facility_location, recommendation, valid_date)
+		INSERT INTO medical_notes (id, child_id, doctor_name, facility_name, recommendation, valid_until)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`
-	_, err = tx.Exec(ctx, queryInsertNote, newID, input.ChildID, input.DoctorName, input.FacilityLocation, input.Recommendation, validDate)
+	_, err = tx.Exec(ctx, queryInsertNote, newID, input.ChildID, input.DoctorName, input.FacilityName, input.Recommendation, validDate)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -205,11 +205,12 @@ func (r *MedicalRepository) CreateMedicalNote(ctx context.Context, input *medica
 	// Insert daily nutrition targets
 	if len(input.DailyNutritionTargets) > 0 {
 		queryTarget := `
-			INSERT INTO daily_nutrition_targets (medical_note_id, nutrient_name, quantity) 
-			VALUES ($1, $2::nutrient_type, $3)`
+			INSERT INTO daily_nutrition_targets (medical_note_id, nutrient, quantity) 
+			VALUES ($1, $2, $3)
+		`
 
 		for _, tgt := range input.DailyNutritionTargets {
-			_, err = tx.Exec(ctx, queryTarget, newID, tgt.NutrientName, tgt.Quantity)
+			_, err = tx.Exec(ctx, queryTarget, newID, tgt.Nutrient, tgt.Quantity)
 			if err != nil {
 				return uuid.Nil, err
 			}
@@ -253,9 +254,10 @@ func (r *MedicalRepository) UpdateMedicalNote(ctx context.Context, noteID uuid.U
 
 	// Parse valid date
 	var validDate *time.Time
-	if input.ValidDate != nil {
-		vd, err := time.Parse(models.DateLayout, *input.ValidDate)
+	if input.ValidUntil != nil {
+		vd, err := time.Parse(models.DateLayout, *input.ValidUntil)
 		if err != nil {
+			tx.Rollback(ctx)
 			return err
 		}
 		validDate = &vd
@@ -266,12 +268,12 @@ func (r *MedicalRepository) UpdateMedicalNote(ctx context.Context, noteID uuid.U
 		UPDATE medical_notes
 		SET 
 			doctor_name = COALESCE($1, doctor_name),
-			facility_location = COALESCE($2, facility_location),
+			facility_name = COALESCE($2, facility_name),
 			recommendation = COALESCE($3, recommendation),
-			valid_date = COALESCE($4, valid_date)
+			valid_until = COALESCE($4, valid_until)
 		WHERE id = $5
 	`
-	res, err := tx.Exec(ctx, queryUpdate, input.DoctorName, input.FacilityLocation, input.Recommendation, validDate, noteID)
+	res, err := tx.Exec(ctx, queryUpdate, input.DoctorName, input.FacilityName, input.Recommendation, validDate, noteID)
 	if err != nil {
 		return err
 	}
@@ -293,11 +295,12 @@ func (r *MedicalRepository) UpdateMedicalNote(ctx context.Context, noteID uuid.U
 
 		// Insert daily nutrition targets
 		queryTarget := `
-			INSERT INTO daily_nutrition_targets (medical_note_id, nutrient_name, quantity) 
-			VALUES ($1, $2::nutrient_type, $3)`
+			INSERT INTO daily_nutrition_targets (medical_note_id, nutrient, quantity) 
+			VALUES ($1, $2, $3)
+		`
 
 		for _, tgt := range *input.DailyNutritionTargets {
-			_, err = tx.Exec(ctx, queryTarget, noteID, tgt.NutrientName, tgt.Quantity)
+			_, err = tx.Exec(ctx, queryTarget, noteID, tgt.Nutrient, tgt.Quantity)
 			if err != nil {
 				return err
 			}

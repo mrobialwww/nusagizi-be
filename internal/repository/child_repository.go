@@ -68,7 +68,7 @@ func (r *ChildRepository) Create(ctx context.Context, motherProfileID uuid.UUID,
 	if input.Allergies != nil {
 		var query string = `
 			INSERT INTO child_allergy_profiles (child_id, category, allergen_name)
-			VALUES ($1, $2::child_allergy_category, $3)`
+			VALUES ($1, $2::child_allergy_type, $3)`
 
 		for _, name := range input.Allergies.Food {
 			if _, err := tx.Exec(ctx, query, childID, "food", name); err != nil {
@@ -168,7 +168,7 @@ func (r *ChildRepository) Update(ctx context.Context, childID uuid.UUID, input *
 		}
 		var query string = `
 			INSERT INTO child_allergy_profiles (child_id, category, allergen_name)
-			VALUES ($1, $2::child_allergy_category, $3)`
+			VALUES ($1, $2::child_allergy_type, $3)`
 
 		for _, name := range input.Allergies.Food {
 			if _, err := tx.Exec(ctx, query, childID, "food", name); err != nil {
@@ -834,7 +834,7 @@ func (r *ChildRepository) fetchActiveMedicalNotes(ctx context.Context, childIDs 
 					ARTITION BY child_id ORDER BY created_at DESC
 				) AS rn
 			FROM medical_notes
-			WHERE child_id = ANY($1) AND valid_date >= CURRENT_DATE
+			WHERE child_id = ANY($1) AND valid_until >= CURRENT_DATE
 		) ranked
 		WHERE rn = 1`
 	rows, err := r.pool.Query(ctx, query, childIDs)
@@ -866,7 +866,7 @@ func (r *ChildRepository) fetchNutritionTargets(ctx context.Context, noteIDs []u
 	}
 
 	const query = `
-		SELECT medical_note_id, nutrient_name, quantity 
+		SELECT medical_note_id, nutrient, quantity 
 		FROM daily_nutrition_targets 
 		WHERE medical_note_id = ANY($1)`
 
@@ -878,13 +878,13 @@ func (r *ChildRepository) fetchNutritionTargets(ctx context.Context, noteIDs []u
 
 	for rows.Next() {
 		var noteID uuid.UUID
-		var nutrientName string
+		var nutrient string
 		var quantity float64
-		if err := rows.Scan(&noteID, &nutrientName, &quantity); err != nil {
+		if err := rows.Scan(&noteID, &nutrient, &quantity); err != nil {
 			return nil, fmt.Errorf("failed to scan nutrition target row: %w", err)
 		}
 		t := result[noteID]
-		switch nutrientName {
+		switch nutrient {
 		case string(medical.NutrientCalories):
 			t.EnergiKkal = quantity
 		case string(medical.NutrientProtein):
