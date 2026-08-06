@@ -67,7 +67,7 @@ func (h *OnboardingHandler) Handle(c *gin.Context) {
 	}
 
 	// 5. Step C: Assign role ke user di Auth0
-	err = auth.AssignRoleToUser(h.cfg.Auth0Domain, h.cfg.Auth0ClientID, h.cfg.Auth0ClientSecret, auth0ID, roleID)
+	err = auth.AssignRoleToUser(h.cfg.Auth0Domain, h.cfg.M2MClientID, h.cfg.M2MClientSecret, auth0ID, roleID)
 	if err != nil {
 		slog.Error("Failed to assign Auth0 role", "auth0_id", auth0ID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan role di Auth0"})
