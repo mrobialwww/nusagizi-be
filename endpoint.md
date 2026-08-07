@@ -68,9 +68,9 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 }
 ```
 
-| Field      | Type   | Wajib | Keterangan                                          |
-| ---------- | ------ | ----- | --------------------------------------------------- |
-| id_token   | string | Ya    | ID Token dari flow Passwordless OTP Auth0           |
+| Field    | Type   | Wajib | Keterangan                                |
+| -------- | ------ | ----- | ----------------------------------------- |
+| id_token | string | Ya    | ID Token dari flow Passwordless OTP Auth0 |
 
 - **Response Body (200)**:
 
@@ -82,12 +82,12 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 
 - **Response Error**:
 
-| Status | Kasus                                               |
-| ------ | --------------------------------------------------- |
-| 400    | `id_token` wajib diisi atau klaim email tidak ada   |
-| 401    | `id_token` tidak valid atau email belum diverifikasi|
-| 404    | akun database untuk email ini tidak ditemukan       |
-| 500    | gagal memperbarui status verifikasi email           |
+| Status | Kasus                                                |
+| ------ | ---------------------------------------------------- |
+| 400    | `id_token` wajib diisi atau klaim email tidak ada    |
+| 401    | `id_token` tidak valid atau email belum diverifikasi |
+| 404    | akun database untuk email ini tidak ditemukan        |
+| 500    | gagal memperbarui status verifikasi email            |
 
 ### 1. Update profil user
 
@@ -288,7 +288,6 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
     "diets": ["TETP"],
     "favorite_foods": ["Ayam", "Telur", "Naspad"],
     "favorite_textures": ["Finger food", "Makanan keluarga"],
-    "food_goal": "Menyesuaikan kondisi kesehatan",
     "notes": "Saya mau menu yang murah"
 }
 ```
@@ -392,7 +391,6 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
     "diets": ["TETP"],
     "favorite_foods": ["Ayam", "Telur", "Naspad"],
     "favorite_textures": ["Finger food", "Makanan keluarga"],
-    "food_goal": "Menyesuaikan kondisi kesehatan",
     "notes": "Saya mau menu yang murah"
 }
 ```
@@ -793,21 +791,25 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
             "total_question": 3,
             "true_answer": 2
         },
-        { "developmental_domain": "Socialization", "total_question": 3, "true_answer": 2 }
+        {
+            "developmental_domain": "Socialization",
+            "total_question": 3,
+            "true_answer": 2
+        }
     ]
 }
 ```
 
-| Field                    | Type           | Keterangan                                                                                 |
-| ------------------------ | -------------- | ------------------------------------------------------------------------------------------ |
-| id                       | UUID           |                                                                                            |
-| kpsp_score               | integer        | 0-10                                                                                       |
-| next_check_date          | date \| "done" |                                                                                            |
-| status                   | string         | "Sesuai Usia", "Perkembangan meragukan", atau "Kemungkinan penyimpangan"                   |
-| created_at               | datetime       |                                                                                            |
-| domains[].developmental_domain     | enum           | 4 aspek: `Gross motor skills`, `Fine motor skills`, `Speech and language`, `Socialization` |
-| domains[].total_question | integer        | jumlah pertanyaan di domain ini untuk `month_target` ybs                                   |
-| domains[].true_answer    | integer        | jumlah jawaban `true` di domain ini                                                        |
+| Field                          | Type           | Keterangan                                                                                 |
+| ------------------------------ | -------------- | ------------------------------------------------------------------------------------------ |
+| id                             | UUID           |                                                                                            |
+| kpsp_score                     | integer        | 0-10                                                                                       |
+| next_check_date                | date \| "done" |                                                                                            |
+| status                         | string         | "Sesuai Usia", "Perkembangan meragukan", atau "Kemungkinan penyimpangan"                   |
+| created_at                     | datetime       |                                                                                            |
+| domains[].developmental_domain | enum           | 4 aspek: `Gross motor skills`, `Fine motor skills`, `Speech and language`, `Socialization` |
+| domains[].total_question       | integer        | jumlah pertanyaan di domain ini untuk `month_target` ybs                                   |
+| domains[].true_answer          | integer        | jumlah jawaban `true` di domain ini                                                        |
 
 - **Response Error**:
 
@@ -888,18 +890,22 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
             "total_question": 3,
             "true_answer": 2
         },
-        { "developmental_domain": "Socialization", "total_question": 3, "true_answer": 2 }
+        {
+            "developmental_domain": "Socialization",
+            "total_question": 3,
+            "true_answer": 2
+        }
     ]
 }
 ```
 
-| Field                                           | Type                 | Keterangan                                                                                    |
-| ----------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------- |
-| id                                              | UUID                 |                                                                                               |
-| kpsp_score                                      | integer              |                                                                                               |
-| month_target                                    | integer              | **[FIX v4]** menggantikan `next_check_date` (dihapus — tidak relevan di halaman detail hasil) |
-| status                                          | string               | "Sesuai Usia", "Perkembangan meragukan", atau "Kemungkinan penyimpangan"                      |
-| recommended_actions[].id/title/action_text      | UUID/string/string   |                                                                                               |
+| Field                                                     | Type                 | Keterangan                                                                                    |
+| --------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------- |
+| id                                                        | UUID                 |                                                                                               |
+| kpsp_score                                                | integer              |                                                                                               |
+| month_target                                              | integer              | **[FIX v4]** menggantikan `next_check_date` (dihapus — tidak relevan di halaman detail hasil) |
+| status                                                    | string               | "Sesuai Usia", "Perkembangan meragukan", atau "Kemungkinan penyimpangan"                      |
+| recommended_actions[].id/title/action_text                | UUID/string/string   |                                                                                               |
 | domains[].developmental_domain/total_question/true_answer | enum/integer/integer | **[FIX v4]** disamakan dengan format agregat endpoint 19                                      |
 
 - **Response Error**:
@@ -1075,10 +1081,10 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 ]
 ```
 
-| Field       | Type   | Keterangan                                                          |
-| ----------- | ------ | ------------------------------------------------------------------- |
-| developmental_domain  | string | Aspek perkembangan: `Gross motor skills`, `Fine motor skills`, dll. |
-| action_text | string | Teks rekomendasi latihan yang harus dilakukan orang tua             |
+| Field                | Type   | Keterangan                                                          |
+| -------------------- | ------ | ------------------------------------------------------------------- |
+| developmental_domain | string | Aspek perkembangan: `Gross motor skills`, `Fine motor skills`, dll. |
+| action_text          | string | Teks rekomendasi latihan yang harus dilakukan orang tua             |
 
 - **Response Error**:
 
@@ -1162,6 +1168,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     "target_fat": 0,
     "carbohydrate": 0,
     "target_carbohydrate": 0,
+    "status": "normal",
     "menu": {
         "id": "...",
         "created_at": "...",
@@ -1191,10 +1198,10 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | id                                                            | UUID    | `child_nutrition_reports.id` |
 | calories/protein/fat/carbohydrate                             | integer | aktual                       |
 | target_calories/target_protein/target_fat/target_carbohydrate | integer | target                       |
-
-| menu.id | UUID | `daily_menus.id` |
-| menu.recipes[] | array\<object\> | dari `recipes` |
-| shopping_list[] | array\<object\> | daftar bahan belanja dari menu (priority=1), digabung dan unitnya dijumlahkan per `ingredient_id` |
+| status                                                        | string  | Ditentukan dari jumlah makronutrisi (kalori, protein, lemak, karbo) yang nilainya >= 90% dari targetnya. (4 = "normal", 3 = "kurang optimal", 2 = "beresiko", <=1 = "sangat buruk") |
+| menu.id                                                       | UUID    | ID dari menu harian anak (`daily_menus.id`) |
+| menu.recipes[]                                                | array   | Daftar resep/makanan yang ada di dalam menu hari ini |
+| shopping_list[]                                               | array   | Daftar bahan belanja dari menu (bahan utama / priority 1). Bahan yang sama (berdasarkan `ingredient_id`) akan digabung dan jumlah takarannya (unit) dijumlahkan secara otomatis |
 
 - **Response Error**:
 
@@ -1955,8 +1962,8 @@ WHERE ce.caregiver_profile_id = ?
 - **Path Params**: `-` (tidak ada)
 - **Query Params**:
 
-| Field  | Type    | Wajib              | Keterangan                                                                                                                                                                                                             |
-| ------ | ------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field  | Type    | Wajib              | Keterangan                                                                                                                                                                                                              |
+| ------ | ------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | status | enum    | Ya                 | `active` (default filter `valid_until >= now()`)                                                                                                                                                                        |
 | month  | integer | Tidak **[FIX v4]** | 1-12. Default: bulan berjalan. Filter berdasarkan **nomor bulan saja** (`EXTRACT(MONTH FROM valid_until) = month`) — tidak peduli tahun, jadi mother bisa lihat "semua catatan bulan Juli" dari tahun manapun sekaligus |
 
@@ -1994,7 +2001,7 @@ WHERE ce.caregiver_profile_id = ?
 
 | Field  | Type    | Wajib              | Keterangan                                                                                            |
 | ------ | ------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
-| status | enum    | Ya                 | `history` (filter `valid_until < now()`)                                                               |
+| status | enum    | Ya                 | `history` (filter `valid_until < now()`)                                                              |
 | month  | integer | Tidak **[FIX v4]** | 1-12. Default: bulan berjalan. Sama seperti endpoint 58 — filter nomor bulan saja, tidak peduli tahun |
 
 - **Request Body**: `-` (tidak ada)
@@ -2088,10 +2095,10 @@ WHERE ce.caregiver_profile_id = ?
 | ----------------------------------------- | --------------- | ------------------ | ------------------------------------------------------------------------- |
 | child_id                                  | UUID            | Ya **[FIX v4]**    | anak yang dituju catatan ini                                              |
 | doctor_name                               | string          | Ya                 | maks 150 karakter, teks bebas (bukan FK)                                  |
-| facility_name                         | string          | Tidak **[FIX v4]** | maks 150 karakter                                                         |
+| facility_name                             | string          | Tidak **[FIX v4]** | maks 150 karakter                                                         |
 | recommendation                            | string          | Ya                 |                                                                           |
 | daily_nutrition_targets[].medical_note_id | string (uuid)   | Ya                 | ID rujukan ke _medical note_                                              |
-| daily_nutrition_targets[].nutrient   | string (enum)   | Ya                 | Hanya diperbolehkan: `"calories"`, `"protein"`, `"fat"`, `"carbohydrate"` |
+| daily_nutrition_targets[].nutrient        | string (enum)   | Ya                 | Hanya diperbolehkan: `"calories"`, `"protein"`, `"fat"`, `"carbohydrate"` |
 | daily_nutrition_targets[].quantity        | float           | Ya                 | Jumlah target nutrisi per hari (misal 150.5)                              |
 | prohibitions                              | array\<string\> | Tidak              | -> row `medical_restrictions` dengan `type='prohibition'`                 |
 | allergies                                 | array\<string\> | Tidak              | -> row `medical_restrictions` dengan `type='allergy'`                     |
@@ -2122,9 +2129,7 @@ WHERE ce.caregiver_profile_id = ?
     "doctor_name": "dr. Tirta",
     "facility_name": "RSSA",
     "recommendation": "Berikan makanan bertekstur lembut dan tinggi kalori...",
-    "daily_nutrition_targets": [
-        { "nutrient": "calories", "quantity": 10 }
-    ],
+    "daily_nutrition_targets": [{ "nutrient": "calories", "quantity": 10 }],
     "prohibitions": ["Makanan Keras"],
     "allergies": ["Kacang Tanah"],
     "valid_date": "22-07-2026"
@@ -2134,7 +2139,7 @@ WHERE ce.caregiver_profile_id = ?
 | Field                   | Type            | Wajib | Keterangan                                                        |
 | ----------------------- | --------------- | ----- | ----------------------------------------------------------------- |
 | doctor_name             | string          | Tidak | maks 150 karakter                                                 |
-| facility_name       | string          | Tidak | maks 150 karakter                                                 |
+| facility_name           | string          | Tidak | maks 150 karakter                                                 |
 | recommendation          | string          | Tidak |                                                                   |
 | daily_nutrition_targets | array\<object\> | Tidak | replace-all — kirim seluruh daftar baru, bukan hanya yang berubah |
 | prohibitions            | array\<string\> | Tidak | replace-all                                                       |
@@ -2235,13 +2240,18 @@ WHERE ce.caregiver_profile_id = ?
     {
         "id": "...",
         "full_name": "...",
-        "birth_date": "22-07-2026",
+        "photo_url": "...",
+        "age": "2 tahun 3 bulan",
         "height_cm": 89,
         "weight_kg": 12.4,
         "kpsp_score": 8,
+        "kpsp_answers_count": 10,
         "protein": 30,
         "target_protein": 35,
-        "streak": 5
+        "streak": 5,
+        "status_growth": "Normal",
+        "status_development": "Sesuai",
+        "status_nutrition": "normal"
     }
 ]
 ```

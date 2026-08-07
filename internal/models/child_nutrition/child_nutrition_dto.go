@@ -44,6 +44,7 @@ type TodayNutritionReportResponse struct {
 	TargetFat          int                `json:"target_fat"`
 	Carbohydrate       int                `json:"carbohydrate"`
 	TargetCarbohydrate int                `json:"target_carbohydrate"`
+	Status             string             `json:"status"`
 	Menu               MenuResponse       `json:"menu"`
 	ShoppingList       []ShoppingListItem `json:"shopping_list"`
 }

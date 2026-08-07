@@ -3,10 +3,9 @@ package repository
 import (
 	"context"
 	"time"
-	
-	"nusagizi_be/internal/models"
+
 	"nusagizi_be/internal/models/dashboard"
-	
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -27,6 +26,7 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 		SELECT 
 			c.id, 
 			c.full_name, 
+			c.photo_url,
 			c.birth_date, 
 			c.gender,
 			c.upload_streak_days,
@@ -34,8 +34,15 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 			gr.weight_kg,
 			gr.head_circumference_cm,
 			dr.kpsp_score,
+			dr.kpsp_answers_count,
+			nr.calories,
+			nr.target_calories,
 			nr.protein, 
-			nr.target_protein
+			nr.target_protein,
+			nr.fat,
+			nr.target_fat,
+			nr.carbohydrate,
+			nr.target_carbohydrate
 		FROM children c
 		LEFT JOIN LATERAL (
 			SELECT height_cm, weight_kg, head_circumference_cm 
@@ -44,13 +51,14 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 			ORDER BY measured_at DESC LIMIT 1
 		) gr ON true
 		LEFT JOIN LATERAL (
-			SELECT kpsp_score 
-			FROM child_development_reports 
-			WHERE child_id = c.id 
-			ORDER BY created_at DESC LIMIT 1
+			SELECT cdr.kpsp_score,
+				(SELECT COUNT(*) FROM assessment_kpsp_answers aka WHERE aka.child_development_report_id = cdr.id) as kpsp_answers_count
+			FROM child_development_reports cdr
+			WHERE cdr.child_id = c.id 
+			ORDER BY cdr.created_at DESC LIMIT 1
 		) dr ON true
 		LEFT JOIN LATERAL (
-			SELECT protein, target_protein 
+			SELECT calories, target_calories, protein, target_protein, fat, target_fat, carbohydrate, target_carbohydrate
 			FROM child_nutrition_reports 
 			WHERE child_id = c.id 
 			ORDER BY created_at DESC LIMIT 1
@@ -68,14 +76,17 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 		var res dashboard.ChildSummaryResponse
 		var birthDate time.Time
 		if err := rows.Scan(
-			&res.ID, &res.FullName, &birthDate, &res.Gender, &res.Streak,
+			&res.ID, &res.FullName, &res.PhotoUrl, &birthDate, &res.Gender, &res.Streak,
 			&res.HeightCm, &res.WeightKg, &res.HeadCircumferenceCm,
-			&res.KpspScore,
+			&res.KpspScore, &res.KpspAnswersCount,
+			&res.Calories, &res.TargetCalories,
 			&res.Protein, &res.TargetProtein,
+			&res.Fat, &res.TargetFat,
+			&res.Carbohydrate, &res.TargetCarbohydrate,
 		); err != nil {
 			return nil, err
 		}
-		res.BirthDate = birthDate.Format(models.DateLayout)
+		res.BirthDateRaw = birthDate
 		results = append(results, res)
 	}
 	return results, rows.Err()

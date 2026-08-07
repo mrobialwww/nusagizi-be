@@ -36,7 +36,14 @@ func (s *ChildNutritionService) GetTodayNutritionReport(ctx context.Context, use
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
 	}
-	return s.repo.GetTodayNutritionReport(ctx, childID)
+	resp, err := s.repo.GetTodayNutritionReport(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+	if resp != nil {
+		resp.Status = DetermineNutritionStatus(resp)
+	}
+	return resp, nil
 }
 
 // GetTodayDailyMenu (Endpoint: 30)
@@ -139,4 +146,36 @@ func (s *ChildNutritionService) GetTodayMenuShopping(ctx context.Context, userID
 		return nil, err
 	}
 	return s.repo.GetTodayMenuShopping(ctx, childID)
+}
+
+// ================================== HELPER FUNCTION ===================================
+// DetermineNutritionStatus evaluates macro targets and returns a descriptive status
+func DetermineNutritionStatus(resp *child_nutri.TodayNutritionReportResponse) string {
+	if resp == nil {
+		return "sangat buruk"
+	}
+	count := 0
+	if resp.TargetCalories > 0 && float64(resp.Calories) >= 0.9*float64(resp.TargetCalories) {
+		count++
+	}
+	if resp.TargetProtein > 0 && float64(resp.Protein) >= 0.9*float64(resp.TargetProtein) {
+		count++
+	}
+	if resp.TargetFat > 0 && float64(resp.Fat) >= 0.9*float64(resp.TargetFat) {
+		count++
+	}
+	if resp.TargetCarbohydrate > 0 && float64(resp.Carbohydrate) >= 0.9*float64(resp.TargetCarbohydrate) {
+		count++
+	}
+
+	switch count {
+	case 4:
+		return "normal"
+	case 3:
+		return "kurang optimal"
+	case 2:
+		return "beresiko"
+	default:
+		return "sangat buruk"
+	}
 }
