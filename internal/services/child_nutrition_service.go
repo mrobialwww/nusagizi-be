@@ -152,7 +152,7 @@ func (s *ChildNutritionService) GetTodayMenuShopping(ctx context.Context, userID
 // DetermineNutritionStatus evaluates macro targets and returns a descriptive status
 func DetermineNutritionStatus(resp *child_nutri.TodayNutritionReportResponse) string {
 	if resp == nil {
-		return "sangat buruk"
+		return "Sangat Buruk"
 	}
 	count := 0
 	if resp.TargetCalories > 0 && float64(resp.Calories) >= 0.9*float64(resp.TargetCalories) {
@@ -170,12 +170,12 @@ func DetermineNutritionStatus(resp *child_nutri.TodayNutritionReportResponse) st
 
 	switch count {
 	case 4:
-		return "normal"
+		return "Normal"
 	case 3:
-		return "kurang optimal"
+		return "Kurang Optimal"
 	case 2:
-		return "beresiko"
+		return "Beresiko"
 	default:
-		return "sangat buruk"
+		return "Sangat Buruk"
 	}
 }

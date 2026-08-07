@@ -30,4 +30,5 @@ type ChildSummaryResponse struct {
 	StatusGrowth        string    `json:"status_growth"`
 	StatusDevelopment   string    `json:"status_development"`
 	StatusNutrition     string    `json:"status_nutrition"`
+	Status              string    `json:"status"`
 }

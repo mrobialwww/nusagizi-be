@@ -29,7 +29,7 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 			c.photo_url,
 			c.birth_date, 
 			c.gender,
-			c.upload_streak_days,
+			c.streak_days,
 			gr.height_cm, 
 			gr.weight_kg,
 			gr.head_circumference_cm,

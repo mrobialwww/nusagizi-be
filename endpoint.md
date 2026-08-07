@@ -380,7 +380,7 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
     "birth_date": "22-07-2026",
     "gender": "male",
     "photo_url": "https://docs.google.com/",
-    "upload_streak_days": 12,
+    "streak_days": 12,
     "allergies": {
         "food": ["Kacang", "Telur"],
         "medicine": ["Penisilin"],
@@ -397,7 +397,7 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 
 | Field              | Type    | Keterangan                          |
 | ------------------ | ------- | ----------------------------------- |
-| upload_streak_days | integer | `child.upload_streak_days`          |
+| streak_days        | integer | `child.streak_days`                 |
 | (field lain)       | —       | sama seperti tabel field endpoint 7 |
 
 - **Response Error**:
@@ -469,7 +469,7 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
     "birth_date": "22-07-2026",
     "gender": "male",
     "photo_url": "https://docs.google.com/",
-    "upload_streak_days": 12,
+    "streak_days": 12,
     "mother_name": "Siti Rahayu"
 }
 ```
@@ -1168,7 +1168,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     "target_fat": 0,
     "carbohydrate": 0,
     "target_carbohydrate": 0,
-    "status": "normal",
+    "status": "Normal",
     "menu": {
         "id": "...",
         "created_at": "...",
@@ -2251,7 +2251,8 @@ WHERE ce.caregiver_profile_id = ?
         "streak": 5,
         "status_growth": "Normal",
         "status_development": "Sesuai",
-        "status_nutrition": "normal"
+        "status_nutrition": "Normal",
+        "status": "Tumbuh Optimal"
     }
 ]
 ```
@@ -2263,7 +2264,18 @@ WHERE ce.caregiver_profile_id = ?
 | height_cm, weight_kg    | number \| null  | dari `child_growth_reports` **terbaru** per `child_id`      |
 | kpsp_score              | integer \| null | dari `child_development_reports` **terbaru** per `child_id` |
 | protein, target_protein | integer \| null | dari `child_nutrition_reports` **terbaru** per `child_id`   |
-| streak                  | integer         | **[FIX v4]** `child.upload_streak_days`                     |
+| streak                  | integer         | **[FIX v4]** `child.streak_days`                            |
+| status                  | string          | Status Gabungan. Lihat aturan penentuan di bawah.           |
+
+**Aturan Penentuan Status Gabungan (Tumbuh, Kembang, Nutrisi):**
+Berdasarkan parameter warna dari ketiga status (Hijau = Normal/Sesuai/Baik, Kuning = Berisiko/Meragukan/Kurang Optimal, Merah = Sangat Buruk/Penyimpangan):
+- Jika terdapat 3 indikator Merah ➔ **"Perlu Konsultasi"**
+- Jika terdapat 2 indikator Merah ➔ **"Perlu Pendampingan"**
+- Jika terdapat 1 indikator Merah ➔ **"Perlu Perhatian"**
+- Jika tidak ada Merah, dan terdapat 3 indikator Kuning ➔ **"Perlu Perhatian"**
+- Jika tidak ada Merah, dan terdapat 1 atau 2 indikator Kuning ➔ **"Perkembangan Baik"**
+- Jika semuanya (3 indikator) bernilai Hijau ➔ **"Tumbuh Optimal"**
+- Jika salah satu/lebih dari ketiga status tersebut belum memiliki data ("Tidak Diketahui" / "Tidak Tersedia") ➔ **"Data Belum Lengkap"**
 
 - **Response Error**:
 
@@ -2418,7 +2430,7 @@ WHERE ce.caregiver_profile_id = ?
 | height_cm, weight_kg    | number \| null  | dari `child_growth_reports` **terbaru** per `child_id`      |
 | kpsp_score              | integer \| null | dari `child_development_reports` **terbaru** per `child_id` |
 | protein, target_protein | integer \| null | dari `child_nutrition_reports` **terbaru** per `child_id`   |
-| streak                  | integer         | **[FIX v4]** `child.upload_streak_days`                     |
+| streak                  | integer         | **[FIX v4]** `child.streak_days`                            |
 
 - **Response Error**:
 

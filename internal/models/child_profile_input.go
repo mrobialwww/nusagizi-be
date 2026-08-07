@@ -42,13 +42,13 @@ type UpdateChildInput struct {
 
 // ChildSimpleResponse is the response body for
 type ChildSimpleResponse struct {
-	ID               string  `json:"id"`
-	FullName         string  `json:"full_name"`
-	BirthDate        string  `json:"birth_date"`
-	Gender           string  `json:"gender"`
-	PhotoURL         *string `json:"photo_url"`
-	UploadStreakDays int     `json:"upload_streak_days"`
-	MotherName       string  `json:"mother_name"`
+	ID         string  `json:"id"`
+	FullName   string  `json:"full_name"`
+	BirthDate  string  `json:"birth_date"`
+	Gender     string  `json:"gender"`
+	PhotoURL   *string `json:"photo_url"`
+	StreakDays int     `json:"streak_days"`
+	MotherName string  `json:"mother_name"`
 }
 
 // ChildDetailResponse is the response body
@@ -58,7 +58,7 @@ type ChildDetailResponse struct {
 	BirthDate        string    `json:"birth_date"` // DD-MM-YYYY
 	Gender           string    `json:"gender"`
 	PhotoURL         *string   `json:"photo_url"`
-	UploadStreakDays int       `json:"upload_streak_days"`
+	StreakDays       int       `json:"streak_days"`
 	Allergies        Allergies `json:"allergies"`
 	ChronicDiseases  []string  `json:"chronic_diseases"`
 	Diets            []string  `json:"diets"`

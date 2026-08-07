@@ -103,7 +103,7 @@ CREATE TABLE children (
     birth_date              DATE NOT NULL,
     photo_url               TEXT,
     notes_profile           TEXT,
-    upload_streak_days      INTEGER NOT NULL CHECK (upload_streak_days >= 0),
+    streak_days             INTEGER NOT NULL CHECK (streak_days >= 0),
     deleted_at              TIMESTAMPTZ,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -49,7 +49,7 @@ func (r *ChildRepository) Create(ctx context.Context, motherProfileID uuid.UUID,
 			birth_date, 
 			photo_url,
 			notes_profile,
-			upload_streak_days
+			streak_days
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, 0)
 		RETURNING id
@@ -358,8 +358,7 @@ func (r *ChildRepository) GetSimpleByID(ctx context.Context, childID uuid.UUID) 
 	var birthDate time.Time
 
 	query := `
-		SELECT 
-			c.id, c.full_name, c.birth_date, c.gender, c.photo_url, c.upload_streak_days, u.full_name
+		SELECT c.id, c.full_name, c.birth_date, c.gender, c.photo_url, c.streak_days, u.full_name
 		FROM children c
 		JOIN mother_profiles mp ON c.mother_profile_id = mp.id
 		JOIN users u ON mp.user_id = u.id
@@ -372,7 +371,7 @@ func (r *ChildRepository) GetSimpleByID(ctx context.Context, childID uuid.UUID) 
 		&birthDate,
 		&child.Gender,
 		&child.PhotoURL,
-		&child.UploadStreakDays,
+		&child.StreakDays,
 		&child.MotherName,
 	)
 
@@ -402,7 +401,7 @@ func (r *ChildRepository) GetByID(ctx context.Context, childID uuid.UUID) (*mode
 			birth_date,
 			photo_url,
 			notes_profile,
-			upload_streak_days
+			streak_days
 		FROM children
 		WHERE id = $1 
 			AND deleted_at IS NULL
@@ -414,7 +413,7 @@ func (r *ChildRepository) GetByID(ctx context.Context, childID uuid.UUID) (*mode
 		&c.BirthDate,
 		&c.PhotoURL,
 		&c.NotesProfile,
-		&c.UploadStreakDays,
+		&c.StreakDays,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -429,7 +428,7 @@ func (r *ChildRepository) GetByID(ctx context.Context, childID uuid.UUID) (*mode
 		BirthDate:        c.BirthDate.Format(models.DateLayout),
 		Gender:           c.Gender,
 		PhotoURL:         c.PhotoURL,
-		UploadStreakDays: c.UploadStreakDays,
+		StreakDays: c.StreakDays,
 		Notes:            c.NotesProfile,
 		// Initialise slices to empty arrays (not null) for consistent JSON output
 		Allergies:        models.Allergies{Food: []string{}, Medicine: []string{}, Animal: []string{}, Others: []string{}},
