@@ -28,8 +28,8 @@ func NewMedicalService(
 	}
 }
 
-// GetMedicalNotes (endpoint: 56 & 57)
-func (s *MedicalService) GetMedicalNotes(ctx context.Context, userID string, status string, month *int) ([]medical.MedicalNoteResponse, error) {
+// GetMedicalNotes 57 & 58)
+func (s *MedicalService) GetMedicalNotes(ctx context.Context, userID string, status string, childName *string, month *int) ([]medical.MedicalNoteResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -43,10 +43,10 @@ func (s *MedicalService) GetMedicalNotes(ctx context.Context, userID string, sta
 		return nil, fmt.Errorf("month must be between 1 and 12")
 	}
 
-	return s.repo.GetMedicalNotes(ctx, motherProfileID, status, month)
+	return s.repo.GetMedicalNotes(ctx, motherProfileID, status, childName, month)
 }
 
-// GetMedicalNoteDetail (endpoint: 58)
+// GetMedicalNoteDetail (endpoint: 59)
 func (s *MedicalService) GetMedicalNoteDetail(ctx context.Context, userID string, noteID uuid.UUID) (*medical.MedicalNoteDetailResponse, error) {
 	childID, err := s.repo.GetChildIDByNoteID(ctx, noteID)
 	if err != nil {
@@ -58,7 +58,7 @@ func (s *MedicalService) GetMedicalNoteDetail(ctx context.Context, userID string
 	return s.repo.GetMedicalNoteDetail(ctx, noteID)
 }
 
-// CreateMedicalNote (endpoint: 59)
+// CreateMedicalNote (endpoint: 60)
 func (s *MedicalService) CreateMedicalNote(ctx context.Context, userID string, input *medical.CreateMedicalNoteInput) (uuid.UUID, error) {
 	if err := checkMotherOwnership(ctx, userID, input.ChildID, s.motherRepo, s.childRepo); err != nil {
 		return uuid.Nil, err
@@ -72,7 +72,7 @@ func (s *MedicalService) CreateMedicalNote(ctx context.Context, userID string, i
 	return s.repo.CreateMedicalNote(ctx, input)
 }
 
-// UpdateMedicalNote (endpoint: 60)
+// UpdateMedicalNote (endpoint: 61)
 func (s *MedicalService) UpdateMedicalNote(ctx context.Context, userID string, noteID uuid.UUID, input *medical.UpdateMedicalNoteInput) error {
 	childID, err := s.repo.GetChildIDByNoteID(ctx, noteID)
 	if err != nil {
@@ -84,7 +84,7 @@ func (s *MedicalService) UpdateMedicalNote(ctx context.Context, userID string, n
 	return s.repo.UpdateMedicalNote(ctx, noteID, input)
 }
 
-// DeleteMedicalNote (endpoint: 61)
+// DeleteMedicalNote (endpoint: 62)
 func (s *MedicalService) DeleteMedicalNote(ctx context.Context, userID string, noteID uuid.UUID) error {
 	childID, err := s.repo.GetChildIDByNoteID(ctx, noteID)
 	if err != nil {

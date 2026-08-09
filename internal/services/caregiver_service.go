@@ -25,7 +25,7 @@ func NewCaregiverService(
 	}
 }
 
-// GetCaregiverEngagements (endpoint: 51)
+// GetCaregiverEngagements (endpoint: 52)
 func (s *CaregiverService) GetCaregiverEngagements(ctx context.Context, userID string) ([]caregiver.CaregiverEngagementResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -34,7 +34,7 @@ func (s *CaregiverService) GetCaregiverEngagements(ctx context.Context, userID s
 	return s.repo.GetCaregiverEngagements(ctx, motherProfileID, false)
 }
 
-// GetRevokedEngagements (endpoint: 52)
+// GetRevokedEngagements (endpoint: 53)
 func (s *CaregiverService) GetRevokedEngagements(ctx context.Context, userID string) ([]caregiver.CaregiverEngagementResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -43,7 +43,7 @@ func (s *CaregiverService) GetRevokedEngagements(ctx context.Context, userID str
 	return s.repo.GetCaregiverEngagements(ctx, motherProfileID, true)
 }
 
-// DeleteCaregiverEngagement (endpoint: 53)
+// DeleteCaregiverEngagement (endpoint: 54)
 func (s *CaregiverService) DeleteCaregiverEngagement(ctx context.Context, userID string, engagementID uuid.UUID) error {
 	// Must verify if engagement belongs to this mother's children
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
@@ -71,7 +71,7 @@ func (s *CaregiverService) DeleteCaregiverEngagement(ctx context.Context, userID
 	return s.repo.DeleteCaregiverEngagement(ctx, engagementID)
 }
 
-// GetCaregiverChildren (endpoint: 55)
+// GetCaregiverChildren (endpoint: 56)
 func (s *CaregiverService) GetCaregiverChildren(ctx context.Context, userID string) ([]caregiver.ChildSimpleResponse, error) {
 	// Automatically resolve caregiver profile from the logged-in user
 	caregiverProfileID, err := s.repo.GetByUserID(ctx, userID)

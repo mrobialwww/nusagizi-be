@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 // DateLayout is the date format used throughout the API (DD-MM-YYYY).
 const DateLayout = "02-01-2006"
 
@@ -71,7 +73,8 @@ type ChildDetailResponse struct {
 type ChildListItem struct {
 	ID        string  `json:"id"`
 	FullName  string  `json:"full_name"`
-	BirthDate string  `json:"birth_date"` // DD-MM-YYYY
+	BirthDate time.Time `json:"-"`
+	Age       string    `json:"age"`
 	Gender    string  `json:"gender"`
 	PhotoURL  *string `json:"photo_url"`
 }

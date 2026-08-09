@@ -2,13 +2,12 @@ package services
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	child_nutri "nusagizi_be/internal/models/child_nutrition"
 	"nusagizi_be/internal/models/dashboard"
 	"nusagizi_be/internal/repository"
+	"nusagizi_be/internal/utils"
 	"nusagizi_be/internal/who"
 )
 
@@ -27,7 +26,7 @@ func NewDashboardService(
 	}
 }
 
-// GetDashboardSummary (endpoint: 64)
+// GetDashboardSummary (endpoint: 65)
 func (s *DashboardService) GetDashboardSummary(ctx context.Context, userID string) ([]dashboard.ChildSummaryResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -40,32 +39,8 @@ func (s *DashboardService) GetDashboardSummary(ctx context.Context, userID strin
 
 	for i := range results {
 		// Calculate AgeMonths
-		var ageMonths int
 		birthDate := results[i].BirthDateRaw
-		now := time.Now()
-		years := now.Year() - birthDate.Year()
-		months := int(now.Month()) - int(birthDate.Month())
-		ageMonths = years*12 + months
-		if now.Day() < birthDate.Day() {
-			ageMonths--
-		}
-		if ageMonths < 0 {
-			ageMonths = 0
-		}
-
-		ageY := ageMonths / 12
-		ageM := ageMonths % 12
-		ageStr := ""
-		if ageY > 0 {
-			ageStr += fmt.Sprintf("%d tahun ", ageY)
-		}
-		if ageM > 0 {
-			ageStr += fmt.Sprintf("%d bulan", ageM)
-		}
-		if ageStr == "" {
-			ageStr = "0 bulan"
-		}
-		results[i].Age = strings.TrimSpace(ageStr)
+		results[i].Age = utils.FormatAgeString(birthDate)
 
 		// Calculate Growth Status
 		weight := 0.0
@@ -80,7 +55,14 @@ func (s *DashboardService) GetDashboardSummary(ctx context.Context, userID strin
 		if results[i].HeadCircumferenceCm != nil {
 			headCm = *results[i].HeadCircumferenceCm
 		}
-		status, _ := who.ComputeGrowthStatus(results[i].Gender, ageMonths, weight, height, headCm)
+
+		growthMeasuredAt := time.Now()
+		if results[i].GrowthMeasuredAt != nil {
+			growthMeasuredAt = *results[i].GrowthMeasuredAt
+		}
+		growthAgeMonths := utils.CalculateAgeInMonths(birthDate, growthMeasuredAt)
+
+		status, _ := who.ComputeGrowthStatus(results[i].Gender, growthAgeMonths, weight, height, headCm)
 		results[i].StatusGrowth = status
 
 		// Calculate Development Status

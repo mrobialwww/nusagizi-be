@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"nusagizi_be/internal/models"
 	"nusagizi_be/internal/repository"
@@ -124,6 +125,46 @@ func (h *ChildNutritionHandler) GetTodayDailyMenu(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, repository.ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this child"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetDailyMenuByID (Endpoint: 40)
+func (h *ChildNutritionHandler) GetDailyMenuByID(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
+	}
+
+	childIDStr := c.Param("child_id")
+	childID, err := uuid.Parse(childIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
+		return
+	}
+
+	dailyMenuIDStr := c.Param("daily_menu_id")
+	dailyMenuID, err := uuid.Parse(dailyMenuIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid daily_menu_id format"}})
+		return
+	}
+
+	resp, err := h.service.GetDailyMenuByID(c.Request.Context(), requester.ID, childID, dailyMenuID)
+	if err != nil {
+		if errors.Is(err, repository.ErrForbidden) {
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this child"}})
+			return
+		}
+		if err.Error() == "not found" || strings.Contains(err.Error(), "no rows") || errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "daily menu not found"}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})

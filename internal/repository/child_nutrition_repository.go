@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	child_nutri "nusagizi_be/internal/models/child_nutrition"
 	"regexp"
@@ -143,6 +144,48 @@ func (r *ChildNutritionRepository) GetTodayDailyMenu(ctx context.Context, childI
 		SELECT id, name, meal_time, meal_texture, calories, protein, portions_consumed
 		FROM recipes
 		WHERE daily_menu_id = $1
+	`
+	rows, err := r.pool.Query(ctx, queryRecipes, menu.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var rec child_nutri.RecipeResponse
+		if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed); err == nil {
+			menu.Recipes = append(menu.Recipes, rec)
+		}
+	}
+
+	return &menu, nil
+}
+
+// GetDailyMenuByID gets a specific daily menu by its ID, ensuring it belongs to the child.
+func (r *ChildNutritionRepository) GetDailyMenuByID(ctx context.Context, childID, dailyMenuID uuid.UUID) (*child_nutri.MenuResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var menu child_nutri.MenuResponse
+	queryMenu := `
+		SELECT dm.id, dm.created_at
+		FROM daily_menus dm
+		JOIN child_nutrition_reports cnr ON cnr.id = dm.child_nutrition_report_id
+		WHERE dm.id = $1 AND cnr.child_id = $2
+	`
+	err := r.pool.QueryRow(ctx, queryMenu, dailyMenuID, childID).Scan(&menu.ID, &menu.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	// Fetch Recipes
+	queryRecipes := `
+		SELECT id, name, meal_time, meal_texture, calories, protein, portions_consumed
+		FROM recipes
+		WHERE daily_menu_id = $1 AND portions_consumed > 0
 	`
 	rows, err := r.pool.Query(ctx, queryRecipes, menu.ID)
 	if err != nil {
@@ -318,11 +361,11 @@ func (r *ChildNutritionRepository) GetRecipeDetail(ctx context.Context, recipeID
 
 	// Fetch Recipe
 	queryRecipe := `
-		SELECT id, name, meal_time, meal_texture, cooking_time, calories, protein
+		SELECT id, name, meal_time, meal_texture, cooking_time, description, calories, protein
 		FROM recipes
 		WHERE id = $1
 	`
-	err := r.pool.QueryRow(ctx, queryRecipe, recipeID).Scan(&detail.ID, &detail.Name, &detail.MealTime, &detail.MealTexture, &detail.CookingTime, &detail.Calories, &detail.Protein)
+	err := r.pool.QueryRow(ctx, queryRecipe, recipeID).Scan(&detail.ID, &detail.Name, &detail.MealTime, &detail.MealTexture, &detail.CookingTime, &detail.Description, &detail.Calories, &detail.Protein)
 	if err != nil {
 		return nil, err
 	}
@@ -469,6 +512,7 @@ func (r *ChildNutritionRepository) GetNutritionReportsByMonth(ctx context.Contex
 	query := `
 		SELECT 
 			r.id, 
+			dm.id as daily_menu_id,
 			r.created_at, 
 			r.calories, 
 			r.protein, 
@@ -485,7 +529,7 @@ func (r *ChildNutritionRepository) GetNutritionReportsByMonth(ctx context.Contex
 			r.child_id = $1 
 			AND EXTRACT(MONTH FROM r.created_at) = $2 
 			AND EXTRACT(YEAR FROM r.created_at) = $3
-		GROUP BY r.id
+		GROUP BY r.id, dm.id
 		ORDER BY r.created_at ASC
 	`
 	rows, err := r.pool.Query(ctx, query, childID, month, year)
@@ -497,7 +541,7 @@ func (r *ChildNutritionRepository) GetNutritionReportsByMonth(ctx context.Contex
 	var results []child_nutri.NutritionReportSummaryResponse
 	for rows.Next() {
 		var res child_nutri.NutritionReportSummaryResponse
-		if err := rows.Scan(&res.ID, &res.CreatedAt, &res.Calories, &res.Protein, &res.Fat, &res.Carbohydrate, &res.MealTimes); err == nil {
+		if err := rows.Scan(&res.ID, &res.DailyMenuID, &res.CreatedAt, &res.Calories, &res.Protein, &res.Fat, &res.Carbohydrate, &res.MealTimes); err == nil {
 			results = append(results, res)
 		}
 	}

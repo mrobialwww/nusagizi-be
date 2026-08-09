@@ -22,7 +22,7 @@ func NewCaregiverHandler(service *services.CaregiverService) *CaregiverHandler {
 	return &CaregiverHandler{service: service}
 }
 
-// GetMotherCaregiverEngagements (endpoint: 51)
+// GetMotherCaregiverEngagements (endpoint: 52)
 func (h *CaregiverHandler) GetCaregiverEngagements(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -49,7 +49,7 @@ func (h *CaregiverHandler) GetCaregiverEngagements(c *gin.Context) {
 	c.JSON(http.StatusOK, engagements)
 }
 
-// GetMotherCaregiverEngagementsRevoked (endpoint: 52)
+// GetMotherCaregiverEngagementsRevoked (endpoint: 53)
 func (h *CaregiverHandler) GetCaregiverEngagementsRevoked(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -76,7 +76,7 @@ func (h *CaregiverHandler) GetCaregiverEngagementsRevoked(c *gin.Context) {
 	c.JSON(http.StatusOK, engagements)
 }
 
-// DeleteCaregiverEngagement (endpoint: 53)
+// DeleteCaregiverEngagement (endpoint: 54)
 func (h *CaregiverHandler) DeleteCaregiverEngagement(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -108,7 +108,7 @@ func (h *CaregiverHandler) DeleteCaregiverEngagement(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// GetCaregiverChildren (endpoint: 55)
+// GetCaregiverChildren (endpoint: 56)
 func (h *CaregiverHandler) GetCaregiverChildren(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)

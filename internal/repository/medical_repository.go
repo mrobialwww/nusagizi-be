@@ -22,9 +22,10 @@ func NewMedicalRepository(pool *pgxpool.Pool) *MedicalRepository {
 }
 
 // GetMedicalNotes gets a list of medical notes (active or history) for a mother's children.
-func (r *MedicalRepository) GetMedicalNotes(ctx context.Context, motherProfileID uuid.UUID, status string, month *int) ([]medical.MedicalNoteResponse, error) {
+func (r *MedicalRepository) GetMedicalNotes(ctx context.Context, motherProfileID uuid.UUID, status string, childName *string, month *int) ([]medical.MedicalNoteResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	args := []any{motherProfileID}
 	query := `
 		SELECT 
 			m.id, 
@@ -33,9 +34,9 @@ func (r *MedicalRepository) GetMedicalNotes(ctx context.Context, motherProfileID
 			m.valid_until, 
 			m.created_at,
 			(SELECT COUNT(*) FROM medical_restrictions WHERE medical_note_id = m.id 
-				AND restriction_type = 'prohibition') AS prohibition_count,
+				AND type = 'prohibition') AS prohibition_count,
 			(SELECT COUNT(*) FROM medical_restrictions WHERE medical_note_id = m.id 
-				AND restriction_type = 'allergy') AS allergy_count
+				AND type = 'allergy') AS allergy_count
 		FROM medical_notes m
 		JOIN children c ON m.child_id = c.id
 		WHERE c.mother_profile_id = $1
@@ -48,13 +49,19 @@ func (r *MedicalRepository) GetMedicalNotes(ctx context.Context, motherProfileID
 		query += ` AND m.valid_until < CURRENT_DATE`
 	}
 
+	if childName != nil {
+		args = append(args, *childName)
+		query += fmt.Sprintf(` AND c.full_name = $%d`, len(args))
+	}
+
 	if month != nil {
-		query += fmt.Sprintf(` AND EXTRACT(MONTH FROM m.valid_until) = %d`, *month)
+		args = append(args, *month)
+		query += fmt.Sprintf(` AND EXTRACT(MONTH FROM m.valid_until) = $%d`, len(args))
 	}
 
 	query += ` ORDER BY m.valid_until DESC`
 
-	rows, err := r.pool.Query(ctx, query, motherProfileID)
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +133,7 @@ func (r *MedicalRepository) GetMedicalNoteDetail(ctx context.Context, noteID uui
 
 	// Get medical restrictions (Prohibitions and Allergies)
 	queryRestrictions := `
-		SELECT restriction_type, value 
+		SELECT type, item_name 
 		FROM medical_restrictions 
 		WHERE medical_note_id = $1`
 
@@ -219,7 +226,7 @@ func (r *MedicalRepository) CreateMedicalNote(ctx context.Context, input *medica
 
 	// Insert medical restrictions (Prohibitions and Allergies)
 	queryRest := `
-		INSERT INTO medical_restrictions (medical_note_id, restriction_type, value) 
+		INSERT INTO medical_restrictions (medical_note_id, type, item_name) 
 		VALUES ($1, $2, $3)`
 
 	for _, p := range input.Prohibitions {
@@ -314,7 +321,7 @@ func (r *MedicalRepository) UpdateMedicalNote(ctx context.Context, noteID uuid.U
 		queryDeleteProh := `
 			DELETE FROM medical_restrictions 
 			WHERE medical_note_id = $1 
-				AND restriction_type = 'prohibition'`
+				AND type = 'prohibition'`
 
 		_, err = tx.Exec(ctx, queryDeleteProh, noteID)
 		if err != nil {
@@ -323,7 +330,7 @@ func (r *MedicalRepository) UpdateMedicalNote(ctx context.Context, noteID uuid.U
 
 		// Insert prohibitions
 		queryRest := `
-			INSERT INTO medical_restrictions (medical_note_id, restriction_type, value) 
+			INSERT INTO medical_restrictions (medical_note_id, type, item_name) 
 			VALUES ($1, $2, $3)`
 
 		for _, p := range *input.Prohibitions {
@@ -339,7 +346,7 @@ func (r *MedicalRepository) UpdateMedicalNote(ctx context.Context, noteID uuid.U
 		queryDeleteAllergy := `
 			DELETE FROM medical_restrictions 
 			WHERE medical_note_id = $1 
-				AND restriction_type = 'allergy'`
+				AND type = 'allergy'`
 		_, err = tx.Exec(ctx, queryDeleteAllergy, noteID)
 		if err != nil {
 			return err
@@ -347,7 +354,7 @@ func (r *MedicalRepository) UpdateMedicalNote(ctx context.Context, noteID uuid.U
 
 		// Insert allergies
 		queryRest := `
-			INSERT INTO medical_restrictions (medical_note_id, restriction_type, value) 
+			INSERT INTO medical_restrictions (medical_note_id, type, item_name) 
 			VALUES ($1, $2, $3)`
 
 		for _, a := range *input.Allergies {

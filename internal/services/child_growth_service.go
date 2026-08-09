@@ -74,12 +74,12 @@ func (s *ChildGrowthService) GetGrowthAnalyses(ctx context.Context, userID strin
 
 	ageRangeMap := map[string][2]int{
 		"0-2":  {0, 2},
-		"0-6":  {0, 6},
+		"0-12": {0, 12},
 		"0-60": {0, 60},
 	}
 	bounds, ok := ageRangeMap[ageRange]
 	if !ok {
-		return nil, fmt.Errorf("invalid age_range, must be one of: 0-2, 0-6, 0-60")
+		return nil, fmt.Errorf("invalid age_range, must be one of: 0-2, 0-12, 0-60")
 	}
 
 	// - measurements: list of raw data (height, weight, head circumference, and age in months) filtered by age_range.

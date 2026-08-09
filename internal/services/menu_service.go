@@ -15,6 +15,7 @@ import (
 	"nusagizi_be/internal/config"
 	"nusagizi_be/internal/models/menu"
 	"nusagizi_be/internal/repository"
+	"nusagizi_be/internal/utils"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -49,8 +50,8 @@ func (s *MenuService) GenerateMenu(ctx context.Context, userID string) error {
 		return fmt.Errorf("failed to get mother profile: %w", err)
 	}
 
-	// Extract batch data directly from child repository (Service A -> Repo B pattern).
-	children, err := s.childRepo.GetChildrenDataForMenu(ctx, motherProfileID)
+	// Extract batch data via service method
+	children, err := s.getChildrenDataForMenu(ctx, motherProfileID)
 	if err != nil {
 		return fmt.Errorf("failed to build AI payload: %w", err)
 	}
@@ -172,4 +173,132 @@ func (s *MenuService) callAIEngine(ctx context.Context, payloadBytes []byte) (*m
 		return nil, fmt.Errorf("ai engine returned an invalid response: %w", err)
 	}
 	return &aiResponse, nil
+}
+
+// getChildrenDataForMenu constructs the AI payload for all children of a mother.
+// It uses batched queries for allergies, growth, and medical notes
+func (s *MenuService) getChildrenDataForMenu(ctx context.Context, motherProfileID uuid.UUID) ([]menu.FoodEnginePayloadChild, error) {
+	// Get all children data from mother
+	children, err := s.childRepo.FetchChildren(ctx, motherProfileID)
+	if err != nil {
+		return nil, err
+	}
+	if len(children) == 0 {
+		return nil, nil
+	}
+
+	// Map children ID to child struct
+	childIDs := make([]uuid.UUID, len(children))
+	for i, c := range children {
+		childIDs[i] = c.ID
+	}
+
+	// Get child allergies data in batch
+	allergiesByChild, err := s.childRepo.FetchAllergies(ctx, childIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get child growth data in batch
+	growthByChild, err := s.childRepo.FetchGrowthHistory(ctx, childIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get child medical notes data in batch
+	medicalNotesByChild, err := s.childRepo.FetchActiveMedicalNotes(ctx, childIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Map medical notes ID to nutrition targets
+	noteIDs := make([]uuid.UUID, 0, len(medicalNotesByChild))
+	for _, note := range medicalNotesByChild {
+		noteIDs = append(noteIDs, note.ID)
+	}
+
+	// Get nutrition targets data in batch
+	targetsByNote, err := s.childRepo.FetchNutritionTargets(ctx, noteIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct payload for each child
+	payload := make([]menu.FoodEnginePayloadChild, 0, len(children))
+	for _, c := range children {
+		// Calculate age in months
+		usiaBulan := utils.CalculateAgeInMonths(c.BirthDate, time.Now())
+
+		// Create child payload
+		childPayload := menu.FoodEnginePayloadChild{
+			ID:                   c.ID.String(),
+			Nama:                 c.Nama,
+			Sex:                  c.Sex,
+			UsiaBulan:            usiaBulan,
+			PreferensiHarga:      "seimbang", // temporary hardcode
+			JumlahProteinPerHari: 1,          // temporary hardcode
+			Alergi:               allergiesByChild[c.ID],
+			RiwayatBerat:         [][]any{},
+			Kondisi:              []menu.FoodEnginePayloadKondisi{}, // temporary fill with empty array
+		}
+
+		// AI expects an empty array [] if there are no allergies
+		if childPayload.Alergi == nil {
+			childPayload.Alergi = []string{}
+		}
+
+		// Attach latest physical measurements and format weight history graph as [AgeInMonths, WeightKg]
+		if growth, ok := growthByChild[c.ID]; ok && len(growth) > 0 {
+			// Latest measurement is first in the slice (newest)
+			latest := growth[0]
+			childPayload.BeratKg = latest.WeightKg
+			childPayload.PanjangCm = latest.HeightCm
+			childPayload.LingkarKepalaCm = latest.HeadCircCm
+
+			// Convert each measurement into a [AgeInMonths, WeightKg] point for the growth curve
+			history := make([][]any, len(growth))
+			for i, g := range growth {
+				history[i] = []any{utils.CalculateAgeInMonths(c.BirthDate, g.MeasurementDate), g.WeightKg}
+			}
+			childPayload.RiwayatBerat = history
+		}
+
+		// Initialize default medical prescription (calculates max safe daily sodium based on child's age)
+		resepDokter := menu.FoodEnginePayloadResepDokter{
+			Tingkat:         nil, // temporary hardcode
+			NomorStr:        nil, // temporary hardcode
+			NamaDokter:      "-",
+			CatatanTambahan: "-",
+			KomposisiPerKg: menu.FoodEnginePayloadKomposisi{
+				EnergiKkal:    0,
+				ProteinG:      0,
+				NatriumMgMaks: getNatriumMaks(usiaBulan),
+			},
+		}
+		// Override default prescription if child has an active doctor's note and targeted nutrition
+		if note, ok := medicalNotesByChild[c.ID]; ok {
+			resepDokter.NamaDokter = note.DoctorName
+			resepDokter.CatatanTambahan = note.Recommendation
+			if targets, ok := targetsByNote[note.ID]; ok {
+				resepDokter.KomposisiPerKg.EnergiKkal = targets.EnergiKkal
+				resepDokter.KomposisiPerKg.ProteinG = targets.ProteinG
+			}
+		}
+		childPayload.ResepDokter = resepDokter
+
+		payload = append(payload, childPayload)
+	}
+
+	return payload, nil
+}
+
+func getNatriumMaks(usiaBulan int) float64 {
+	if usiaBulan <= 5 {
+		return 120
+	} else if usiaBulan <= 11 {
+		return 370
+	} else if usiaBulan <= 36 {
+		return 800
+	}
+	return 900
 }

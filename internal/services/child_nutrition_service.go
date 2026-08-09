@@ -54,6 +54,14 @@ func (s *ChildNutritionService) GetTodayDailyMenu(ctx context.Context, userID st
 	return s.repo.GetTodayDailyMenu(ctx, childID)
 }
 
+// GetDailyMenuByID (Endpoint: 40)
+func (s *ChildNutritionService) GetDailyMenuByID(ctx context.Context, userID string, childID uuid.UUID, dailyMenuID uuid.UUID) (*child_nutri.MenuResponse, error) {
+	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
+		return nil, err
+	}
+	return s.repo.GetDailyMenuByID(ctx, childID, dailyMenuID)
+}
+
 // UpdateRecipeCompleteStatus (Endpoint: 31)
 func (s *ChildNutritionService) UpdateRecipeCompleteStatus(ctx context.Context, userID string, recipeID uuid.UUID, portionsConsumed float64) error {
 	childID, err := s.repo.GetChildIDByRecipeID(ctx, recipeID)
@@ -174,7 +182,7 @@ func DetermineNutritionStatus(resp *child_nutri.TodayNutritionReportResponse) st
 	case 3:
 		return "Kurang Optimal"
 	case 2:
-		return "Beresiko"
+		return "Berisiko"
 	default:
 		return "Sangat Buruk"
 	}

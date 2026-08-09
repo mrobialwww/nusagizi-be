@@ -16,6 +16,7 @@ type ChildSummaryResponse struct {
 	HeightCm            *float64  `json:"height_cm"`
 	WeightKg            *float64  `json:"weight_kg"`
 	HeadCircumferenceCm *float64  `json:"-"`
+	GrowthMeasuredAt    *time.Time `json:"-"`
 	KpspScore           *int      `json:"kpsp_score"`
 	KpspAnswersCount    *int      `json:"kpsp_answers_count"`
 	Calories            *int      `json:"-"`

@@ -21,7 +21,7 @@ func NewDashboardHandler(service *services.DashboardService) *DashboardHandler {
 	return &DashboardHandler{service: service}
 }
 
-// GetDashboardSummary (endpoint: 64)
+// GetDashboardSummary (endpoint: 65)
 func (h *DashboardHandler) GetDashboardSummary(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)

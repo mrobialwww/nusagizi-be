@@ -33,6 +33,7 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 			gr.height_cm, 
 			gr.weight_kg,
 			gr.head_circumference_cm,
+			gr.measured_at,
 			dr.kpsp_score,
 			dr.kpsp_answers_count,
 			nr.calories,
@@ -45,7 +46,7 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 			nr.target_carbohydrate
 		FROM children c
 		LEFT JOIN LATERAL (
-			SELECT height_cm, weight_kg, head_circumference_cm 
+			SELECT height_cm, weight_kg, head_circumference_cm, measured_at 
 			FROM child_growth_reports 
 			WHERE child_id = c.id 
 			ORDER BY measured_at DESC LIMIT 1
@@ -77,7 +78,7 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 		var birthDate time.Time
 		if err := rows.Scan(
 			&res.ID, &res.FullName, &res.PhotoUrl, &birthDate, &res.Gender, &res.Streak,
-			&res.HeightCm, &res.WeightKg, &res.HeadCircumferenceCm,
+			&res.HeightCm, &res.WeightKg, &res.HeadCircumferenceCm, &res.GrowthMeasuredAt,
 			&res.KpspScore, &res.KpspAnswersCount,
 			&res.Calories, &res.TargetCalories,
 			&res.Protein, &res.TargetProtein,

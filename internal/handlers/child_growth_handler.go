@@ -91,9 +91,9 @@ func (h *ChildGrowthHandler) GetGrowthAnalyses(c *gin.Context) {
 
 	// Validate input age_range format
 	switch ageRange {
-	case "0-2", "0-6", "0-60":
+	case "0-2", "0-12", "0-60":
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid age_range, must be one of: 0-2, 0-6, 0-60"}})
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid age_range, must be one of: 0-2, 0-12, 0-60"}})
 		return
 	}
 

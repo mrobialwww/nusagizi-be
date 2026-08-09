@@ -7,10 +7,10 @@ import (
 )
 
 type RecipeResponse struct {
-	ID           uuid.UUID `json:"id"`
-	Name         string    `json:"name"`
-	MealTime     string    `json:"meal_time"`
-	MealTexture  string    `json:"meal_texture"`
+	ID               uuid.UUID `json:"id"`
+	Name             string    `json:"name"`
+	MealTime         string    `json:"meal_time"`
+	MealTexture      string    `json:"meal_texture"`
 	Calories         int       `json:"calories"`
 	Protein          int       `json:"protein"`
 	PortionsConsumed float64   `json:"portions_consumed"`
@@ -70,6 +70,7 @@ type RecipeDetailResponse struct {
 	MealTime        string                   `json:"meal_time"`
 	MealTexture     string                   `json:"meal_texture"`
 	CookingTime     string                   `json:"cooking_time"`
+	Description     string                   `json:"description"`
 	Calories        int                      `json:"calories"`
 	Protein         int                      `json:"protein"`
 	MainIngredients []MainIngredientResponse `json:"main_ingredients"`
@@ -78,13 +79,14 @@ type RecipeDetailResponse struct {
 }
 
 type NutritionReportSummaryResponse struct {
-	ID           uuid.UUID `json:"id"`
-	Calories     int       `json:"calories"`
-	Protein      int       `json:"protein"`
-	Fat          int       `json:"fat"`
-	Carbohydrate int       `json:"carbohydrate"`
-	MealTimes    []string  `json:"meal_times"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           uuid.UUID  `json:"id"`
+	DailyMenuID  *uuid.UUID `json:"daily_menu_id"`
+	Calories     int        `json:"calories"`
+	Protein      int        `json:"protein"`
+	Fat          int        `json:"fat"`
+	Carbohydrate int        `json:"carbohydrate"`
+	MealTimes    []string   `json:"meal_times"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 type SwapIngredientPriorityInput struct {

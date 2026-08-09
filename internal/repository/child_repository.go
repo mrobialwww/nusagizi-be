@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"nusagizi_be/internal/models"
 	"nusagizi_be/internal/models/medical"
-	"nusagizi_be/internal/models/menu"
 	"strings"
 	"time"
 
@@ -423,13 +422,13 @@ func (r *ChildRepository) GetByID(ctx context.Context, childID uuid.UUID) (*mode
 	}
 
 	resp := &models.ChildDetailResponse{
-		ID:               c.ID.String(),
-		FullName:         c.FullName,
-		BirthDate:        c.BirthDate.Format(models.DateLayout),
-		Gender:           c.Gender,
-		PhotoURL:         c.PhotoURL,
+		ID:         c.ID.String(),
+		FullName:   c.FullName,
+		BirthDate:  c.BirthDate.Format(models.DateLayout),
+		Gender:     c.Gender,
+		PhotoURL:   c.PhotoURL,
 		StreakDays: c.StreakDays,
-		Notes:            c.NotesProfile,
+		Notes:      c.NotesProfile,
 		// Initialise slices to empty arrays (not null) for consistent JSON output
 		Allergies:        models.Allergies{Food: []string{}, Medicine: []string{}, Animal: []string{}, Others: []string{}},
 		ChronicDiseases:  []string{},
@@ -576,11 +575,9 @@ func (r *ChildRepository) GetByMotherProfileID(ctx context.Context, motherProfil
 	result := []models.ChildListItem{}
 	for rows.Next() {
 		var item models.ChildListItem
-		var birthDate time.Time
-		if err := rows.Scan(&item.ID, &item.FullName, &birthDate, &item.Gender, &item.PhotoURL); err != nil {
+		if err := rows.Scan(&item.ID, &item.FullName, &item.BirthDate, &item.Gender, &item.PhotoURL); err != nil {
 			return nil, err
 		}
-		item.BirthDate = birthDate.Format(models.DateLayout)
 		result = append(result, item)
 	}
 	return result, rows.Err()
@@ -607,128 +604,8 @@ func (r *ChildRepository) SoftDelete(ctx context.Context, childID uuid.UUID) err
 	return nil
 }
 
-// GetChildrenDataForMenu constructs the AI payload for all children of a mother.
-// It uses batched queries for allergies, growth, and medical notes
-func (r *ChildRepository) GetChildrenDataForMenu(ctx context.Context, motherProfileID uuid.UUID) ([]menu.FoodEnginePayloadChild, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Get all children data from mother
-	children, err := r.fetchChildren(ctx, motherProfileID)
-	if err != nil {
-		return nil, err
-	}
-	if len(children) == 0 {
-		return nil, nil
-	}
-
-	// Map children ID to child struct
-	childIDs := make([]uuid.UUID, len(children))
-	for i, c := range children {
-		childIDs[i] = c.ID
-	}
-
-	// Get child allergies data in batch
-	allergiesByChild, err := r.fetchAllergies(ctx, childIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get child growth data in batch
-	growthByChild, err := r.fetchGrowthHistory(ctx, childIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get child medical notes data in batch
-	medicalNotesByChild, err := r.fetchActiveMedicalNotes(ctx, childIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Map medical notes ID to nutrition targets
-	noteIDs := make([]uuid.UUID, 0, len(medicalNotesByChild))
-	for _, note := range medicalNotesByChild {
-		noteIDs = append(noteIDs, note.ID)
-	}
-
-	// Get nutrition targets data in batch
-	targetsByNote, err := r.fetchNutritionTargets(ctx, noteIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Construct payload for each child
-	payload := make([]menu.FoodEnginePayloadChild, 0, len(children))
-	for _, c := range children {
-		// Calculate age in months
-		usiaBulan := calculateAgeInMonths(c.BirthDate, time.Now())
-
-		// Create child payload
-		childPayload := menu.FoodEnginePayloadChild{
-			ID:                   c.ID.String(),
-			Nama:                 c.Nama,
-			Sex:                  c.Sex,
-			UsiaBulan:            usiaBulan,
-			PreferensiHarga:      "seimbang", // temporary hardcode
-			JumlahProteinPerHari: 1,          // temporary hardcode
-			Alergi:               allergiesByChild[c.ID],
-			RiwayatBerat:         [][]any{},
-			Kondisi:              []menu.FoodEnginePayloadKondisi{}, // temporary fill with empty array
-		}
-
-		// AI expects an empty array [] if there are no allergies
-		if childPayload.Alergi == nil {
-			childPayload.Alergi = []string{}
-		}
-
-		// Attach latest physical measurements and format weight history graph as [AgeInMonths, WeightKg]
-		if growth, ok := growthByChild[c.ID]; ok && len(growth) > 0 {
-			// Latest measurement is first in the slice (newest)
-			latest := growth[0]
-			childPayload.BeratKg = latest.WeightKg
-			childPayload.PanjangCm = latest.HeightCm
-			childPayload.LingkarKepalaCm = latest.HeadCircCm
-
-			// Convert each measurement into a [AgeInMonths, WeightKg] point for the growth curve
-			history := make([][]any, len(growth))
-			for i, g := range growth {
-				history[i] = []any{calculateAgeInMonths(c.BirthDate, g.MeasurementDate), g.WeightKg}
-			}
-			childPayload.RiwayatBerat = history
-		}
-
-		// Initialize default medical prescription (calculates max safe daily sodium based on child's age)
-		resepDokter := menu.FoodEnginePayloadResepDokter{
-			Tingkat:         nil, // temporary hardcode
-			NomorStr:        nil, // temporary hardcode
-			NamaDokter:      "-",
-			CatatanTambahan: "-",
-			KomposisiPerKg: menu.FoodEnginePayloadKomposisi{
-				EnergiKkal:    0,
-				ProteinG:      0,
-				NatriumMgMaks: getNatriumMaks(usiaBulan),
-			},
-		}
-		// Override default prescription if child has an active doctor's note and targeted nutrition
-		if note, ok := medicalNotesByChild[c.ID]; ok {
-			resepDokter.NamaDokter = note.DoctorName
-			resepDokter.CatatanTambahan = note.Recommendation
-			if targets, ok := targetsByNote[note.ID]; ok {
-				resepDokter.KomposisiPerKg.EnergiKkal = targets.EnergiKkal
-				resepDokter.KomposisiPerKg.ProteinG = targets.ProteinG
-			}
-		}
-		childPayload.ResepDokter = resepDokter
-
-		payload = append(payload, childPayload)
-	}
-
-	return payload, nil
-}
-
-// fetchChildren fetches all active children for a mother.
-func (r *ChildRepository) fetchChildren(ctx context.Context, motherProfileID uuid.UUID) ([]models.ChildInfo, error) {
+// FetchChildren fetches all active children for a mother.
+func (r *ChildRepository) FetchChildren(ctx context.Context, motherProfileID uuid.UUID) ([]models.ChildInfo, error) {
 	const query = `
 		SELECT 
 			id,
@@ -758,8 +635,8 @@ func (r *ChildRepository) fetchChildren(ctx context.Context, motherProfileID uui
 	return children, nil
 }
 
-// fetchAllergies batch-loads allergen names for all given children in a single query, grouped by child ID.
-func (r *ChildRepository) fetchAllergies(ctx context.Context, childIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
+// FetchAllergies batch-loads allergen names for all given children in a single query, grouped by child ID.
+func (r *ChildRepository) FetchAllergies(ctx context.Context, childIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
 	const query = `
 		SELECT child_id, allergen_name 
 		FROM child_allergy_profiles 
@@ -786,9 +663,9 @@ func (r *ChildRepository) fetchAllergies(ctx context.Context, childIDs []uuid.UU
 	return result, nil
 }
 
-// fetchGrowthHistory batch-loads up to the 4 most recent growth reports per child (index 0 = most recent)
+// FetchGrowthHistory batch-loads up to the 4 most recent growth reports per child (index 0 = most recent)
 // using a window function instead of one "ORDER BY ... LIMIT" query per child.
-func (r *ChildRepository) fetchGrowthHistory(ctx context.Context, childIDs []uuid.UUID) (map[uuid.UUID][]models.GrowthPoint, error) {
+func (r *ChildRepository) FetchGrowthHistory(ctx context.Context, childIDs []uuid.UUID) (map[uuid.UUID][]models.GrowthPoint, error) {
 	const query = `
 		SELECT child_id, measurement_date, weight_kg, height_cm, head_circumference_cm
 		FROM (
@@ -821,9 +698,9 @@ func (r *ChildRepository) fetchGrowthHistory(ctx context.Context, childIDs []uui
 	return result, nil
 }
 
-// fetchActiveMedicalNotes batch-loads the single most recent active medical note
+// FetchActiveMedicalNotes batch-loads the single most recent active medical note
 // per child using a window function, preventing N+1 queries.
-func (r *ChildRepository) fetchActiveMedicalNotes(ctx context.Context, childIDs []uuid.UUID) (map[uuid.UUID]models.MedicalNote, error) {
+func (r *ChildRepository) FetchActiveMedicalNotes(ctx context.Context, childIDs []uuid.UUID) (map[uuid.UUID]models.MedicalNote, error) {
 	const query = `
 		SELECT child_id, id, doctor_name, recommendation
 		FROM (
@@ -857,8 +734,8 @@ func (r *ChildRepository) fetchActiveMedicalNotes(ctx context.Context, childIDs 
 	return result, nil
 }
 
-// fetchNutritionTargets batch-loads calorie/protein targets for the given medical notes in one query instead of one query per note.
-func (r *ChildRepository) fetchNutritionTargets(ctx context.Context, noteIDs []uuid.UUID) (map[uuid.UUID]models.NutritionTargets, error) {
+// FetchNutritionTargets batch-loads calorie/protein targets for the given medical notes in one query instead of one query per note.
+func (r *ChildRepository) FetchNutritionTargets(ctx context.Context, noteIDs []uuid.UUID) (map[uuid.UUID]models.NutritionTargets, error) {
 	result := make(map[uuid.UUID]models.NutritionTargets)
 	if len(noteIDs) == 0 {
 		return result, nil
@@ -895,27 +772,4 @@ func (r *ChildRepository) fetchNutritionTargets(ctx context.Context, noteIDs []u
 		return nil, fmt.Errorf("error iterating nutrition target rows: %w", err)
 	}
 	return result, nil
-}
-
-// ================================== HELPER FUNCTION ===================================
-func calculateAgeInMonths(birthDate, targetDate time.Time) int {
-	months := (targetDate.Year()-birthDate.Year())*12 + int(targetDate.Month()-birthDate.Month())
-	if targetDate.Day() < birthDate.Day() {
-		months--
-	}
-	if months < 0 {
-		return 0
-	}
-	return months
-}
-
-func getNatriumMaks(usiaBulan int) float64 {
-	if usiaBulan <= 5 {
-		return 120
-	} else if usiaBulan <= 11 {
-		return 370
-	} else if usiaBulan <= 36 {
-		return 800
-	}
-	return 900
 }

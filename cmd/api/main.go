@@ -167,6 +167,7 @@ func main() {
 		// Modul 5: Child Nutrition & Menu
 		protected.GET("/children/:child_id/nutrition/today", childNutriHandler.GetTodayNutritionReport)
 		protected.GET("/children/:child_id/daily-menus/today", childNutriHandler.GetTodayDailyMenu)
+		protected.GET("/children/:child_id/daily-menus/:daily_menu_id", childNutriHandler.GetDailyMenuByID)
 		protected.PATCH("/recipes/:recipe_id/complete", childNutriHandler.UpdateRecipeCompleteStatus)
 		protected.PATCH("/recipes/:recipe_id/bookmark", childNutriHandler.UpdateRecipeBookmarkStatus)
 		protected.GET("/recipes/:recipe_id", childNutriHandler.GetRecipeDetail)

@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"nusagizi_be/internal/models"
 	"nusagizi_be/internal/repository"
+	"nusagizi_be/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -75,5 +77,14 @@ func (s *ChildService) GetChildrenByMother(ctx context.Context, userID string) (
 		return nil, err
 	}
 
-	return s.repo.GetByMotherProfileID(ctx, motherProfileID)
+	children, err := s.repo.GetByMotherProfileID(ctx, motherProfileID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, c := range children {
+		children[i].Age = utils.FormatAgeString(c.BirthDate)
+	}
+
+	return children, nil
 }

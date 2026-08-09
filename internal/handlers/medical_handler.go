@@ -25,7 +25,7 @@ func NewMedicalHandler(service *services.MedicalService) *MedicalHandler {
 	return &MedicalHandler{service: service}
 }
 
-// GetMedicalNotes (endpoint: 56, 57)
+// GetMedicalNotes (endpoint: 57, 58)
 func (h *MedicalHandler) GetMedicalNotes(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -34,8 +34,9 @@ func (h *MedicalHandler) GetMedicalNotes(c *gin.Context) {
 		return
 	}
 
-	// Get status and month from query params
+	// Get status, child_name, and month from query params
 	status := c.Query("status")
+	childNameStr := c.Query("child_name")
 	monthStr := c.Query("month")
 
 	// Validate input status
@@ -44,6 +45,11 @@ func (h *MedicalHandler) GetMedicalNotes(c *gin.Context) {
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "status must be active or history"}})
 		return
+	}
+
+	var childName *string
+	if childNameStr != "" {
+		childName = &childNameStr
 	}
 
 	// Validate input month
@@ -57,7 +63,7 @@ func (h *MedicalHandler) GetMedicalNotes(c *gin.Context) {
 		month = &m
 	}
 
-	notes, err := h.service.GetMedicalNotes(c.Request.Context(), requester.ID, status, month)
+	notes, err := h.service.GetMedicalNotes(c.Request.Context(), requester.ID, status, childName, month)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrForbidden):
@@ -75,7 +81,7 @@ func (h *MedicalHandler) GetMedicalNotes(c *gin.Context) {
 	c.JSON(http.StatusOK, notes)
 }
 
-// GetMedicalNoteDetail (endpoint: 58)
+// GetMedicalNoteDetail (endpoint: 59)
 func (h *MedicalHandler) GetMedicalNoteDetail(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -107,7 +113,7 @@ func (h *MedicalHandler) GetMedicalNoteDetail(c *gin.Context) {
 	c.JSON(http.StatusOK, note)
 }
 
-// CreateMedicalNote (endpoint: 59)
+// CreateMedicalNote (endpoint: 60)
 func (h *MedicalHandler) CreateMedicalNote(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -167,7 +173,7 @@ func (h *MedicalHandler) CreateMedicalNote(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": noteID})
 }
 
-// UpdateMedicalNote (endpoint: 60)
+// UpdateMedicalNote (endpoint: 61)
 func (h *MedicalHandler) UpdateMedicalNote(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
@@ -229,7 +235,7 @@ func (h *MedicalHandler) UpdateMedicalNote(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// DeleteMedicalNote (endpoint: 61)
+// DeleteMedicalNote (endpoint: 62)
 func (h *MedicalHandler) DeleteMedicalNote(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
