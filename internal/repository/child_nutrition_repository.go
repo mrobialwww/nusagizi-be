@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	child_nutri "nusagizi_be/internal/models/child_nutrition"
 	"regexp"
 	"strconv"
@@ -23,22 +24,21 @@ func NewChildNutritionRepository(pool *pgxpool.Pool) *ChildNutritionRepository {
 	return &ChildNutritionRepository{pool: pool}
 }
 
-// GetTodayNutritionReport fetches nutrition, menu, recipes, shopping, and items for "today" (latest record).
-func (r *ChildNutritionRepository) GetTodayNutritionReport(ctx context.Context, childID uuid.UUID) (*child_nutri.TodayNutritionReportResponse, error) {
+// GetTodayNutritionReport fetches nutrition, menu, recipes, shopping, and items for a specific date.
+func (r *ChildNutritionRepository) GetTodayNutritionReport(ctx context.Context, childID uuid.UUID, reportDate time.Time) (*child_nutri.TodayNutritionReportResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var report child_nutri.TodayNutritionReportResponse
 
 	// Fetch Report Base
 	queryReport := `
-		SELECT id, calories, target_calories, protein, target_protein, fat, target_fat, carbohydrate, target_carbohydrate
+		SELECT id, report_date, calories, target_calories, protein, target_protein, fat, target_fat, carbohydrate, target_carbohydrate
 		FROM child_nutrition_reports
-		WHERE child_id = $1
-		ORDER BY created_at DESC
-		LIMIT 1
+		WHERE child_id = $1 AND report_date = $2
 	`
-	err := r.pool.QueryRow(ctx, queryReport, childID).Scan(
-		&report.ID, &report.Calories, &report.TargetCalories, &report.Protein, &report.TargetProtein,
+	var rDate time.Time
+	err := r.pool.QueryRow(ctx, queryReport, childID, reportDate.Format("2006-01-02")).Scan(
+		&report.ID, &rDate, &report.Calories, &report.TargetCalories, &report.Protein, &report.TargetProtein,
 		&report.Fat, &report.TargetFat, &report.Carbohydrate, &report.TargetCarbohydrate,
 	)
 	if err != nil {
@@ -48,27 +48,24 @@ func (r *ChildNutritionRepository) GetTodayNutritionReport(ctx context.Context, 
 		return nil, err
 	}
 
-	// Fetch Menu & Recipes
-	queryMenu := `
-		SELECT id, created_at 
-		FROM daily_menus 
-		WHERE child_nutrition_report_id = $1`
+	// Format date and map Report ID to Menu ID for backward compatibility
+	report.ReportDate = rDate.Format("2006-01-02")
+	report.Menu.ID = report.ID
 
-	err = r.pool.QueryRow(ctx, queryMenu, report.ID).Scan(&report.Menu.ID, &report.Menu.CreatedAt)
+	// Fetch Recipes from Junction
+	queryRecipes := `
+		SELECT r.id, r.name, r.meal_time, r.meal_texture, r.calories, r.protein, cnr.portions_consumed, r.is_bookmarked
+		FROM recipes r
+		JOIN child_nutrition_recipes cnr ON cnr.recipe_id = r.id
+		WHERE cnr.child_nutrition_report_id = $1
+	`
+	rows, err := r.pool.Query(ctx, queryRecipes, report.ID)
 	if err == nil {
-		queryRecipes := `
-			SELECT id, name, meal_time, meal_texture, calories, protein, portions_consumed
-			FROM recipes
-			WHERE daily_menu_id = $1
-		`
-		rows, err := r.pool.Query(ctx, queryRecipes, report.Menu.ID)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var rec child_nutri.RecipeResponse
-				if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed); err == nil {
-					report.Menu.Recipes = append(report.Menu.Recipes, rec)
-				}
+		defer rows.Close()
+		for rows.Next() {
+			var rec child_nutri.RecipeResponse
+			if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed, &rec.IsBookmarked); err == nil {
+				report.Menu.Recipes = append(report.Menu.Recipes, rec)
 			}
 		}
 
@@ -81,11 +78,12 @@ func (r *ChildNutritionRepository) GetTodayNutritionReport(ctx context.Context, 
 			FROM main_ingredients mi
 			JOIN ingredients i ON i.id = mi.ingredient_id
 			JOIN recipes r ON r.id = mi.recipe_id
-			WHERE r.daily_menu_id = $1
+			JOIN child_nutrition_recipes cnr ON cnr.recipe_id = r.id
+			WHERE cnr.child_nutrition_report_id = $1
 				AND mi.priority = 1
 			ORDER BY i.name ASC
 		`
-		shoppingRows, err := r.pool.Query(ctx, queryShopping, report.Menu.ID)
+		shoppingRows, err := r.pool.Query(ctx, queryShopping, report.ID)
 		if err == nil {
 			defer shoppingRows.Close()
 			var rawList []child_nutri.ShoppingListItem
@@ -110,70 +108,18 @@ func (r *ChildNutritionRepository) GetTodayNutritionReport(ctx context.Context, 
 	return &report, nil
 }
 
-// GetTodayDailyMenu gets just the menu for "today".
-func (r *ChildNutritionRepository) GetTodayDailyMenu(ctx context.Context, childID uuid.UUID) (*child_nutri.MenuResponse, error) {
+// GetReportMenuByID gets a specific report menu by its ID, ensuring it belongs to the child.
+func (r *ChildNutritionRepository) GetReportMenuByID(ctx context.Context, childID, reportID uuid.UUID) (*child_nutri.MenuResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	// First get latest report ID
-	var reportID uuid.UUID
-	queryReport := `
-		SELECT id 
-		FROM child_nutrition_reports 
-		WHERE child_id = $1 
-		ORDER BY created_at DESC LIMIT 1
-	`
-	err := r.pool.QueryRow(ctx, queryReport, childID).Scan(&reportID)
-	if err != nil {
-		return nil, err
-	}
 
-	// Fetch Menu
 	var menu child_nutri.MenuResponse
 	queryMenu := `
 		SELECT id, created_at
-		FROM daily_menus 
-		WHERE child_nutrition_report_id = $1
+		FROM child_nutrition_reports
+		WHERE id = $1 AND child_id = $2
 	`
-	err = r.pool.QueryRow(ctx, queryMenu, reportID).Scan(&menu.ID, &menu.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-
-	// Fetch Recipes
-	queryRecipes := `
-		SELECT id, name, meal_time, meal_texture, calories, protein, portions_consumed
-		FROM recipes
-		WHERE daily_menu_id = $1
-	`
-	rows, err := r.pool.Query(ctx, queryRecipes, menu.ID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var rec child_nutri.RecipeResponse
-		if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed); err == nil {
-			menu.Recipes = append(menu.Recipes, rec)
-		}
-	}
-
-	return &menu, nil
-}
-
-// GetDailyMenuByID gets a specific daily menu by its ID, ensuring it belongs to the child.
-func (r *ChildNutritionRepository) GetDailyMenuByID(ctx context.Context, childID, dailyMenuID uuid.UUID) (*child_nutri.MenuResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	var menu child_nutri.MenuResponse
-	queryMenu := `
-		SELECT dm.id, dm.created_at
-		FROM daily_menus dm
-		JOIN child_nutrition_reports cnr ON cnr.id = dm.child_nutrition_report_id
-		WHERE dm.id = $1 AND cnr.child_id = $2
-	`
-	err := r.pool.QueryRow(ctx, queryMenu, dailyMenuID, childID).Scan(&menu.ID, &menu.CreatedAt)
+	err := r.pool.QueryRow(ctx, queryMenu, reportID, childID).Scan(&menu.ID, &menu.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -183,9 +129,10 @@ func (r *ChildNutritionRepository) GetDailyMenuByID(ctx context.Context, childID
 
 	// Fetch Recipes
 	queryRecipes := `
-		SELECT id, name, meal_time, meal_texture, calories, protein, portions_consumed
-		FROM recipes
-		WHERE daily_menu_id = $1 AND portions_consumed > 0
+		SELECT r.id, r.name, r.meal_time, r.meal_texture, r.calories, r.protein, cnr.portions_consumed
+		FROM recipes r
+		JOIN child_nutrition_recipes cnr ON cnr.recipe_id = r.id
+		WHERE cnr.child_nutrition_report_id = $1
 	`
 	rows, err := r.pool.Query(ctx, queryRecipes, menu.ID)
 	if err != nil {
@@ -203,8 +150,8 @@ func (r *ChildNutritionRepository) GetDailyMenuByID(ctx context.Context, childID
 	return &menu, nil
 }
 
-// GetTodayMenuShopping gets the menu and aggregated shopping list for "today".
-func (r *ChildNutritionRepository) GetTodayMenuShopping(ctx context.Context, childID uuid.UUID) (*child_nutri.MenuShoppingResponse, error) {
+// GetTodayMenuShopping gets the menu and aggregated shopping list for a specific date.
+func (r *ChildNutritionRepository) GetTodayMenuShopping(ctx context.Context, childID uuid.UUID, targetDate time.Time) (*child_nutri.MenuShoppingResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -212,14 +159,12 @@ func (r *ChildNutritionRepository) GetTodayMenuShopping(ctx context.Context, chi
 
 	// Fetch Menu & Recipes using a single query to get menu
 	queryMenu := `
-		SELECT dm.id, dm.created_at
-		FROM daily_menus dm
-		JOIN child_nutrition_reports cnr ON cnr.id = dm.child_nutrition_report_id
-		WHERE cnr.child_id = $1
-		ORDER BY cnr.created_at DESC
-		LIMIT 1
+		SELECT id, created_at
+		FROM child_nutrition_reports
+		WHERE child_id = $1 
+			AND report_date = $2
 	`
-	err := r.pool.QueryRow(ctx, queryMenu, childID).Scan(&res.Menu.ID, &res.Menu.CreatedAt)
+	err := r.pool.QueryRow(ctx, queryMenu, childID, targetDate).Scan(&res.Menu.ID, &res.Menu.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			res.ShoppingList = []child_nutri.ShoppingListItem{}
@@ -230,9 +175,10 @@ func (r *ChildNutritionRepository) GetTodayMenuShopping(ctx context.Context, chi
 
 	// Fetch Recipes
 	queryRecipes := `
-		SELECT id, name, meal_time, meal_texture, calories, protein, portions_consumed
-		FROM recipes
-		WHERE daily_menu_id = $1
+		SELECT r.id, r.name, r.meal_time, r.meal_texture, r.calories, r.protein, cnr.portions_consumed
+		FROM recipes r
+		JOIN child_nutrition_recipes cnr ON cnr.recipe_id = r.id
+		WHERE cnr.child_nutrition_report_id = $1
 	`
 	rows, err := r.pool.Query(ctx, queryRecipes, res.Menu.ID)
 	if err == nil {
@@ -253,8 +199,8 @@ func (r *ChildNutritionRepository) GetTodayMenuShopping(ctx context.Context, chi
 			mi.unit
 		FROM main_ingredients mi
 		JOIN ingredients i ON i.id = mi.ingredient_id
-		JOIN recipes r ON r.id = mi.recipe_id
-		WHERE r.daily_menu_id = $1
+		JOIN child_nutrition_recipes cnr ON cnr.recipe_id = mi.recipe_id
+		WHERE cnr.child_nutrition_report_id = $1
 			AND mi.priority = 1
 		ORDER BY i.name ASC
 	`
@@ -280,6 +226,40 @@ func (r *ChildNutritionRepository) GetTodayMenuShopping(ctx context.Context, chi
 	return &res, nil
 }
 
+// GetReportByChildAndDate gets the nutrition report ID and can check existence based on childID and reportDate.
+func (r *ChildNutritionRepository) GetReportByChildAndDate(ctx context.Context, childID uuid.UUID, reportDate time.Time) (*child_nutri.TodayNutritionReportResponse, error) {
+	var report child_nutri.TodayNutritionReportResponse
+	query := `
+		SELECT id, report_date 
+		FROM child_nutrition_reports 
+		WHERE child_id = $1 
+			AND report_date = $2`
+
+	var rDate time.Time
+	err := r.pool.QueryRow(ctx, query, childID, reportDate.Format("2006-01-02")).Scan(&report.ID, &rDate)
+	if err != nil {
+		return nil, err
+	}
+	report.ReportDate = rDate.Format("2006-01-02")
+	return &report, nil
+}
+
+// IsReportReused checks if any recipe in the given report ID is also linked to another report (meaning it's shared/reused).
+func (r *ChildNutritionRepository) IsReportReused(ctx context.Context, reportID uuid.UUID) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1 FROM child_nutrition_recipes cnr
+			WHERE cnr.recipe_id IN (
+				SELECT recipe_id FROM child_nutrition_recipes WHERE child_nutrition_report_id = $1
+			)
+			AND cnr.child_nutrition_report_id != $1
+		)
+	`
+	var isReused bool
+	err := r.pool.QueryRow(ctx, query, reportID).Scan(&isReused)
+	return isReused, err
+}
+
 // GetChildIDByRecipeID helper to find child_id given a recipe_id
 func (r *ChildNutritionRepository) GetChildIDByRecipeID(ctx context.Context, recipeID uuid.UUID) (uuid.UUID, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -287,49 +267,38 @@ func (r *ChildNutritionRepository) GetChildIDByRecipeID(ctx context.Context, rec
 
 	var childID uuid.UUID
 	query := `
-		SELECT dm.child_nutrition_report_id
-		FROM recipes r
-		JOIN daily_menus dm ON dm.id = r.daily_menu_id
-		WHERE r.id = $1
+		SELECT cnr.child_id 
+		FROM child_nutrition_reports cnr
+		JOIN child_nutrition_recipes cj ON cj.child_nutrition_report_id = cnr.id
+		WHERE cj.recipe_id = $1
+		LIMIT 1
 	`
-	var reportID uuid.UUID
-	err := r.pool.QueryRow(ctx, query, recipeID).Scan(&reportID)
+	err := r.pool.QueryRow(ctx, query, recipeID).Scan(&childID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return uuid.Nil, fmt.Errorf("recipe not found")
+			return uuid.Nil, fmt.Errorf("recipe not found or not linked to any child")
 		}
 		return uuid.Nil, err
 	}
-
-	query2 := `
-		SELECT child_id 
-		FROM child_nutrition_reports 
-		WHERE id = $1`
-
-	err = r.pool.QueryRow(ctx, query2, reportID).Scan(&childID)
-	if err != nil {
-		return uuid.Nil, err
-	}
-
 	return childID, nil
 }
 
-// UpdateRecipeCompleteStatus updates a recipe's completion status through portions consumed.
-func (r *ChildNutritionRepository) UpdateRecipeCompleteStatus(ctx context.Context, recipeID uuid.UUID, portionsConsumed float64) error {
+// UpdateRecipeCompleteStatus updates a recipe's completion status through portions consumed in junction table.
+func (r *ChildNutritionRepository) UpdateRecipeCompleteStatus(ctx context.Context, recipeID uuid.UUID, reportID uuid.UUID, portionsConsumed float64) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	queryUpdate := `
-		UPDATE recipes
+		UPDATE child_nutrition_recipes
 		SET portions_consumed = $1
-		WHERE id = $2
+		WHERE recipe_id = $2 AND child_nutrition_report_id = $3
 	`
-	tag, err := r.pool.Exec(ctx, queryUpdate, portionsConsumed, recipeID)
+	tag, err := r.pool.Exec(ctx, queryUpdate, portionsConsumed, recipeID, reportID)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("recipe not found")
+		return fmt.Errorf("recipe junction not found")
 	}
 	return nil
 }
@@ -361,11 +330,11 @@ func (r *ChildNutritionRepository) GetRecipeDetail(ctx context.Context, recipeID
 
 	// Fetch Recipe
 	queryRecipe := `
-		SELECT id, name, meal_time, meal_texture, cooking_time, description, calories, protein
+		SELECT id, name, meal_time, meal_texture, cooking_time, description, calories, protein, is_bookmarked
 		FROM recipes
 		WHERE id = $1
 	`
-	err := r.pool.QueryRow(ctx, queryRecipe, recipeID).Scan(&detail.ID, &detail.Name, &detail.MealTime, &detail.MealTexture, &detail.CookingTime, &detail.Description, &detail.Calories, &detail.Protein)
+	err := r.pool.QueryRow(ctx, queryRecipe, recipeID).Scan(&detail.ID, &detail.Name, &detail.MealTime, &detail.MealTexture, &detail.CookingTime, &detail.Description, &detail.Calories, &detail.Protein, &detail.IsBookmarked)
 	if err != nil {
 		return nil, err
 	}
@@ -440,10 +409,16 @@ func (r *ChildNutritionRepository) GetRecipeDetail(ctx context.Context, recipeID
 	return &detail, nil
 }
 
-// SwapMainIngredientPriority sets target ingredient to priority 1, shifts others down.
-func (r *ChildNutritionRepository) SwapMainIngredientPriority(ctx context.Context, recipeID uuid.UUID, slot string, priority int) error {
+// SwapMainIngredientPriority sets target ingredient to priority 1, shifts others down for multiple requests atomically.
+func (r *ChildNutritionRepository) SwapMainIngredientPriority(ctx context.Context, requests []child_nutri.SwapPriorityRequest) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
 
 	query := `
 		WITH ranked AS (
@@ -459,35 +434,41 @@ func (r *ChildNutritionRepository) SwapMainIngredientPriority(ctx context.Contex
 		FROM ranked r
 		WHERE mi.id = r.id;
 	`
-	tag, err := r.pool.Exec(ctx, query, recipeID, slot, priority)
-	if err != nil {
-		return err
+
+	for _, req := range requests {
+		tag, err := tx.Exec(ctx, query, req.RecipeID, req.Slot, req.Priority)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return fmt.Errorf("record not found or no rows updated for recipe_id %s", req.RecipeID)
+		}
 	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("record not found or no rows updated")
-	}
-	return nil
+
+	return tx.Commit(ctx)
 }
 
-// GetBookmarkedRecipes returns all bookmarked recipes for a child.
+// GetBookmarkedRecipes returns all bookmarked recipes for a specific child.
 func (r *ChildNutritionRepository) GetBookmarkedRecipes(ctx context.Context, childID uuid.UUID) ([]child_nutri.RecipeResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+
+	// Query across multiple days via the junction table for this specific child
 	query := `
-		SELECT 
+		SELECT DISTINCT
 			r.id, 
 			r.name, 
 			r.meal_time, 
 			r.meal_texture, 
 			r.calories, 
 			r.protein, 
-			r.portions_consumed,
 			r.is_bookmarked
 		FROM recipes r
-		JOIN daily_menus dm ON r.daily_menu_id = dm.id
-		JOIN child_nutrition_reports cnr ON dm.child_nutrition_report_id = cnr.id
+		JOIN child_nutrition_recipes cj ON r.id = cj.recipe_id
+		JOIN child_nutrition_reports cnr ON cj.child_nutrition_report_id = cnr.id
 		WHERE cnr.child_id = $1 
 			AND r.is_bookmarked = true
+		ORDER BY r.name ASC
 	`
 	rows, err := r.pool.Query(ctx, query, childID)
 	if err != nil {
@@ -498,7 +479,7 @@ func (r *ChildNutritionRepository) GetBookmarkedRecipes(ctx context.Context, chi
 	var recipes []child_nutri.RecipeResponse
 	for rows.Next() {
 		var rec child_nutri.RecipeResponse
-		if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed, &rec.IsBookmarked); err == nil {
+		if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.IsBookmarked); err == nil {
 			recipes = append(recipes, rec)
 		}
 	}
@@ -512,25 +493,25 @@ func (r *ChildNutritionRepository) GetNutritionReportsByMonth(ctx context.Contex
 	query := `
 		SELECT 
 			r.id, 
-			dm.id as daily_menu_id,
 			r.created_at, 
+			r.report_date,
 			r.calories, 
 			r.protein, 
 			r.fat, 
 			r.carbohydrate,
 			COALESCE(
-				ARRAY_AGG(rec.meal_time) FILTER (WHERE rec.portions_consumed > 0), 
+				ARRAY_AGG(rec.meal_time) FILTER (WHERE cnr.portions_consumed > 0), 
 				'{}'
 			) as meal_times
 		FROM child_nutrition_reports r
-		LEFT JOIN daily_menus dm ON dm.child_nutrition_report_id = r.id
-		LEFT JOIN recipes rec ON rec.daily_menu_id = dm.id
+		LEFT JOIN child_nutrition_recipes cnr ON cnr.child_nutrition_report_id = r.id
+		LEFT JOIN recipes rec ON rec.id = cnr.recipe_id
 		WHERE 
 			r.child_id = $1 
-			AND EXTRACT(MONTH FROM r.created_at) = $2 
-			AND EXTRACT(YEAR FROM r.created_at) = $3
-		GROUP BY r.id, dm.id
-		ORDER BY r.created_at ASC
+			AND EXTRACT(MONTH FROM r.report_date) = $2 
+			AND EXTRACT(YEAR FROM r.report_date) = $3
+		GROUP BY r.id
+		ORDER BY r.report_date ASC
 	`
 	rows, err := r.pool.Query(ctx, query, childID, month, year)
 	if err != nil {
@@ -541,7 +522,9 @@ func (r *ChildNutritionRepository) GetNutritionReportsByMonth(ctx context.Contex
 	var results []child_nutri.NutritionReportSummaryResponse
 	for rows.Next() {
 		var res child_nutri.NutritionReportSummaryResponse
-		if err := rows.Scan(&res.ID, &res.DailyMenuID, &res.CreatedAt, &res.Calories, &res.Protein, &res.Fat, &res.Carbohydrate, &res.MealTimes); err == nil {
+		var rDate time.Time
+		if err := rows.Scan(&res.ID, &res.CreatedAt, &rDate, &res.Calories, &res.Protein, &res.Fat, &res.Carbohydrate, &res.MealTimes); err == nil {
+			res.ReportDate = rDate.Format("2006-01-02")
 			results = append(results, res)
 		}
 	}
@@ -549,7 +532,7 @@ func (r *ChildNutritionRepository) GetNutritionReportsByMonth(ctx context.Contex
 }
 
 // GetDailyShopByMother fetches daily shop ingredients for all children of a mother.
-func (r *ChildNutritionRepository) GetDailyShopByMother(ctx context.Context, motherProfileID uuid.UUID) ([]child_nutri.DailyShopIngredient, error) {
+func (r *ChildNutritionRepository) GetDailyShopByMother(ctx context.Context, motherProfileID uuid.UUID, targetDate time.Time) ([]child_nutri.DailyShopIngredient, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -560,20 +543,19 @@ func (r *ChildNutritionRepository) GetDailyShopByMother(ctx context.Context, mot
 			mi.slot, 
 			mi.unit, 
 			mi.priority,
-			i.id AS ingredient_id, 
 			i.name AS ingredient_name
 		FROM children c
 		JOIN child_nutrition_reports cnr ON cnr.child_id = c.id
-		JOIN daily_menus dm ON dm.child_nutrition_report_id = cnr.id
-		JOIN recipes r ON r.daily_menu_id = dm.id
+		JOIN child_nutrition_recipes cjr ON cjr.child_nutrition_report_id = cnr.id
+		JOIN recipes r ON r.id = cjr.recipe_id
 		JOIN main_ingredients mi ON mi.recipe_id = r.id
 		JOIN ingredients i ON i.id = mi.ingredient_id
 		WHERE c.mother_profile_id = $1
-			AND DATE(cnr.created_at) = CURRENT_DATE
+			AND cnr.report_date = $2
 			AND c.deleted_at IS NULL
 		ORDER BY c.full_name, mi.recipe_id, mi.slot, mi.priority ASC
 	`
-	rows, err := r.pool.Query(ctx, query, motherProfileID)
+	rows, err := r.pool.Query(ctx, query, motherProfileID, targetDate)
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +564,7 @@ func (r *ChildNutritionRepository) GetDailyShopByMother(ctx context.Context, mot
 	var flatRows []FlatIngredientRow
 	for rows.Next() {
 		var row FlatIngredientRow
-		if err := rows.Scan(&row.ChildName, &row.RecipeID, &row.Slot, &row.Unit, &row.Priority, &row.IngredientID, &row.IngredientName); err == nil {
+		if err := rows.Scan(&row.ChildName, &row.RecipeID, &row.Slot, &row.Unit, &row.Priority, &row.IngredientName); err == nil {
 			flatRows = append(flatRows, row)
 		}
 	}
@@ -590,7 +572,7 @@ func (r *ChildNutritionRepository) GetDailyShopByMother(ctx context.Context, mot
 }
 
 // GetDailyShopByCaregiver fetches daily shop ingredients for children engaged by a caregiver.
-func (r *ChildNutritionRepository) GetDailyShopByCaregiver(ctx context.Context, caregiverProfileID uuid.UUID) ([]child_nutri.DailyShopIngredient, error) {
+func (r *ChildNutritionRepository) GetDailyShopByCaregiver(ctx context.Context, caregiverProfileID uuid.UUID, targetDate time.Time) ([]child_nutri.DailyShopIngredient, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -601,22 +583,21 @@ func (r *ChildNutritionRepository) GetDailyShopByCaregiver(ctx context.Context, 
 			mi.slot, 
 			mi.unit, 
 			mi.priority,
-			i.id AS ingredient_id, 
 			i.name AS ingredient_name
 		FROM children c
 		JOIN caregiver_engagements ce ON ce.child_id = c.id
 		JOIN child_nutrition_reports cnr ON cnr.child_id = c.id
-		JOIN daily_menus dm ON dm.child_nutrition_report_id = cnr.id
-		JOIN recipes r ON r.daily_menu_id = dm.id
+		JOIN child_nutrition_recipes cjr ON cjr.child_nutrition_report_id = cnr.id
+		JOIN recipes r ON r.id = cjr.recipe_id
 		JOIN main_ingredients mi ON mi.recipe_id = r.id
 		JOIN ingredients i ON i.id = mi.ingredient_id
 		WHERE ce.caregiver_profile_id = $1
 			AND ce.deleted_at IS NULL
-			AND DATE(cnr.created_at) = CURRENT_DATE
+			AND cnr.report_date = $2
 			AND c.deleted_at IS NULL
 		ORDER BY c.full_name, mi.recipe_id, mi.slot, mi.priority ASC
 	`
-	rows, err := r.pool.Query(ctx, query, caregiverProfileID)
+	rows, err := r.pool.Query(ctx, query, caregiverProfileID, targetDate)
 	if err != nil {
 		return nil, err
 	}
@@ -625,11 +606,84 @@ func (r *ChildNutritionRepository) GetDailyShopByCaregiver(ctx context.Context, 
 	var flatRows []FlatIngredientRow
 	for rows.Next() {
 		var row FlatIngredientRow
-		if err := rows.Scan(&row.ChildName, &row.RecipeID, &row.Slot, &row.Unit, &row.Priority, &row.IngredientID, &row.IngredientName); err == nil {
+		if err := rows.Scan(&row.ChildName, &row.RecipeID, &row.Slot, &row.Unit, &row.Priority, &row.IngredientName); err == nil {
 			flatRows = append(flatRows, row)
 		}
 	}
 	return groupDailyShopIngredients(flatRows), nil
+}
+
+// GetRecipeMealTime gets the meal time of a given recipe.
+func (r *ChildNutritionRepository) GetRecipeMealTime(ctx context.Context, recipeID uuid.UUID) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	const query = `
+		SELECT meal_time 
+		FROM recipes WHERE id = $1`
+	var mealTime string
+	err := r.pool.QueryRow(ctx, query, recipeID).Scan(&mealTime)
+	return mealTime, err
+}
+
+// ReuseRecipeTx replaces a recipe in a target CNR for a specific meal time with a source recipe atomically.
+func (r *ChildNutritionRepository) ReuseRecipeTx(ctx context.Context, targetCNR_ID uuid.UUID, sourceRecipeID uuid.UUID, targetMealTime string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	const getOldRecipeQuery = `
+		SELECT r.id 
+		FROM recipes r
+		JOIN child_nutrition_recipes cnr ON cnr.recipe_id = r.id
+		WHERE cnr.child_nutrition_report_id = $1 AND r.meal_time = $2`
+
+	const deleteJunctionQuery = `
+		DELETE FROM child_nutrition_recipes 
+		WHERE child_nutrition_report_id = $1 AND recipe_id = $2`
+
+	const deleteOrphanRecipeQuery = `
+		DELETE FROM recipes 
+		WHERE id = $1
+			AND NOT EXISTS (
+				SELECT 1 
+				FROM child_nutrition_recipes 
+				WHERE recipe_id = $1
+			)`
+
+	const insertJunctionQuery = `
+		INSERT INTO child_nutrition_recipes (child_nutrition_report_id, recipe_id, portions_consumed)
+		VALUES ($1, $2, 0)`
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Step 1: Find the old recipe in the target slot with the same meal_time
+	var oldRecipeIDInSlot uuid.UUID
+	err = tx.QueryRow(ctx, getOldRecipeQuery, targetCNR_ID, targetMealTime).Scan(&oldRecipeIDInSlot)
+
+	if err == nil && oldRecipeIDInSlot != uuid.Nil {
+		// Remove relation from target junction since it will be replaced
+		if _, err = tx.Exec(ctx, deleteJunctionQuery, targetCNR_ID, oldRecipeIDInSlot); err != nil {
+			return err
+		}
+
+		// Delete the old recipe if it is now an orphan (not used in any CNR)
+		if _, err = tx.Exec(ctx, deleteOrphanRecipeQuery, oldRecipeIDInSlot); err != nil {
+			return err
+		}
+	} else if err != pgx.ErrNoRows {
+		return err
+	}
+
+	// Step 2: Link sourceRecipeID to target CNR
+	if _, err = tx.Exec(ctx, insertJunctionQuery, targetCNR_ID, sourceRecipeID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // ================================== HELPER FUNCTION ===================================
@@ -665,10 +719,12 @@ func aggregateShoppingList(items []child_nutri.ShoppingListItem) []child_nutri.S
 
 			// Only sum when both units are parseable and their labels match exactly
 			if ok1 && ok2 && ua1 == ua2 && ub1 == ub2 {
+				sumA := math.Round((va1+va2)*100) / 100
+				sumB := math.Round((vb1+vb2)*100) / 100
 				if ub1 != "" { // e.g. "1.6 sdm (16g)" + "1.6 sdm (16g)" → "3.2 sdm (32g)"
-					ext.Unit = fmt.Sprintf("%g %s (%g%s)", va1+va2, ua1, vb1+vb2, ub1)
+					ext.Unit = fmt.Sprintf("%g %s (%g%s)", sumA, ua1, sumB, ub1)
 				} else { // e.g. "16g" + "16g" → "32 g"
-					ext.Unit = fmt.Sprintf("%g %s", va1+va2, ua1)
+					ext.Unit = fmt.Sprintf("%g %s", sumA, ua1)
 				}
 			}
 		}
@@ -688,7 +744,6 @@ type FlatIngredientRow struct {
 	Slot           string
 	Unit           string
 	Priority       int
-	IngredientID   string
 	IngredientName string
 }
 
@@ -707,35 +762,33 @@ func groupDailyShopIngredients(rows []FlatIngredientRow) []child_nutri.DailyShop
 		k := key{recipeID: row.RecipeID, slot: row.Slot}
 
 		if row.Priority == 1 {
-			// Bahan utama — karena urut ASC, ini selalu datang lebih dulu
+			// Main ingredient — guaranteed to appear first due to ASC priority sorting
 			if _, exists := mainMap[k]; !exists {
 				orderedKeys = append(orderedKeys, k)
 				mainMap[k] = &child_nutri.DailyShopIngredient{
-					Name:         row.IngredientName,
-					IngredientID: row.IngredientID,
-					Unit:         row.Unit,
-					Priority:     row.Priority,
-					Slot:         row.Slot,
-					RecipeID:     row.RecipeID,
-					ChildName:    row.ChildName,
-					Pengganti:    []child_nutri.DailyShopSubstitute{},
+					Name:        row.IngredientName,
+					Unit:        row.Unit,
+					Priority:    row.Priority,
+					Slot:        row.Slot,
+					RecipeID:    row.RecipeID,
+					ChildName:   row.ChildName,
+					Substitutes: []child_nutri.DailyShopSubstitute{},
 				}
 			}
 		} else if main, exists := mainMap[k]; exists {
-			// Bahan pengganti — parent-nya sudah pasti ada di map
-			main.Pengganti = append(main.Pengganti, child_nutri.DailyShopSubstitute{
-				Name:         row.IngredientName,
-				IngredientID: row.IngredientID,
-				Unit:         row.Unit,
-				Priority:     row.Priority,
+			// Substitute ingredient — its main ingredient parent is guaranteed to exist in the map
+			main.Substitutes = append(main.Substitutes, child_nutri.DailyShopSubstitute{
+				Name:     row.IngredientName,
+				Unit:     row.Unit,
+				Priority: row.Priority,
 			})
 		}
 	}
 
-	// Pre-allocate slice dengan kapasitas yang sudah diketahui
+	// Pre-allocate the result slice with a known capacity to optimize memory allocation
 	result := make([]child_nutri.DailyShopIngredient, 0, len(orderedKeys))
 	for _, k := range orderedKeys {
 		result = append(result, *mainMap[k])
 	}
-	return result // make() sudah non-nil, tidak perlu cek len == 0
+	return result // The result is guaranteed to be non-nil due to make(), no need to check length
 }

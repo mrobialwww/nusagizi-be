@@ -39,40 +39,65 @@ func (r *MenuRepository) ReplaceTodayMenu(
 	}
 	defer tx.Rollback(ctx) // no-op once committed
 
-	// Delete existing menu for today
-	const deleteQuery = `
-		DELETE FROM child_nutrition_reports 
-		WHERE child_id = $1 
-			AND DATE(created_at) = $2`
+	// Get old CNR ID for orphan cleanup
+	var existingCNR_ID uuid.UUID
+	err = tx.QueryRow(ctx, `
+		SELECT id FROM child_nutrition_reports 
+		WHERE child_id = $1 AND report_date = $2`,
+		childID, today.Format("2006-01-02")).Scan(&existingCNR_ID)
 
-	if _, err := tx.Exec(ctx, deleteQuery, childID, today.Format("2006-01-02")); err != nil {
-		return fmt.Errorf("failed to delete existing menu: %w", err)
+	if err == nil && existingCNR_ID != uuid.Nil {
+		// Collect old recipe IDs
+		var oldRecipeIDs []uuid.UUID
+		rows, _ := tx.Query(ctx, "SELECT recipe_id FROM child_nutrition_recipes WHERE child_nutrition_report_id = $1", existingCNR_ID)
+		defer rows.Close()
+		for rows.Next() {
+			var id uuid.UUID
+			if rows.Scan(&id) == nil {
+				oldRecipeIDs = append(oldRecipeIDs, id)
+			}
+		}
+
+		// Delete existing menu for today (CASCADE automatically removes relations in junction)
+		const deleteQuery = `
+			DELETE FROM child_nutrition_reports 
+			WHERE id = $1`
+		if _, err := tx.Exec(ctx, deleteQuery, existingCNR_ID); err != nil {
+			return fmt.Errorf("failed to delete existing menu: %w", err)
+		}
+
+		// Delete Orphan Recipes
+		if len(oldRecipeIDs) > 0 {
+			const deleteOrphans = `
+				DELETE FROM recipes 
+				WHERE id = ANY($1) 
+					AND NOT EXISTS (
+						SELECT 1 
+						FROM child_nutrition_recipes 
+						WHERE recipe_id = recipes.id
+					)`
+			if _, err := tx.Exec(ctx, deleteOrphans, oldRecipeIDs); err != nil {
+				return fmt.Errorf("failed to delete orphan recipes: %w", err)
+			}
+		}
+	} else if err != pgx.ErrNoRows {
+		return fmt.Errorf("failed to check existing menu: %w", err)
 	}
 
 	// Insert new nutrition report
 	const reportQuery = `
 		INSERT INTO child_nutrition_reports
-		(child_id, target_calories, target_protein, target_fat, target_carbohydrate, calories, protein, fat, carbohydrate)
-		VALUES ($1, $2, $3, $4, $5, 0, 0, 0, 0) RETURNING id`
+		(child_id, report_date, target_calories, target_protein, target_fat, target_carbohydrate, calories, protein, fat, carbohydrate)
+		VALUES ($1, $2, $3, $4, $5, $6, 0, 0, 0, 0) RETURNING id`
 
 	var reportID uuid.UUID
-	if err := tx.QueryRow(ctx, reportQuery, childID, targetCalories, targetProtein, targetFat, targetCarbo).Scan(&reportID); err != nil {
+	if err := tx.QueryRow(ctx, reportQuery, childID, today.Format("2006-01-02"), targetCalories, targetProtein, targetFat, targetCarbo).Scan(&reportID); err != nil {
 		return fmt.Errorf("failed to insert nutrition report: %w", err)
-	}
-
-	// Insert daily_menus
-	const dailyMenuQuery = `
-		INSERT INTO daily_menus (child_nutrition_report_id)
-		VALUES ($1) RETURNING id`
-
-	var dailyMenuID uuid.UUID
-	if err := tx.QueryRow(ctx, dailyMenuQuery, reportID).Scan(&dailyMenuID); err != nil {
-		return fmt.Errorf("failed to insert daily menu: %w", err)
 	}
 
 	// Insert recipes (breakfast, lunch, dinner)
 	for mealTime, sesi := range menuData.Sesi {
-		// Map AI keys (sarapan, makan siang, dll) to DB ENUM if needed, assuming AI keys are updated to breakfast, lunch, dinner
+		// Map AI keys (breakfast, lunch, etc.) to DB ENUM if needed, assuming AI keys are updated to breakfast, lunch, dinner
 		dbMealTime := mapMealTime(mealTime)
 		waktuMasak := sesi.PanduanMasak.WaktuMasak
 		cal, pro, fat, car := 0.0, 0.0, 0.0, 0.0
@@ -89,18 +114,24 @@ func (r *MenuRepository) ReplaceTodayMenu(
 			car = m.Dapat
 		}
 
+		// Insert new recipe into the 'recipes' table.
 		const recipeQuery = `
 			INSERT INTO recipes
-			(daily_menu_id, name, description, meal_time, meal_texture, cooking_time, calories, protein, fat, carbohydrate, is_bookmarked, is_completed, photo_url)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, false, '') RETURNING id`
+			(name, description, meal_time, meal_texture, cooking_time, calories, protein, fat, carbohydrate, is_bookmarked)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false) RETURNING id`
 
 		var recipeID uuid.UUID
 		err = tx.QueryRow(ctx, recipeQuery,
-			dailyMenuID, sesi.PanduanMasak.ResepNama, sesi.PanduanMasak.Catatan, dbMealTime, sesi.PanduanMasak.Tekstur, waktuMasak,
+			sesi.PanduanMasak.ResepNama, sesi.PanduanMasak.Catatan, dbMealTime, sesi.PanduanMasak.Tekstur, waktuMasak,
 			cal, pro, fat, car,
 		).Scan(&recipeID)
 		if err != nil {
 			return fmt.Errorf("failed to insert recipe %s: %w", mealTime, err)
+		}
+
+		// Insert junction
+		if _, err := tx.Exec(ctx, `INSERT INTO child_nutrition_recipes (child_nutrition_report_id, recipe_id, portions_consumed) VALUES ($1, $2, 0)`, reportID, recipeID); err != nil {
+			return fmt.Errorf("failed to insert junction for %s: %w", mealTime, err)
 		}
 
 		if err := insertRecipeDetails(ctx, tx, recipeID, sesi.Bahan, sesi.PanduanMasak); err != nil {
@@ -116,18 +147,24 @@ func (r *MenuRepository) ReplaceTodayMenu(
 			desc = selingan.Pesan[0]
 		}
 
+		// Insert new snack recipe into the 'recipes' table.
 		const selinganRecipeQuery = `
 			INSERT INTO recipes
-			(daily_menu_id, name, description, meal_time, meal_texture, cooking_time, calories, protein, fat, carbohydrate, is_bookmarked, is_completed, photo_url)
-			VALUES ($1, $2, $3, $4, '', 0, $5, $6, $7, $8, false, false, '') RETURNING id`
+			(name, description, meal_time, meal_texture, cooking_time, calories, protein, fat, carbohydrate, is_bookmarked)
+			VALUES ($1, $2, $3, '', '', $4, $5, $6, $7, false) RETURNING id`
 
 		var recipeID uuid.UUID
 		err = tx.QueryRow(ctx, selinganRecipeQuery,
-			dailyMenuID, selingan.Resep.Nama, desc, dbMealTime,
+			selingan.Resep.Nama, desc, dbMealTime,
 			selingan.Makro.Energi, selingan.Makro.Protein, selingan.Makro.Lemak, selingan.Makro.Karbo,
 		).Scan(&recipeID)
 		if err != nil {
 			return fmt.Errorf("failed to insert recipe selingan %s: %w", mealTime, err)
+		}
+
+		// Insert junction
+		if _, err := tx.Exec(ctx, `INSERT INTO child_nutrition_recipes (child_nutrition_report_id, recipe_id, portions_consumed) VALUES ($1, $2, 0)`, reportID, recipeID); err != nil {
+			return fmt.Errorf("failed to insert junction selingan for %s: %w", mealTime, err)
 		}
 
 		if err := insertSelinganDetails(ctx, tx, recipeID, selingan.Bahan, selingan.Resep.Langkah); err != nil {
@@ -144,18 +181,18 @@ func (r *MenuRepository) ReplaceTodayMenu(
 // mapMealTime maps the AI response meal time keys to the database ENUM values.
 func mapMealTime(aiKey string) string {
 	switch aiKey {
-	case "sarapan", "breakfast":
+	case "pagi", "sarapan":
 		return "breakfast"
-	case "makan siang", "lunch":
+	case "siang":
 		return "lunch"
-	case "makan malam", "dinner":
+	case "malam":
 		return "dinner"
-	case "selingan_1", "selingan_siang", "morning_snack":
+	case "selingan_1":
 		return "morning_snack"
-	case "selingan_2", "selingan_sore", "afternoon_snack":
+	case "selingan_2":
 		return "afternoon_snack"
 	default:
-		return aiKey // Fallback to raw key
+		return aiKey
 	}
 }
 
@@ -171,7 +208,7 @@ func insertRecipeDetails(ctx context.Context, tx pgx.Tx, recipeID uuid.UUID, bah
 			return fmt.Errorf("failed to insert main ingredient %s: %w", b.Kode, err)
 		}
 		// Priority 2, 3, 4... for substitutes
-		for i, p := range b.Pengganti {
+		for i, p := range b.Substitutes {
 			if _, err := tx.Exec(ctx, queryPriority, recipeID, p.Kode, p.Satuan, b.Slot, i+2); err != nil {
 				return fmt.Errorf("failed to insert substitute ingredient %s: %w", p.Kode, err)
 			}
@@ -211,7 +248,7 @@ func insertSelinganDetails(ctx context.Context, tx pgx.Tx, recipeID uuid.UUID, b
 			return fmt.Errorf("failed to insert main ingredient %s: %w", b.Kode, err)
 		}
 		// Priority 2, 3, 4... for substitutes
-		for i, p := range b.Pengganti {
+		for i, p := range b.Substitutes {
 			if _, err := tx.Exec(ctx, queryPriority, recipeID, p.Kode, p.Satuan, b.Slot, i+2); err != nil {
 				return fmt.Errorf("failed to insert substitute ingredient %s: %w", p.Kode, err)
 			}

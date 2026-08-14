@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,25 +24,27 @@ import (
 
 // MenuService orchestrates menu generation: fetching child data, calling the AI engine, and persisting the resulting menu.
 type MenuService struct {
-	cfg        *config.Config
-	menuRepo   *repository.MenuRepository
-	motherRepo *repository.MotherProfileRepository
-	childRepo  *repository.ChildRepository
-	httpClient *http.Client
+	cfg            *config.Config
+	menuRepo       *repository.MenuRepository
+	motherRepo     *repository.MotherProfileRepository
+	childRepo      *repository.ChildRepository
+	childNutriRepo *repository.ChildNutritionRepository
+	httpClient     *http.Client
 }
 
-func NewMenuService(cfg *config.Config, menuRepo *repository.MenuRepository, motherRepo *repository.MotherProfileRepository, childRepo *repository.ChildRepository) *MenuService {
+func NewMenuService(cfg *config.Config, menuRepo *repository.MenuRepository, motherRepo *repository.MotherProfileRepository, childRepo *repository.ChildRepository, childNutriRepo *repository.ChildNutritionRepository) *MenuService {
 	return &MenuService{
-		cfg:        cfg,
-		menuRepo:   menuRepo,
-		motherRepo: motherRepo,
-		childRepo:  childRepo,
-		httpClient: &http.Client{Timeout: 30 * time.Second}, // Reuse client for HTTP connection pooling
+		cfg:            cfg,
+		menuRepo:       menuRepo,
+		motherRepo:     motherRepo,
+		childRepo:      childRepo,
+		childNutriRepo: childNutriRepo,
+		httpClient:     &http.Client{Timeout: 30 * time.Second}, // Reuse client for HTTP connection pooling
 	}
 }
 
 // GenerateMenu (Endpoint: 39) generates and saves today's menu for all children of a mother.
-func (s *MenuService) GenerateMenu(ctx context.Context, userID string) error {
+func (s *MenuService) GenerateMenu(ctx context.Context, userID string, reportDate time.Time) error {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -81,59 +84,71 @@ func (s *MenuService) GenerateMenu(ctx context.Context, userID string) error {
 		)
 	}
 
-	return s.saveAllChildMenus(ctx, aiResponse.Anak, time.Now())
+	return s.saveAllChildMenus(ctx, aiResponse.Anak, reportDate)
 }
 
 // saveAllChildMenus saves children's menus concurrently (max 4).
 // Errors from individual saves are collected and do not block others.
-func (s *MenuService) saveAllChildMenus(ctx context.Context, anakList []menu.FoodEngineAnak, today time.Time) error {
+func (s *MenuService) saveAllChildMenus(ctx context.Context, childList []menu.FoodEngineAnak, today time.Time) error {
 	sem := make(chan struct{}, 4) // maxConcurrentChildSaves
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var errs []error
 
-	for _, anak := range anakList {
+	for _, child := range childList {
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(anak menu.FoodEngineAnak) {
+		go func(child menu.FoodEngineAnak) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			childID, err := uuid.Parse(anak.ID)
+			childID, err := uuid.Parse(child.ID)
 			if err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Errorf("child %s: invalid id: %w", anak.ID, err))
+				errs = append(errs, fmt.Errorf("child %s: invalid id: %w", child.ID, err))
 				mu.Unlock()
 				return
 			}
 
-			// 1. Calculate Macros, Sum target macros across all sessions (breakfast, lunch, dinner) and snacks
+			// Check if any recipe in today's report for this child is reused from a previous report
+			existingCNR, err := s.childNutriRepo.GetReportByChildAndDate(ctx, childID, today)
+			if err == nil && existingCNR != nil {
+
+				isReused, err := s.childNutriRepo.IsReportReused(ctx, existingCNR.ID)
+				if err == nil && isReused {
+					// Skip this child because their menu is being reused, allow others to continue
+					slog.WarnContext(ctx, "Skipping menu replacement for child due to reused report", "child_id", childID)
+					return
+				}
+			}
+
+			// Calculate Macros, Sum target macros across all sessions (breakfast, lunch, dinner) and snacks
 			var calories, protein, fat, carbo float64
-			for _, sesi := range anak.Menu.Sesi {
+			for _, sesi := range child.Menu.Sesi {
 				calories += sesi.Makro["energi"].Target
 				protein += sesi.Makro["protein"].Target
 				fat += sesi.Makro["lemak"].Target
 				carbo += sesi.Makro["karbo"].Target
 			}
 
-			for _, selingan := range anak.Menu.Selingan {
+			for _, selingan := range child.Menu.Selingan {
 				calories += selingan.Makro.Energi
 				protein += selingan.Makro.Protein
 				fat += selingan.Makro.Lemak
 				carbo += selingan.Makro.Karbo
 			}
 
-			// 2. Save to Database
+			// Save to Database
 			if err := s.menuRepo.ReplaceTodayMenu(
 				ctx, childID, today,
 				calories, protein, fat, carbo,
-				anak.Menu,
+				child.Menu,
 			); err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Errorf("child %s: failed to save new menu: %w", anak.ID, err))
+				errs = append(errs, fmt.Errorf("child %s: failed to save new menu: %w", child.ID, err))
 				mu.Unlock()
 			}
-		}(anak)
+		}(child)
 	}
 	wg.Wait()
 
@@ -162,7 +177,10 @@ func (s *MenuService) callAIEngine(ctx context.Context, payloadBytes []byte) (*m
 
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read ai engine response body: %w", err)
+	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("ai engine returned status %d: %s", resp.StatusCode, string(body))
@@ -229,11 +247,19 @@ func (s *MenuService) getChildrenDataForMenu(ctx context.Context, motherProfileI
 		// Calculate age in months
 		usiaBulan := utils.CalculateAgeInMonths(c.BirthDate, time.Now())
 
-		// Create child payload
+		// Map sex from DB format (male/female) to AI Engine format (boys/girls)
+		sex := strings.ToLower(c.Sex)
+		if sex == "male" || sex == "boy" || sex == "boys" || sex == "l" {
+			sex = "boys"
+		} else {
+			sex = "girls"
+		}
+
+		// Create child payload (using c.ID.String() for Nama so AI Engine returns UUID in anak.ID)
 		childPayload := menu.FoodEnginePayloadChild{
 			ID:                   c.ID.String(),
-			Nama:                 c.Nama,
-			Sex:                  c.Sex,
+			Nama:                 c.ID.String(),
+			Sex:                  sex,
 			UsiaBulan:            usiaBulan,
 			PreferensiHarga:      "seimbang", // temporary hardcode
 			JumlahProteinPerHari: 1,          // temporary hardcode

@@ -193,8 +193,8 @@ func (h *ChildHandler) GetChildProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// ListByMother (Endpoint: 11)
-func (h *ChildHandler) ListByMother(c *gin.Context) {
+// GetListChild (Endpoint: 11)
+func (h *ChildHandler) GetListChild(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
 	if !exists || !ok {
@@ -204,23 +204,18 @@ func (h *ChildHandler) ListByMother(c *gin.Context) {
 
 	// ID is automatically deduced from the requester's token in the service layer
 
-	children, err := h.service.GetChildrenByMother(c.Request.Context(), requester.ID)
+	children, err := h.service.GetListChild(c.Request.Context(), requester.ID)
 	if err != nil {
-		switch {
-		case errors.Is(err, repository.ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not own this mother profile"}})
-		default:
-			slog.Error("GetChildrenByMother failed", "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
-		}
+		slog.Error("GetListChild failed", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		return
 	}
 
 	c.JSON(http.StatusOK, children)
 }
 
-// GetChildSimple (Endpoint: 12)
-func (h *ChildHandler) GetChildSimple(c *gin.Context) {
+// GetChild (Endpoint: 12)
+func (h *ChildHandler) GetChild(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
 	if !exists || !ok {
@@ -234,7 +229,7 @@ func (h *ChildHandler) GetChildSimple(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.service.GetChildSimple(c.Request.Context(), requester.ID, childID)
+	resp, err := h.service.GetChild(c.Request.Context(), requester.ID, childID)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrForbidden):
@@ -242,7 +237,7 @@ func (h *ChildHandler) GetChildSimple(c *gin.Context) {
 		case errors.Is(err, repository.ErrNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "child not found or already deleted"}})
 		default:
-			slog.Error("GetChildSimple failed", "error", err)
+			slog.Error("GetChild failed", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
 		}
 		return

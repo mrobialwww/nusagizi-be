@@ -1,59 +1,34 @@
--- Dummy seed: child_nutrition_reports + turunannya, 1-9 Agustus 2026 (M. Razky, Budi, Ani)
--- Helper unit: "1.6 sdm (16g)", "8.2g", "1/2 sdt (2.5g)", "1 siung (5g)", "sejumput (0.5g)"
-CREATE OR REPLACE FUNCTION pg_temp.rand_unit(min_g NUMERIC, max_g NUMERIC, is_spice BOOLEAN)
+-- Dummy seed: child_nutrition_reports + turunannya, 1-13 Agustus 2026 (M. Razky, Budi, Ani)
+-- Deterministic unit generator: each ingredient code has its own consistent measurement unit (e.g. AR001 is always sdm)
+CREATE OR REPLACE FUNCTION pg_temp.fmt_unit(spec TEXT)
 RETURNS TEXT AS $$
 DECLARE
-    m_names TEXT[] := ARRAY['sdm','potong','genggam','batang']; 
-    m_factors NUMERIC[] := ARRAY[10,15,10,10];
-    c_names TEXT[] := ARRAY['sdt','siung','ruas'];
-    f_labels TEXT[] := ARRAY['1/4','1/2','3/4','1','1 1/2','2']; 
-    f_values NUMERIC[] := ARRAY[0.25,0.5,0.75,1,1.5,2];
-    r NUMERIC := random(); 
-    style INT; 
-    i INT; 
-    fi INT; 
-    g NUMERIC; 
+    u_name TEXT := split_part(spec, ':', 3);
+    factor NUMERIC := split_part(spec, ':', 4)::numeric;
     qty NUMERIC;
+    g NUMERIC;
 BEGIN
-    IF is_spice THEN
-        style := CASE 
-            WHEN r < 0.2 THEN 3 
-            WHEN r < 0.6 THEN 2 
-            WHEN r < 0.85 THEN 1 
-            ELSE 4 
-        END;
-    ELSE
-        style := CASE 
-            WHEN r < 0.35 THEN 1 
-            ELSE 4 
-        END;
-    END IF;
-
-    IF style = 3 THEN
+    IF u_name = 'sejumput' THEN
         g := round((0.3 + random() * 0.5)::numeric, 1);
         RETURN 'sejumput (' || g || 'g)';
-    ELSIF style = 2 THEN
-        i := 1 + floor(random() * array_length(c_names, 1))::int; 
-        fi := 1 + floor(random() * array_length(f_values, 1))::int;
-        g := round((5 * f_values[fi])::numeric, 1);
-        RETURN f_labels[fi] || ' ' || c_names[i] || ' (' || g || 'g)';
-    ELSIF style = 4 THEN
-        i := 1 + floor(random() * array_length(m_names, 1))::int; 
-        qty := round((0.2 + random() * 2.3)::numeric, 1);
-        g := round((qty * m_factors[i])::numeric, 1);
-        RETURN qty || ' ' || m_names[i] || ' (' || g || 'g)';
-    ELSE
-        g := round((min_g + random() * (max_g - min_g))::numeric, 1);
-        RETURN g || 'g';
     END IF;
+
+    -- Generate realistic multiplier between 0.4 and 2.0
+    qty := round((0.4 + random() * 1.6)::numeric, 1);
+    IF factor <= 0 THEN
+        factor := 10;
+    END IF;
+    g := round((qty * factor)::numeric, 1);
+    
+    RETURN qty || ' ' || u_name || ' (' || g || 'g)';
 END;
 $$ LANGUAGE plpgsql;
 
 DO $$
 DECLARE
-    mother_id UUID := 'da16603d-129d-49be-a311-7eb868b15984';
+    mother_id UUID := '8bdee998-ad6e-46ba-bf57-2e69afaeef78';
     d1 DATE := '2026-08-01'; 
-    d2 DATE := '2026-08-09';
+    d2 DATE := '2026-08-25';
     meals TEXT[] := ARRAY[
         'breakfast:0.25:Bubur',
         'morning_snack:0.10:Camilan',
@@ -62,27 +37,28 @@ DECLARE
         'dinner:0.25:Sup'
     ];
     karbo TEXT[] := ARRAY[
-        'AR001:Beras giling', 'BR013:Kentang', 'BR031:Ubi jalar putih',
-        'BR028:Ubi jalar kuning', 'BR016:Singkong', 'AR005:Beras jagung kuning'
+        'AR001:Beras giling:sdm:10', 'BR013:Kentang:potong:50', 'BR031:Ubi jalar putih:potong:40',
+        'BR028:Ubi jalar kuning:potong:40', 'BR016:Singkong:potong:45', 'AR005:Beras jagung kuning:sdm:10'
     ];
     protein TEXT[] := ARRAY[
-        'FR005:Daging Ayam', 'GR046:Ikan mas', 'GR053:Ikan patin', 'HR002:Telur ayam ras',
-        'FR024:Daging Sapi', 'GR048:Ikan mujahir', 'GR025:Ikan gabus', 'CP077:Tempe', 
-        'CP061:Tahu', 'CR026:Kacang merah'
+        'FR005:Daging Ayam:potong:25', 'GR046:Ikan mas:potong:30', 'GR053:Ikan patin:potong:30', 'HR002:Telur ayam ras:butir:50',
+        'FR024:Daging Sapi:potong:30', 'GR048:Ikan mujahir:potong:30', 'GR025:Ikan gabus:potong:30', 'CP077:Tempe:potong:20', 
+        'CP061:Tahu:potong:25', 'CR026:Kacang merah:sdm:12'
     ];
     sayur TEXT[] := ARRAY[
-        'DR008:Bayam', 'DR166:Wortel', 'DR161:Tomat merah', 'DR097:Kacang panjang', 
-        'DR013:Buncis', 'DR123:Labu siam', 'DR141:Sawi', 'DR044:Daun kubis', 
-        'DR038:Daun kelor', 'DR113:Kool kembang'
+        'DR008:Bayam:genggam:15', 'DR166:Wortel:batang:25', 'DR161:Tomat merah:potong:20', 'DR097:Kacang panjang:batang:15', 
+        'DR013:Buncis:batang:10', 'DR123:Labu siam:potong:30', 'DR141:Sawi:genggam:15', 'DR044:Daun kubis:lembar:15', 
+        'DR038:Daun kelor:genggam:10', 'DR113:Kool kembang:potong:25'
     ];
     buah TEXT[] := ARRAY[
-        'ER073:Pepaya', 'ER054:Mangga', 'ER087:Pisang mas', 'ER039:Jeruk manis', 
-        'ER001:Alpukat', 'ER070:Nanas', 'ER097:Rambutan'
+        'ER073:Pepaya:potong:50', 'ER054:Mangga:potong:40', 'ER087:Pisang mas:buah:40', 'ER039:Jeruk manis:buah:50', 
+        'ER001:Alpukat:potong:45', 'ER070:Nanas:potong:40', 'ER097:Rambutan:buah:20'
     ];
-    lemak TEXT[] := ARRAY['KP003:Santan', 'JR006:Susu sapi', 'KR011:Minyak kelapa'];
+    lemak TEXT[] := ARRAY['KP003:Santan:sdm:10', 'JR006:Susu sapi:sdm:15', 'KR011:Minyak kelapa:sdm:5'];
     spices TEXT[] := ARRAY[
-        'Bawang merah', 'Bawang putih', 'Garam', 'Gula pasir', 'Merica', 
-        'Daun salam', 'Serai', 'Kunyit', 'Jahe', 'Ketumbar'
+        'Bawang merah:Bawang merah:siung:5', 'Bawang putih:Bawang putih:siung:5', 'Garam:Garam:sdt:2', 
+        'Gula pasir:Gula pasir:sdt:4', 'Merica:Merica:sejumput:0.5', 'Daun salam:Daun salam:lembar:1', 
+        'Serai:Serai:batang:10', 'Kunyit:Kunyit:ruas:5', 'Jahe:Jahe:ruas:5', 'Ketumbar:Ketumbar:sdt:2'
     ];
     steps TEXT[] := ARRAY[
         'Cuci bersih semua bahan.', 'Kukus/rebus bahan utama hingga matang.',
@@ -95,28 +71,34 @@ DECLARE
     rid UUID; 
     mid UUID; 
     recid UUID;
-    tcal INT; 
-    tprot INT; 
-    tfat INT; 
-    tcarb INT; 
+    tcal NUMERIC(6,2); 
+    tprot NUMERIC(6,2); 
+    tfat NUMERIC(6,2); 
+    tcarb NUMERIC(6,2); 
     tex TEXT;
     i INT; 
     j INT; 
     k INT; 
+    p INT;
     mt TEXT; 
     frac NUMERIC; 
     label TEXT; 
     snack BOOLEAN;
-    cal INT; 
-    prot INT; 
-    carb INT; 
-    fat INT;
+    cal NUMERIC(6,2); 
+    prot NUMERIC(6,2); 
+    carb NUMERIC(6,2); 
+    fat NUMERIC(6,2);
     a TEXT; 
     b TEXT; 
     s TEXT; 
     nm TEXT; 
     ds TEXT; 
     port NUMERIC;
+    buah_chosen TEXT[];
+    lemak_chosen TEXT[];
+    karbo_chosen TEXT[];
+    protein_chosen TEXT[];
+    sayur_chosen TEXT[];
 BEGIN
     FOR c IN
         SELECT id, full_name,
@@ -139,20 +121,14 @@ BEGIN
             mid := gen_random_uuid();
             
             INSERT INTO child_nutrition_reports (
-                id, child_id, calories, target_calories, protein, target_protein, 
-                fat, target_fat, carbohydrate, target_carbohydrate, created_at, updated_at
+                id, child_id, report_date, calories, target_calories, protein, target_protein, fat, target_fat, carbohydrate, target_carbohydrate, created_at, updated_at
             ) VALUES (
-                rid, c.id, round(tcal * (0.6 + random() * 0.45)), tcal, 
-                round(tprot * (0.6 + random() * 0.45)), tprot,
-                round(tfat * (0.6 + random() * 0.45)), tfat, 
-                round(tcarb * (0.6 + random() * 0.45)), tcarb, 
+                rid, c.id, dt,
+                round((tcal * (0.6 + random() * 0.45))::numeric, 2), tcal,
+                round((tprot * (0.6 + random() * 0.45))::numeric, 2), tprot,
+                round((tfat * (0.6 + random() * 0.45))::numeric, 2), tfat,
+                round((tcarb * (0.6 + random() * 0.45))::numeric, 2), tcarb,
                 dt + TIME '08:00', dt + TIME '08:00'
-            );
-            
-            INSERT INTO daily_menus (
-                id, child_nutrition_report_id, created_at, updated_at
-            ) VALUES (
-                mid, rid, dt + TIME '08:00', dt + TIME '08:00'
             );
 
             FOR i IN 1..5 LOOP
@@ -161,21 +137,26 @@ BEGIN
                 label := split_part(meals[i], ':', 3);
                 snack := mt IN ('morning_snack', 'afternoon_snack');
                 
-                cal := round(tcal * frac * (0.85 + random() * 0.3)); 
-                prot := round(tprot * frac * (0.85 + random() * 0.3));
-                carb := round(tcarb * frac * (0.85 + random() * 0.3)); 
-                fat := round(tfat * frac * (0.85 + random() * 0.3));
+                cal := round((tcal * frac * (0.85 + random() * 0.3))::numeric, 2); 
+                prot := round((tprot * frac * (0.85 + random() * 0.3))::numeric, 2);
+                carb := round((tcarb * frac * (0.85 + random() * 0.3))::numeric, 2); 
+                fat := round((tfat * frac * (0.85 + random() * 0.3))::numeric, 2);
                 recid := gen_random_uuid();
 
                 IF snack THEN
-                    a := buah[1 + floor(random() * array_length(buah, 1))::int]; 
-                    b := lemak[1 + floor(random() * array_length(lemak, 1))::int];
+                    SELECT array_agg(item) INTO buah_chosen FROM (SELECT unnest(buah) AS item ORDER BY random() LIMIT 3) t;
+                    SELECT array_agg(item) INTO lemak_chosen FROM (SELECT unnest(lemak) AS item ORDER BY random() LIMIT 3) t;
+                    a := buah_chosen[1]; 
+                    b := lemak_chosen[1];
                     nm := label || ' ' || split_part(a, ':', 2);
                     ds := 'Camilan sehat berbahan ' || lower(split_part(a, ':', 2)) || '.';
                 ELSE
-                    a := karbo[1 + floor(random() * array_length(karbo, 1))::int]; 
-                    b := protein[1 + floor(random() * array_length(protein, 1))::int];
-                    s := sayur[1 + floor(random() * array_length(sayur, 1))::int];
+                    SELECT array_agg(item) INTO karbo_chosen FROM (SELECT unnest(karbo) AS item ORDER BY random() LIMIT 3) t;
+                    SELECT array_agg(item) INTO protein_chosen FROM (SELECT unnest(protein) AS item ORDER BY random() LIMIT 3) t;
+                    SELECT array_agg(item) INTO sayur_chosen FROM (SELECT unnest(sayur) AS item ORDER BY random() LIMIT 3) t;
+                    a := karbo_chosen[1]; 
+                    b := protein_chosen[1];
+                    s := sayur_chosen[1];
                     nm := label || ' ' || split_part(a, ':', 2) || ' ' || split_part(b, ':', 2);
                     ds := 'Menu ' || replace(mt, '_', ' ') || ' dengan ' || lower(split_part(a, ':', 2)) || 
                           ', ' || lower(split_part(b, ':', 2)) || ', dan ' || lower(split_part(s, ':', 2)) || '.';
@@ -184,50 +165,79 @@ BEGIN
                 port := (ARRAY[0, 0.33, 0.66, 1])[1 + floor(random() * 4)::int];
                 
                 INSERT INTO recipes (
-                    id, daily_menu_id, name, meal_time, meal_texture, calories, 
-                    protein, carbohydrate, fat, description, cooking_time, is_bookmarked, portions_consumed
+                    id, name, meal_time, meal_texture, calories, 
+                    protein, carbohydrate, fat, description, cooking_time, is_bookmarked,
+                    created_at, updated_at
                 ) VALUES (
-                    recid, mid, nm, mt::meal_time_type, tex, cal, prot, carb, fat, ds,
-                    (10 + floor(random() * 4) * 10) || ' menit', random() < 0.2, port
+                    recid, nm, mt::meal_time_type, tex, cal, prot, carb, fat, ds,
+                    (10 + floor(random() * 4) * 10) || ' menit', random() < 0.2,
+                    dt + TIME '08:00', dt + TIME '08:00'
                 );
 
-                INSERT INTO main_ingredients (
-                    id, recipe_id, ingredient_id, unit, priority, slot
+                INSERT INTO child_nutrition_recipes (
+                    child_nutrition_report_id, recipe_id, portions_consumed, created_at, updated_at
                 ) VALUES (
-                    gen_random_uuid(), recid, split_part(a, ':', 1), pg_temp.rand_unit(20, 100, false), 1,
-                    CASE WHEN snack THEN 'buah' ELSE 'karbohidrat' END
+                    rid, recid, port, dt + TIME '08:00', dt + TIME '08:00'
                 );
-                
-                INSERT INTO main_ingredients (
-                    id, recipe_id, ingredient_id, unit, priority, slot
-                ) VALUES (
-                    gen_random_uuid(), recid, split_part(b, ':', 1), pg_temp.rand_unit(10, 50, false), 2,
-                    CASE WHEN snack THEN 'lemak_susu' ELSE 'protein' END
-                );
-                
-                IF NOT snack THEN
-                    INSERT INTO main_ingredients (
-                        id, recipe_id, ingredient_id, unit, priority, slot
-                    ) VALUES (
-                        gen_random_uuid(), recid, split_part(s, ':', 1), pg_temp.rand_unit(15, 60, false), 3, 'sayur'
-                    );
+
+                IF snack THEN
+                    FOR p IN 1..3 LOOP
+                        IF p <= array_length(buah_chosen, 1) THEN
+                            INSERT INTO main_ingredients (
+                                id, recipe_id, ingredient_id, unit, priority, slot, created_at, updated_at
+                            ) VALUES (
+                                gen_random_uuid(), recid, split_part(buah_chosen[p], ':', 1), pg_temp.fmt_unit(buah_chosen[p]), p, 'buah', dt + TIME '08:00', dt + TIME '08:00'
+                            );
+                        END IF;
+                        IF p <= array_length(lemak_chosen, 1) THEN
+                            INSERT INTO main_ingredients (
+                                id, recipe_id, ingredient_id, unit, priority, slot, created_at, updated_at
+                            ) VALUES (
+                                gen_random_uuid(), recid, split_part(lemak_chosen[p], ':', 1), pg_temp.fmt_unit(lemak_chosen[p]), p, 'lemak_susu', dt + TIME '08:00', dt + TIME '08:00'
+                            );
+                        END IF;
+                    END LOOP;
+                ELSE
+                    FOR p IN 1..3 LOOP
+                        IF p <= array_length(karbo_chosen, 1) THEN
+                            INSERT INTO main_ingredients (
+                                id, recipe_id, ingredient_id, unit, priority, slot, created_at, updated_at
+                            ) VALUES (
+                                gen_random_uuid(), recid, split_part(karbo_chosen[p], ':', 1), pg_temp.fmt_unit(karbo_chosen[p]), p, 'karbohidrat', dt + TIME '08:00', dt + TIME '08:00'
+                            );
+                        END IF;
+                        IF p <= array_length(protein_chosen, 1) THEN
+                            INSERT INTO main_ingredients (
+                                id, recipe_id, ingredient_id, unit, priority, slot, created_at, updated_at
+                            ) VALUES (
+                                gen_random_uuid(), recid, split_part(protein_chosen[p], ':', 1), pg_temp.fmt_unit(protein_chosen[p]), p, 'protein', dt + TIME '08:00', dt + TIME '08:00'
+                            );
+                        END IF;
+                        IF p <= array_length(sayur_chosen, 1) THEN
+                            INSERT INTO main_ingredients (
+                                id, recipe_id, ingredient_id, unit, priority, slot, created_at, updated_at
+                            ) VALUES (
+                                gen_random_uuid(), recid, split_part(sayur_chosen[p], ':', 1), pg_temp.fmt_unit(sayur_chosen[p]), p, 'sayur', dt + TIME '08:00', dt + TIME '08:00'
+                            );
+                        END IF;
+                    END LOOP;
                 END IF;
 
                 FOR j IN 1..(2 + floor(random() * 3)::int) LOOP
                     INSERT INTO cooking_steps (
-                        id, recipe_id, step_number, instruction, image_url
+                        id, recipe_id, step_number, instruction, image_url, created_at, updated_at
                     ) VALUES (
                         gen_random_uuid(), recid, j, steps[1 + floor(random() * array_length(steps, 1))::int],
-                        'https://placehold.co/600x400?text=Langkah+' || j
+                        'https://placehold.co/600x400?text=Langkah+' || j, dt + TIME '08:00', dt + TIME '08:00'
                     );
                 END LOOP;
 
                 FOR k IN 1..(1 + floor(random() * 3)::int) LOOP
                     j := 1 + floor(random() * array_length(spices, 1))::int;
                     INSERT INTO recipe_spices (
-                        id, recipe_id, name, unit
+                        id, recipe_id, name, unit, created_at, updated_at
                     ) VALUES (
-                        gen_random_uuid(), recid, spices[j], pg_temp.rand_unit(1, 8, true)
+                        gen_random_uuid(), recid, split_part(spices[j], ':', 2), pg_temp.fmt_unit(spices[j]), dt + TIME '08:00', dt + TIME '08:00'
                     );
                 END LOOP;
             END LOOP;

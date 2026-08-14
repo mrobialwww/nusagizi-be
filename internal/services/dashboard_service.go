@@ -26,7 +26,7 @@ func NewDashboardService(
 	}
 }
 
-// GetDashboardSummary (endpoint: 65)
+// GetDashboardSummary (Endpoint: 64)
 func (s *DashboardService) GetDashboardSummary(ctx context.Context, userID string) ([]dashboard.ChildSummaryResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {

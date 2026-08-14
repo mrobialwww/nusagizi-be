@@ -113,7 +113,7 @@ func (s *ChildDevelopmentService) CreateDevelopmentReport(ctx context.Context, u
 		return uuid.Nil, fmt.Errorf("answers must be exactly 10")
 	}
 
-	childInfo, err := s.childRepo.GetSimpleByID(ctx, childID)
+	childInfo, err := s.childRepo.GetChild(ctx, childID)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -148,7 +148,7 @@ func (s *ChildDevelopmentService) UpdateDevelopmentReport(ctx context.Context, u
 		return fmt.Errorf("answers cannot be empty")
 	}
 
-	childInfo, err := s.childRepo.GetSimpleByID(ctx, childID)
+	childInfo, err := s.childRepo.GetChild(ctx, childID)
 	if err != nil {
 		return err
 	}

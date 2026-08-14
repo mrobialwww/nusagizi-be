@@ -74,7 +74,7 @@ func main() {
 	userSvc := services.NewUserService(userRepo, motherRepo, caregiverRepo)
 	childSvc := services.NewChildService(childRepo, motherRepo, caregiverRepo)
 	childDevSvc := services.NewChildDevelopmentService(childDevRepo, childRepo, motherRepo)
-	menuSvc := services.NewMenuService(cfg, menuRepo, motherRepo, childRepo)
+	menuSvc := services.NewMenuService(cfg, menuRepo, motherRepo, childRepo, childNutriRepo)
 	childNutriSvc := services.NewChildNutritionService(childNutriRepo, childRepo, motherRepo, caregiverRepo)
 	childGrowthSvc := services.NewChildGrowthService(childGrowthRepo, childRepo, motherRepo)
 	caregiverSvc := services.NewCaregiverService(caregiverRepo, motherRepo)
@@ -138,11 +138,11 @@ func main() {
 
 		// Modul 2: Child Profile
 		protected.POST("/children", childHandler.CreateChildProfile)
-		protected.GET("/children", childHandler.ListByMother)
-		protected.GET("/children/:child_id", childHandler.GetChildProfile)
+		protected.GET("/children", childHandler.GetListChild)
+		protected.GET("/children/:child_id", childHandler.GetChild)
 		protected.PATCH("/children/:child_id", childHandler.UpdateChildProfile)
 		protected.DELETE("/children/:child_id", childHandler.DeleteChildProfile)
-		protected.GET("/children/:child_id/simple", childHandler.GetChildSimple)
+		protected.GET("/children/:child_id/profile", childHandler.GetChildProfile)
 
 		// Modul 3: Child Growth
 		protected.GET("/children/:child_id/growth-reports/latest", childGrowthHandler.GetLatestGrowthReport)
@@ -166,16 +166,16 @@ func main() {
 
 		// Modul 5: Child Nutrition & Menu
 		protected.GET("/children/:child_id/nutrition/today", childNutriHandler.GetTodayNutritionReport)
-		protected.GET("/children/:child_id/daily-menus/today", childNutriHandler.GetTodayDailyMenu)
-		protected.GET("/children/:child_id/daily-menus/:daily_menu_id", childNutriHandler.GetDailyMenuByID)
+		protected.POST("/children/:child_id/nutrition/reuse-recipe", childNutriHandler.ReuseRecipe)
+		protected.GET("/children/:child_id/nutrition-reports/:report_id", childNutriHandler.GetReportMenuByID)
 		protected.PATCH("/recipes/:recipe_id/complete", childNutriHandler.UpdateRecipeCompleteStatus)
 		protected.PATCH("/recipes/:recipe_id/bookmark", childNutriHandler.UpdateRecipeBookmarkStatus)
 		protected.GET("/recipes/:recipe_id", childNutriHandler.GetRecipeDetail)
-		protected.PATCH("/recipes/:recipe_id/main-ingredients/priority", childNutriHandler.SwapMainIngredientPriority)
+		protected.PATCH("/recipes/main-ingredients/priority", childNutriHandler.SwapMainIngredientPriority)
 		protected.GET("/children/:child_id/recipes/bookmarked", childNutriHandler.GetBookmarkedRecipes)
 		protected.GET("/children/:child_id/nutrition-reports", childNutriHandler.GetNutritionReportsByMonth)
 		protected.GET("/menu/daily-shop", childNutriHandler.GetDailyShopIngredients)
-		protected.GET("/children/:child_id/daily-menus/today/shopping", childNutriHandler.GetTodayMenuShopping)
+		protected.GET("/children/:child_id/nutrition-reports/today/shopping", childNutriHandler.GetTodayMenuShopping)
 		protected.POST("/menu/generate", menuHandler.GenerateMenu)
 
 		// Modul 6: Photos & Contacts
@@ -195,7 +195,6 @@ func main() {
 		protected.GET("/mother-profiles/caregiver-engagements", caregiverHandler.GetCaregiverEngagements)
 		protected.GET("/mother-profiles/caregiver-engagements/revoked", caregiverHandler.GetCaregiverEngagementsRevoked)
 		protected.DELETE("/caregiver-engagements/:caregiver_engagement_id", caregiverHandler.DeleteCaregiverEngagement)
-		protected.GET("/caregiver-profiles/children", caregiverHandler.GetCaregiverChildren)
 
 		// Modul 8: Medical
 		protected.GET("/medical-notes", medicalHandler.GetMedicalNotes)

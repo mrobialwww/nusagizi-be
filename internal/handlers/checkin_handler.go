@@ -21,7 +21,7 @@ func NewCheckinHandler(service *services.CheckinService) *CheckinHandler {
 	return &CheckinHandler{service: service}
 }
 
-// GenerateToken (Endpoint: 66)
+// GenerateToken (Endpoint: 65)
 func (h *CheckinHandler) Generate(c *gin.Context) {
 	var req checkin.GenerateReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -41,7 +41,7 @@ func (h *CheckinHandler) Generate(c *gin.Context) {
 	})
 }
 
-// ValidateToken (Endpoint: 67)
+// ValidateToken (Endpoint: 66)
 func (h *CheckinHandler) Validate(c *gin.Context) {
 	// Retrieve user from JWT context
 	v, exists := c.Get("user")

@@ -1,8 +1,8 @@
 {
     "meta": {
-        "hari_ke": 6,
-        "hari_label": "Sabtu",
-        "tanggal": "2026-08-01",
+        "hari_ke": 4,
+        "hari_label": "Kamis",
+        "tanggal": "2026-08-13",
         "jumlah_sesi": 5
     },
     "anak": [
@@ -70,592 +70,112 @@
             "menu": {
                 "sesi": {
                     "sarapan": {
-                        "bahan": [
-                            {
-                                "slot": "karbo",
-                                "kode": "AR001",
-                                "nama": "Beras giling, mentah",
-                                "gram_mentah": 16.2,
-                                "gram_matang": 24.3,
-                                "satuan": "1.6 sdm (16g)",
-                                "energi": 57.8,
-                                "protein": 1.4,
-                                "lemak": 0.3,
-                                "karbo": 12.5,
-                                "harga": "murah",
-                                "pengganti": [
-                                    {
-                                        "kode": "AR013",
-                                        "nama": "Beras tumbuk merah, mentah",
-                                        "gram_mentah": 16.2,
-                                        "gram_matang": 24.3,
-                                        "satuan": "1.6 sdm (16g)",
-                                        "energi": 57.0,
-                                        "protein": 1.2,
-                                        "lemak": 0.1,
-                                        "karbo": 12.3,
-                                        "jarak": 0.49
-                                    },
-                                    {
-                                        "kode": "AR008",
-                                        "nama": "Beras ketan putih tumbuk, mentah",
-                                        "gram_mentah": 16.2,
-                                        "gram_matang": 24.3,
-                                        "satuan": "1.6 sdm (16g)",
-                                        "energi": 58.5,
-                                        "protein": 1.2,
-                                        "lemak": 0.1,
-                                        "karbo": 12.7,
-                                        "jarak": 0.54
-                                    },
-                                    {
-                                        "kode": "AR014",
-                                        "nama": "Cantel/Sorgum, mentah",
-                                        "gram_mentah": 16.2,
-                                        "gram_matang": 24.3,
-                                        "satuan": "1.6 sdm (16g)",
-                                        "energi": 59.3,
-                                        "protein": 1.8,
-                                        "lemak": 0.5,
-                                        "karbo": 11.8,
-                                        "jarak": 0.99
-                                    }
-                                ]
-                            },
-                            {
-                                "slot": "protein",
-                                "kode": "FR031",
-                                "nama": "Hati Sapi, segar",
-                                "gram_mentah": 8.2,
-                                "gram_matang": 6.2,
-                                "satuan": "8.2g",
-                                "energi": 10.8,
-                                "protein": 1.6,
-                                "lemak": 0.3,
-                                "karbo": 0.5,
-                                "harga": "sedang",
-                                "pengganti": []
-                            },
-                            {
-                                "slot": "lemak",
-                                "kode": "KR013",
-                                "nama": "Minyak wijen",
-                                "gram_mentah": 2.7,
-                                "gram_matang": 2.7,
-                                "satuan": "0.5 sdm (3g)",
-                                "energi": 23.8,
-                                "protein": 0.0,
-                                "lemak": 2.7,
-                                "karbo": 0.0,
-                                "harga": "sedang",
-                                "pengganti": [
-                                    {
-                                        "kode": "KR014",
-                                        "nama": "Minyak zaitun",
-                                        "gram_mentah": 2.7,
-                                        "gram_matang": 2.7,
-                                        "satuan": "0.5 sdm (3g)",
-                                        "energi": 23.9,
-                                        "protein": 0.0,
-                                        "lemak": 2.7,
-                                        "karbo": 0.0,
-                                        "jarak": 0.2
-                                    },
-                                    {
-                                        "kode": "KR011",
-                                        "nama": "Minyak kelapa",
-                                        "gram_mentah": 2.7,
-                                        "gram_matang": 2.7,
-                                        "satuan": "0.5 sdm (3g)",
-                                        "energi": 23.5,
-                                        "protein": 0.0,
-                                        "lemak": 2.6,
-                                        "karbo": 0.0,
-                                        "jarak": 0.8
-                                    }
-                                ]
-                            },
-                            {
-                                "slot": "sayur",
-                                "kode": "DR044",
-                                "nama": "Daun kubis, segar",
-                                "gram_mentah": 5.8,
-                                "gram_matang": 3.5,
-                                "satuan": "0.6 genggam (6g)",
-                                "energi": 3.0,
-                                "protein": 0.1,
-                                "lemak": 0.1,
-                                "karbo": 0.5,
-                                "harga": "murah",
-                                "pengganti": [
-                                    {
-                                        "kode": "DR013",
-                                        "nama": "Buncis, segar",
-                                        "gram_mentah": 5.8,
-                                        "gram_matang": 3.5,
-                                        "satuan": "0.6 batang (6g)",
-                                        "energi": 2.0,
-                                        "protein": 0.1,
-                                        "lemak": 0.0,
-                                        "karbo": 0.4,
-                                        "jarak": 0.81
-                                    },
-                                    {
-                                        "kode": "DR166",
-                                        "nama": "Wortel, segar",
-                                        "gram_mentah": 5.8,
-                                        "gram_matang": 3.5,
-                                        "satuan": "0.4 potong (6g)",
-                                        "energi": 2.1,
-                                        "protein": 0.1,
-                                        "lemak": 0.0,
-                                        "karbo": 0.5,
-                                        "jarak": 0.81
-                                    },
-                                    {
-                                        "kode": "DR161",
-                                        "nama": "Tomat merah, segar",
-                                        "gram_mentah": 5.8,
-                                        "gram_matang": 3.5,
-                                        "satuan": "5.8g",
-                                        "energi": 1.4,
-                                        "protein": 0.1,
-                                        "lemak": 0.0,
-                                        "karbo": 0.3,
-                                        "jarak": 0.99
-                                    }
-                                ]
-                            }
-                        ],
-                        "panduan_masak": {
-                            "usia_label": "puree",
-                            "tekstur": "puree (halus)",
-                            "jenis_masakan": "Bubur Nasi & Lauk",
-                            "resep_nama": "Bubur Beras giling, mentah dengan Hati Sapi, segar dan Daun kubis, segar",
-                            "waktu_masak": "63 menit",
-                            "catatan": "Marinasi: 1/2 sdt perasan jeruk nipis. Nasi/beras dimasak hingga menjadi bubur.",
-                            "bumbu": [
-                                {
-                                    "nama": "Air jeruk nipis",
-                                    "satuan": "1/2 sdt (2.5g)"
-                                },
-                                {
-                                    "nama": "Bawang putih",
-                                    "satuan": "1 siung (5g)"
-                                },
-                                {
-                                    "nama": "Garam",
-                                    "satuan": "sejumput (0.5g)"
-                                }
-                            ],
-                            "langkah": [
-                                "1. MARINASI Hati Sapi, segar: 1/2 sdt perasan jeruk nipis. Potong daging kecil-kecil (0.5cm). Lumuri jeruk nipis 5 menit. REBUS LAMA 30 menit sampai sangat empuk. Haluskan dengan saringan.",
-                                "2. Cuci Beras giling, mentah, rebus dengan air (rasio 1:10) selama 25 menit sampai sangat lunak.",
-                                "3. Potong Hati Sapi, segar kecil-kecil (dadu 0.5cm), rebus dalam air terpisah sampai empuk (15 menit).",
-                                "4. Cincang halus Daun kubis, segar, tumis dengan Minyak wijen (0.5 sdm (3g)) selama 2 menit sampai layu.",
-                                "5. Campurkan Hati Sapi, segar dan Daun kubis, segar ke bubur, aduk rata.",
-                                "6. Haluskan dengan saringan kawat (tekan pakai punggung sendok) atau ulek halus. Jangan pakai blender - butuh tambahan air yang mengencerkan makanan.",
-                                "7. Sajikan hangat. Tambahkan $buah yang sudah dikerik/dihaluskan sebagai pencuci mulut."
-                            ]
-                        },
-                        "makro": {
-                            "energi": {
-                                "dapat": 78.7,
-                                "target": 80.0,
-                                "persen": 98.4
-                            },
-                            "protein": {
-                                "dapat": 2.5,
-                                "target": 2.6,
-                                "persen": 94.4
-                            },
-                            "lemak": {
-                                "dapat": 3.2,
-                                "target": 3.5,
-                                "persen": 90.7
-                            },
-                            "karbo": {
-                                "dapat": 10.8,
-                                "target": 10.5,
-                                "persen": 102.4
-                            }
-                        },
-                        "pesan": []
-                    },
-                    "siang": {
-                        "bahan": [
-                            {
-                                "slot": "karbo",
-                                "kode": "AR001",
-                                "nama": "Beras giling, mentah",
-                                "gram_mentah": 16.2,
-                                "gram_matang": 24.3,
-                                "satuan": "1.6 sdm (16g)",
-                                "energi": 57.8,
-                                "protein": 1.4,
-                                "lemak": 0.3,
-                                "karbo": 12.5,
-                                "harga": "murah",
-                                "pengganti": [
-                                    {
-                                        "kode": "AR013",
-                                        "nama": "Beras tumbuk merah, mentah",
-                                        "gram_mentah": 16.2,
-                                        "gram_matang": 24.3,
-                                        "satuan": "1.6 sdm (16g)",
-                                        "energi": 57.0,
-                                        "protein": 1.2,
-                                        "lemak": 0.1,
-                                        "karbo": 12.3,
-                                        "jarak": 0.49
-                                    },
-                                    {
-                                        "kode": "AR008",
-                                        "nama": "Beras ketan putih tumbuk, mentah",
-                                        "gram_mentah": 16.2,
-                                        "gram_matang": 24.3,
-                                        "satuan": "1.6 sdm (16g)",
-                                        "energi": 58.5,
-                                        "protein": 1.2,
-                                        "lemak": 0.1,
-                                        "karbo": 12.7,
-                                        "jarak": 0.54
-                                    },
-                                    {
-                                        "kode": "AR014",
-                                        "nama": "Cantel/Sorgum, mentah",
-                                        "gram_mentah": 16.2,
-                                        "gram_matang": 24.3,
-                                        "satuan": "1.6 sdm (16g)",
-                                        "energi": 59.3,
-                                        "protein": 1.8,
-                                        "lemak": 0.5,
-                                        "karbo": 11.8,
-                                        "jarak": 0.99
-                                    }
-                                ]
-                            },
-                            {
-                                "slot": "protein",
-                                "kode": "FR031",
-                                "nama": "Hati Sapi, segar",
-                                "gram_mentah": 8.2,
-                                "gram_matang": 6.2,
-                                "satuan": "8.2g",
-                                "energi": 10.8,
-                                "protein": 1.6,
-                                "lemak": 0.3,
-                                "karbo": 0.5,
-                                "harga": "sedang",
-                                "pengganti": []
-                            },
-                            {
-                                "slot": "lemak",
-                                "kode": "KR013",
-                                "nama": "Minyak wijen",
-                                "gram_mentah": 2.7,
-                                "gram_matang": 2.7,
-                                "satuan": "0.5 sdm (3g)",
-                                "energi": 23.8,
-                                "protein": 0.0,
-                                "lemak": 2.7,
-                                "karbo": 0.0,
-                                "harga": "sedang",
-                                "pengganti": [
-                                    {
-                                        "kode": "KR014",
-                                        "nama": "Minyak zaitun",
-                                        "gram_mentah": 2.7,
-                                        "gram_matang": 2.7,
-                                        "satuan": "0.5 sdm (3g)",
-                                        "energi": 23.9,
-                                        "protein": 0.0,
-                                        "lemak": 2.7,
-                                        "karbo": 0.0,
-                                        "jarak": 0.2
-                                    },
-                                    {
-                                        "kode": "KR011",
-                                        "nama": "Minyak kelapa",
-                                        "gram_mentah": 2.7,
-                                        "gram_matang": 2.7,
-                                        "satuan": "0.5 sdm (3g)",
-                                        "energi": 23.5,
-                                        "protein": 0.0,
-                                        "lemak": 2.6,
-                                        "karbo": 0.0,
-                                        "jarak": 0.8
-                                    }
-                                ]
-                            }
-                        ],
+                        "bahan": [],
                         "panduan_masak": {
                             "usia_label": "puree",
                             "tekstur": "puree (halus)",
                             "jenis_masakan": "Puree Masakan Sederhana",
-                            "resep_nama": "Bubur Beras giling, mentah dengan Hati Sapi, segar dan $sayur",
-                            "waktu_masak": "63 menit",
-                            "catatan": "Marinasi: 1/2 sdt perasan jeruk nipis. Nasi/beras dimasak hingga menjadi bubur.",
-                            "bumbu": [
-                                {
-                                    "nama": "Air jeruk nipis",
-                                    "satuan": "1/2 sdt (2.5g)"
-                                },
-                                {
-                                    "nama": "Bawang putih",
-                                    "satuan": "1 siung (5g)"
-                                },
-                                {
-                                    "nama": "Garam",
-                                    "satuan": "sejumput (0.5g)"
-                                }
-                            ],
-                            "langkah": [
-                                "1. MARINASI Hati Sapi, segar: 1/2 sdt perasan jeruk nipis. Potong daging kecil-kecil (0.5cm). Lumuri jeruk nipis 5 menit. REBUS LAMA 30 menit sampai sangat empuk. Haluskan dengan saringan.",
-                                "2. Cuci Beras giling, mentah, rebus dengan air (rasio 1:10) selama 25 menit sampai sangat lunak.",
-                                "3. Potong Hati Sapi, segar kecil-kecil (dadu 0.5cm), rebus dalam air terpisah sampai empuk (15 menit).",
-                                "4. Cincang halus $sayur, tumis dengan Minyak wijen (0.5 sdm (3g)) selama 2 menit sampai layu.",
-                                "5. Campurkan Hati Sapi, segar dan $sayur ke bubur, aduk rata.",
-                                "6. Haluskan dengan saringan kawat (tekan pakai punggung sendok) atau ulek halus. Jangan pakai blender - butuh tambahan air yang mengencerkan makanan.",
-                                "7. Sajikan hangat. Tambahkan $buah yang sudah dikerik/dihaluskan sebagai pencuci mulut."
-                            ]
+                            "resep_nama": "Puree Masakan Sederhana ()",
+                            "waktu_masak": "10 menit",
+                            "catatan": "",
+                            "bumbu": [],
+                            "langkah": []
                         },
                         "makro": {
                             "energi": {
-                                "dapat": 76.3,
+                                "dapat": 0,
                                 "target": 80.0,
-                                "persen": 95.4
+                                "persen": 0
                             },
                             "protein": {
-                                "dapat": 2.4,
+                                "dapat": 0,
                                 "target": 2.6,
-                                "persen": 90.0
+                                "persen": 0
                             },
                             "lemak": {
-                                "dapat": 3.1,
+                                "dapat": 0,
                                 "target": 3.5,
-                                "persen": 89.2
+                                "persen": 0
                             },
                             "karbo": {
-                                "dapat": 10.4,
+                                "dapat": 0,
                                 "target": 10.5,
-                                "persen": 98.9
+                                "persen": 0
                             }
                         },
-                        "pesan": ["lemak hanya 89% (target >= 95%)"]
+                        "pesan": ["Protein tidak tersedia untuk sesi ini."]
                     },
-                    "malam": {
-                        "bahan": [
-                            {
-                                "slot": "karbo",
-                                "kode": "AR001",
-                                "nama": "Beras giling, mentah",
-                                "gram_mentah": 16.2,
-                                "gram_matang": 24.3,
-                                "satuan": "1.6 sdm (16g)",
-                                "energi": 57.8,
-                                "protein": 1.4,
-                                "lemak": 0.3,
-                                "karbo": 12.5,
-                                "harga": "murah",
-                                "pengganti": [
-                                    {
-                                        "kode": "AR013",
-                                        "nama": "Beras tumbuk merah, mentah",
-                                        "gram_mentah": 16.2,
-                                        "gram_matang": 24.3,
-                                        "satuan": "1.6 sdm (16g)",
-                                        "energi": 57.0,
-                                        "protein": 1.2,
-                                        "lemak": 0.1,
-                                        "karbo": 12.3,
-                                        "jarak": 0.49
-                                    },
-                                    {
-                                        "kode": "AR008",
-                                        "nama": "Beras ketan putih tumbuk, mentah",
-                                        "gram_mentah": 16.2,
-                                        "gram_matang": 24.3,
-                                        "satuan": "1.6 sdm (16g)",
-                                        "energi": 58.5,
-                                        "protein": 1.2,
-                                        "lemak": 0.1,
-                                        "karbo": 12.7,
-                                        "jarak": 0.54
-                                    },
-                                    {
-                                        "kode": "AR014",
-                                        "nama": "Cantel/Sorgum, mentah",
-                                        "gram_mentah": 16.2,
-                                        "gram_matang": 24.3,
-                                        "satuan": "1.6 sdm (16g)",
-                                        "energi": 59.3,
-                                        "protein": 1.8,
-                                        "lemak": 0.5,
-                                        "karbo": 11.8,
-                                        "jarak": 0.99
-                                    }
-                                ]
-                            },
-                            {
-                                "slot": "protein",
-                                "kode": "FR031",
-                                "nama": "Hati Sapi, segar",
-                                "gram_mentah": 8.2,
-                                "gram_matang": 6.2,
-                                "satuan": "8.2g",
-                                "energi": 10.8,
-                                "protein": 1.6,
-                                "lemak": 0.3,
-                                "karbo": 0.5,
-                                "harga": "sedang",
-                                "pengganti": []
-                            },
-                            {
-                                "slot": "lemak",
-                                "kode": "KR013",
-                                "nama": "Minyak wijen",
-                                "gram_mentah": 2.7,
-                                "gram_matang": 2.7,
-                                "satuan": "0.5 sdm (3g)",
-                                "energi": 23.8,
-                                "protein": 0.0,
-                                "lemak": 2.7,
-                                "karbo": 0.0,
-                                "harga": "sedang",
-                                "pengganti": [
-                                    {
-                                        "kode": "KR014",
-                                        "nama": "Minyak zaitun",
-                                        "gram_mentah": 2.7,
-                                        "gram_matang": 2.7,
-                                        "satuan": "0.5 sdm (3g)",
-                                        "energi": 23.9,
-                                        "protein": 0.0,
-                                        "lemak": 2.7,
-                                        "karbo": 0.0,
-                                        "jarak": 0.2
-                                    },
-                                    {
-                                        "kode": "KR011",
-                                        "nama": "Minyak kelapa",
-                                        "gram_mentah": 2.7,
-                                        "gram_matang": 2.7,
-                                        "satuan": "0.5 sdm (3g)",
-                                        "energi": 23.5,
-                                        "protein": 0.0,
-                                        "lemak": 2.6,
-                                        "karbo": 0.0,
-                                        "jarak": 0.8
-                                    }
-                                ]
-                            },
-                            {
-                                "slot": "sayur",
-                                "kode": "DR044",
-                                "nama": "Daun kubis, segar",
-                                "gram_mentah": 5.8,
-                                "gram_matang": 3.5,
-                                "satuan": "0.6 genggam (6g)",
-                                "energi": 3.0,
-                                "protein": 0.1,
-                                "lemak": 0.1,
-                                "karbo": 0.5,
-                                "harga": "murah",
-                                "pengganti": [
-                                    {
-                                        "kode": "DR013",
-                                        "nama": "Buncis, segar",
-                                        "gram_mentah": 5.8,
-                                        "gram_matang": 3.5,
-                                        "satuan": "0.6 batang (6g)",
-                                        "energi": 2.0,
-                                        "protein": 0.1,
-                                        "lemak": 0.0,
-                                        "karbo": 0.4,
-                                        "jarak": 0.81
-                                    },
-                                    {
-                                        "kode": "DR166",
-                                        "nama": "Wortel, segar",
-                                        "gram_mentah": 5.8,
-                                        "gram_matang": 3.5,
-                                        "satuan": "0.4 potong (6g)",
-                                        "energi": 2.1,
-                                        "protein": 0.1,
-                                        "lemak": 0.0,
-                                        "karbo": 0.5,
-                                        "jarak": 0.81
-                                    },
-                                    {
-                                        "kode": "DR161",
-                                        "nama": "Tomat merah, segar",
-                                        "gram_mentah": 5.8,
-                                        "gram_matang": 3.5,
-                                        "satuan": "5.8g",
-                                        "energi": 1.4,
-                                        "protein": 0.1,
-                                        "lemak": 0.0,
-                                        "karbo": 0.3,
-                                        "jarak": 0.99
-                                    }
-                                ]
-                            }
-                        ],
+                    "siang": {
+                        "bahan": [],
                         "panduan_masak": {
                             "usia_label": "puree",
                             "tekstur": "puree (halus)",
-                            "jenis_masakan": "Bubur Nasi & Lauk",
-                            "resep_nama": "Bubur Beras giling, mentah dengan Hati Sapi, segar dan Daun kubis, segar",
-                            "waktu_masak": "63 menit",
-                            "catatan": "Marinasi: 1/2 sdt perasan jeruk nipis. Nasi/beras dimasak hingga menjadi bubur.",
-                            "bumbu": [
-                                {
-                                    "nama": "Air jeruk nipis",
-                                    "satuan": "1/2 sdt (2.5g)"
-                                },
-                                {
-                                    "nama": "Bawang putih",
-                                    "satuan": "1 siung (5g)"
-                                },
-                                {
-                                    "nama": "Garam",
-                                    "satuan": "sejumput (0.5g)"
-                                }
-                            ],
-                            "langkah": [
-                                "1. MARINASI Hati Sapi, segar: 1/2 sdt perasan jeruk nipis. Potong daging kecil-kecil (0.5cm). Lumuri jeruk nipis 5 menit. REBUS LAMA 30 menit sampai sangat empuk. Haluskan dengan saringan.",
-                                "2. Cuci Beras giling, mentah, rebus dengan air (rasio 1:10) selama 25 menit sampai sangat lunak.",
-                                "3. Potong Hati Sapi, segar kecil-kecil (dadu 0.5cm), rebus dalam air terpisah sampai empuk (15 menit).",
-                                "4. Cincang halus Daun kubis, segar, tumis dengan Minyak wijen (0.5 sdm (3g)) selama 2 menit sampai layu.",
-                                "5. Campurkan Hati Sapi, segar dan Daun kubis, segar ke bubur, aduk rata.",
-                                "6. Haluskan dengan saringan kawat (tekan pakai punggung sendok) atau ulek halus. Jangan pakai blender - butuh tambahan air yang mengencerkan makanan.",
-                                "7. Sajikan hangat. Tambahkan $buah yang sudah dikerik/dihaluskan sebagai pencuci mulut."
-                            ]
+                            "jenis_masakan": "Puree Masakan Sederhana",
+                            "resep_nama": "Puree Masakan Sederhana ()",
+                            "waktu_masak": "10 menit",
+                            "catatan": "",
+                            "bumbu": [],
+                            "langkah": []
                         },
                         "makro": {
                             "energi": {
-                                "dapat": 78.7,
+                                "dapat": 0,
                                 "target": 80.0,
-                                "persen": 98.4
+                                "persen": 0
                             },
                             "protein": {
-                                "dapat": 2.5,
+                                "dapat": 0,
                                 "target": 2.6,
-                                "persen": 94.4
+                                "persen": 0
                             },
                             "lemak": {
-                                "dapat": 3.2,
+                                "dapat": 0,
                                 "target": 3.5,
-                                "persen": 90.7
+                                "persen": 0
                             },
                             "karbo": {
-                                "dapat": 10.8,
+                                "dapat": 0,
                                 "target": 10.5,
-                                "persen": 102.4
+                                "persen": 0
                             }
                         },
-                        "pesan": []
+                        "pesan": ["Protein tidak tersedia untuk sesi ini."]
+                    },
+                    "malam": {
+                        "bahan": [],
+                        "panduan_masak": {
+                            "usia_label": "puree",
+                            "tekstur": "puree (halus)",
+                            "jenis_masakan": "Puree Masakan Sederhana",
+                            "resep_nama": "Puree Masakan Sederhana ()",
+                            "waktu_masak": "10 menit",
+                            "catatan": "",
+                            "bumbu": [],
+                            "langkah": []
+                        },
+                        "makro": {
+                            "energi": {
+                                "dapat": 0,
+                                "target": 80.0,
+                                "persen": 0
+                            },
+                            "protein": {
+                                "dapat": 0,
+                                "target": 2.6,
+                                "persen": 0
+                            },
+                            "lemak": {
+                                "dapat": 0,
+                                "target": 3.5,
+                                "persen": 0
+                            },
+                            "karbo": {
+                                "dapat": 0,
+                                "target": 10.5,
+                                "persen": 0
+                            }
+                        },
+                        "pesan": ["Protein tidak tersedia untuk sesi ini."]
                     }
                 },
                 "selingan": {
@@ -664,66 +184,66 @@
                         "bahan": [
                             {
                                 "slot": "selingan",
-                                "kode": "ER001",
-                                "nama": "Alpukat, segar",
+                                "kode": "ER070",
+                                "nama": "Nanas, segar",
                                 "gram_mentah": 12.0,
                                 "gram_matang": 12.0,
-                                "satuan": "0.4 sdm (12g)",
-                                "energi": 10.2,
+                                "satuan": "0.3 potong (12g)",
+                                "energi": 4.8,
                                 "protein": 0.1,
-                                "lemak": 0.8,
-                                "karbo": 0.9,
-                                "harga": "mahal",
+                                "lemak": 0.0,
+                                "karbo": 1.2,
+                                "harga": "murah",
                                 "pengganti": [
                                     {
-                                        "kode": "ER012",
-                                        "nama": "Buah Naga Merah, segar",
+                                        "kode": "ER035",
+                                        "nama": "Jeruk bali, segar",
                                         "gram_mentah": 12.0,
                                         "gram_matang": 12.0,
                                         "satuan": "12.0g",
-                                        "energi": 8.5,
-                                        "protein": 0.2,
-                                        "lemak": 0.4,
-                                        "karbo": 1.1,
-                                        "jarak": 0.99
-                                    },
-                                    {
-                                        "kode": "ER052",
-                                        "nama": "Lemon, segar",
-                                        "gram_mentah": 12.0,
-                                        "gram_matang": 12.0,
-                                        "satuan": "2.4 sdt (12g)",
-                                        "energi": 4.1,
-                                        "protein": 0.1,
-                                        "lemak": 0.1,
-                                        "karbo": 0.7,
-                                        "jarak": 1.15
-                                    },
-                                    {
-                                        "kode": "ER070",
-                                        "nama": "Nanas, segar",
-                                        "gram_mentah": 12.0,
-                                        "gram_matang": 12.0,
-                                        "satuan": "0.3 potong (12g)",
-                                        "energi": 4.8,
+                                        "energi": 5.8,
                                         "protein": 0.1,
                                         "lemak": 0.0,
-                                        "karbo": 1.2,
-                                        "jarak": 1.17
+                                        "karbo": 1.5,
+                                        "jarak": 0.34
+                                    },
+                                    {
+                                        "kode": "ER039",
+                                        "nama": "Jeruk manis, segar",
+                                        "gram_mentah": 12.0,
+                                        "gram_matang": 12.0,
+                                        "satuan": "12.0g",
+                                        "energi": 5.4,
+                                        "protein": 0.1,
+                                        "lemak": 0.0,
+                                        "karbo": 1.3,
+                                        "jarak": 0.36
+                                    },
+                                    {
+                                        "kode": "ER031",
+                                        "nama": "Jambu biji",
+                                        "gram_mentah": 12.0,
+                                        "gram_matang": 12.0,
+                                        "satuan": "12.0g",
+                                        "energi": 5.9,
+                                        "protein": 0.1,
+                                        "lemak": 0.0,
+                                        "karbo": 1.5,
+                                        "jarak": 0.44
                                     }
                                 ]
                             }
                         ],
                         "makro": {
-                            "energi": 10.2,
+                            "energi": 4.8,
                             "protein": 0.1,
-                            "lemak": 0.8,
-                            "karbo": 0.9
+                            "lemak": 0.0,
+                            "karbo": 1.2
                         },
                         "resep": {
-                            "nama": "Selingan buah: Alpukat, segar",
+                            "nama": "Selingan buah: Nanas, segar",
                             "langkah": [
-                                "Kupas Alpukat, segar, haluskan dengan saringan. Sajikan suhu ruang."
+                                "Kupas Nanas, segar, haluskan dengan saringan. Sajikan suhu ruang."
                             ]
                         },
                         "fokus_mikro": ["vit_c", "serat"],
@@ -734,33 +254,70 @@
                         "bahan": [
                             {
                                 "slot": "selingan",
-                                "kode": "CR026",
-                                "nama": "Kacang merah, kering",
-                                "gram_mentah": 6.7,
+                                "kode": "BR028",
+                                "nama": "Ubi jalar, kuning, segar",
+                                "gram_mentah": 10.9,
                                 "gram_matang": 12.0,
-                                "satuan": "0.4 sdm (7g)",
-                                "energi": 21.0,
-                                "protein": 1.5,
-                                "lemak": 0.1,
-                                "karbo": 3.8,
+                                "satuan": "0.4 potong (11g)",
+                                "energi": 13.0,
+                                "protein": 0.1,
+                                "lemak": 0.0,
+                                "karbo": 2.7,
                                 "harga": "murah",
-                                "pengganti": []
+                                "pengganti": [
+                                    {
+                                        "kode": "BR031",
+                                        "nama": "Ubi jalar putih, segar",
+                                        "gram_mentah": 10.9,
+                                        "gram_matang": 12.0,
+                                        "satuan": "0.4 potong (11g)",
+                                        "energi": 9.6,
+                                        "protein": 0.0,
+                                        "lemak": 0.0,
+                                        "karbo": 2.2,
+                                        "jarak": 0.33
+                                    },
+                                    {
+                                        "kode": "BR016",
+                                        "nama": "Ketela pohon/ singkong, segar",
+                                        "gram_mentah": 10.9,
+                                        "gram_matang": 12.0,
+                                        "satuan": "0.4 potong (11g)",
+                                        "energi": 16.8,
+                                        "protein": 0.1,
+                                        "lemak": 0.0,
+                                        "karbo": 4.0,
+                                        "jarak": 0.75
+                                    },
+                                    {
+                                        "kode": "BR030",
+                                        "nama": "Ubi jalar merah, segar",
+                                        "gram_mentah": 10.9,
+                                        "gram_matang": 12.0,
+                                        "satuan": "0.4 potong (11g)",
+                                        "energi": 16.5,
+                                        "protein": 0.2,
+                                        "lemak": 0.0,
+                                        "karbo": 3.9,
+                                        "jarak": 1.21
+                                    }
+                                ]
                             }
                         ],
                         "makro": {
-                            "energi": 21.0,
-                            "protein": 1.5,
-                            "lemak": 0.1,
-                            "karbo": 3.8
+                            "energi": 13.0,
+                            "protein": 0.1,
+                            "lemak": 0.0,
+                            "karbo": 2.7
                         },
                         "resep": {
-                            "nama": "Selingan penutup: Kacang merah, kering",
+                            "nama": "Selingan penutup: Ubi jalar, kuning, segar",
                             "langkah": [
                                 "[🔹 UNTUK USIA 6-8 BULAN: sajikan dalam bentuk puree halus]",
-                                "Rendam Kacang merah, kering dalam air selama 8-12 jam (jika menggunakan kacang kering).",
-                                "Rebus hingga empuk (sekitar 30-45 menit).",
-                                "Tiriskan, lalu haluskan dengan blender atau tumbuk kasar.",
-                                "Sajikan sebagai pasta atau campurkan ke bubur."
+                                "Kupas Ubi jalar, kuning, segar, cuci bersih, potong-potong.",
+                                "Kukus hingga empuk (10-15 menit).",
+                                "Untuk usia <9 bulan: haluskan dengan garpu atau saringan.",
+                                "Untuk usia ≥9 bulan: potong finger food dan sajikan."
                             ]
                         },
                         "fokus_mikro": [],
@@ -934,42 +491,17 @@
                             },
                             {
                                 "slot": "protein",
-                                "kode": "FR024",
-                                "nama": "Daging Sapi, segar",
-                                "gram_mentah": 27.0,
+                                "kode": "CP061",
+                                "nama": "Tahu, mentah",
+                                "gram_mentah": 20.2,
                                 "gram_matang": 20.2,
-                                "satuan": "0.9 potong (27g)",
-                                "energi": 73.7,
-                                "protein": 4.7,
-                                "lemak": 5.9,
-                                "karbo": 0.0,
-                                "harga": "mahal",
-                                "pengganti": [
-                                    {
-                                        "kode": "FR016",
-                                        "nama": "Daging Domba, segar",
-                                        "gram_mentah": 27.0,
-                                        "gram_matang": 20.2,
-                                        "satuan": "0.9 potong (27g)",
-                                        "energi": 85.6,
-                                        "protein": 4.2,
-                                        "lemak": 7.5,
-                                        "karbo": 0.0,
-                                        "jarak": 0.32
-                                    },
-                                    {
-                                        "kode": "FR019",
-                                        "nama": "Daging Kambing, segar",
-                                        "gram_mentah": 27.0,
-                                        "gram_matang": 20.2,
-                                        "satuan": "0.9 potong (27g)",
-                                        "energi": 40.2,
-                                        "protein": 4.5,
-                                        "lemak": 2.5,
-                                        "karbo": 0.0,
-                                        "jarak": 0.74
-                                    }
-                                ]
+                                "satuan": "0.5 potong (20g)",
+                                "energi": 16.2,
+                                "protein": 2.2,
+                                "lemak": 0.9,
+                                "karbo": 0.2,
+                                "harga": "murah",
+                                "pengganti": []
                             },
                             {
                                 "slot": "lemak",
@@ -1066,29 +598,13 @@
                             "usia_label": "nasi biasa",
                             "tekstur": "nasi biasa",
                             "jenis_masakan": "Nasi & Lauk Lengkap",
-                            "resep_nama": "Bubur Beras giling, mentah dengan Daging Sapi, segar dan Daun kubis, segar",
-                            "waktu_masak": "52 menit",
-                            "catatan": "Marinasi: 1 sdt jeruk nipis, 1 siung bawang putih, 1/2 ruas jahe, 1 siung bawang merah, sejumput merica (opsional).",
+                            "resep_nama": "Bubur Beras giling, mentah dengan Tahu, mentah dan Daun kubis, segar",
+                            "waktu_masak": "37 menit",
+                            "catatan": "",
                             "bumbu": [
                                 {
-                                    "nama": "Air jeruk nipis",
-                                    "satuan": "1 sdt (5g)"
-                                },
-                                {
                                     "nama": "Bawang putih",
-                                    "satuan": "1 siung (10g)"
-                                },
-                                {
-                                    "nama": "Jahe",
-                                    "satuan": "1/2 ruas (4g)"
-                                },
-                                {
-                                    "nama": "Bawang merah",
                                     "satuan": "1 siung (5g)"
-                                },
-                                {
-                                    "nama": "Merica",
-                                    "satuan": "sejumput (0.5g)"
                                 },
                                 {
                                     "nama": "Garam",
@@ -1096,40 +612,39 @@
                                 }
                             ],
                             "langkah": [
-                                "1. MARINASI Daging Sapi, segar: 1 sdt jeruk nipis, 1 siung bawang putih, 1/2 ruas jahe, 1 siung bawang merah, sejumput merica (opsional). Potong 2cm. Haluskan bumbu, lumuri daging. Diamkan 20 menit. Tumis atau rebus.",
-                                "2. Masak Beras giling, mentah jadi nasi biasa.",
-                                "3. Potong Daging Sapi, segar sesuai selera (2cm), yang sudah dimarinasi (lihat langkah 1).",
-                                "4. Tumis Daging Sapi, segar dengan Minyak zaitun (1.6 sdm (8g)) sampai matang kecokelatan (5 menit).",
-                                "5. Potong Daun kubis, segar seukuran gigitan, tumis terpisah 3 menit.",
-                                "6. Sajikan nasi, Daging Sapi, segar, dan Daun kubis, segar di piring. $buah dipotong sesuai selera sebagai penutup."
+                                "1. Masak Beras giling, mentah jadi nasi biasa.",
+                                "2. Potong Tahu, mentah sesuai selera (2cm), yang sudah dimarinasi (lihat langkah 1).",
+                                "3. Tumis Tahu, mentah dengan Minyak zaitun (1.6 sdm (8g)) sampai matang kecokelatan (5 menit).",
+                                "4. Potong Daun kubis, segar seukuran gigitan, tumis terpisah 3 menit.",
+                                "5. Sajikan nasi, Tahu, mentah, dan Daun kubis, segar di piring. $buah dipotong sesuai selera sebagai penutup."
                             ]
                         },
                         "makro": {
                             "energi": {
-                                "dapat": 307.5,
+                                "dapat": 261.4,
                                 "target": 500.0,
-                                "persen": 61.5
+                                "persen": 52.3
                             },
                             "protein": {
-                                "dapat": 8.2,
+                                "dapat": 6.2,
                                 "target": 10.0,
-                                "persen": 82.2
+                                "persen": 62.0
                             },
                             "lemak": {
-                                "dapat": 13.8,
+                                "dapat": 9.8,
                                 "target": 17.9,
-                                "persen": 77.1
+                                "persen": 54.8
                             },
                             "karbo": {
-                                "dapat": 39.5,
+                                "dapat": 39.6,
                                 "target": 74.8,
-                                "persen": 52.8
+                                "persen": 53.0
                             }
                         },
                         "pesan": [
-                            "energi hanya 61% (target >= 95%)",
-                            "protein hanya 82% (target >= 95%)",
-                            "lemak hanya 77% (target >= 95%)",
+                            "energi hanya 52% (target >= 95%)",
+                            "protein hanya 62% (target >= 95%)",
+                            "lemak hanya 55% (target >= 95%)",
                             "karbo hanya 53% (target >= 95%)"
                         ]
                     },
@@ -1188,42 +703,17 @@
                             },
                             {
                                 "slot": "protein",
-                                "kode": "FR024",
-                                "nama": "Daging Sapi, segar",
-                                "gram_mentah": 27.0,
+                                "kode": "CP061",
+                                "nama": "Tahu, mentah",
+                                "gram_mentah": 20.2,
                                 "gram_matang": 20.2,
-                                "satuan": "0.9 potong (27g)",
-                                "energi": 73.7,
-                                "protein": 4.7,
-                                "lemak": 5.9,
-                                "karbo": 0.0,
-                                "harga": "mahal",
-                                "pengganti": [
-                                    {
-                                        "kode": "FR016",
-                                        "nama": "Daging Domba, segar",
-                                        "gram_mentah": 27.0,
-                                        "gram_matang": 20.2,
-                                        "satuan": "0.9 potong (27g)",
-                                        "energi": 85.6,
-                                        "protein": 4.2,
-                                        "lemak": 7.5,
-                                        "karbo": 0.0,
-                                        "jarak": 0.32
-                                    },
-                                    {
-                                        "kode": "FR019",
-                                        "nama": "Daging Kambing, segar",
-                                        "gram_mentah": 27.0,
-                                        "gram_matang": 20.2,
-                                        "satuan": "0.9 potong (27g)",
-                                        "energi": 40.2,
-                                        "protein": 4.5,
-                                        "lemak": 2.5,
-                                        "karbo": 0.0,
-                                        "jarak": 0.74
-                                    }
-                                ]
+                                "satuan": "0.5 potong (20g)",
+                                "energi": 16.2,
+                                "protein": 2.2,
+                                "lemak": 0.9,
+                                "karbo": 0.2,
+                                "harga": "murah",
+                                "pengganti": []
                             },
                             {
                                 "slot": "lemak",
@@ -1269,29 +759,13 @@
                             "usia_label": "nasi biasa",
                             "tekstur": "nasi biasa",
                             "jenis_masakan": "Masakan Sederhana",
-                            "resep_nama": "Bubur Beras giling, mentah dengan Daging Sapi, segar dan $sayur",
-                            "waktu_masak": "52 menit",
-                            "catatan": "Marinasi: 1 sdt jeruk nipis, 1 siung bawang putih, 1/2 ruas jahe, 1 siung bawang merah, sejumput merica (opsional).",
+                            "resep_nama": "Bubur Beras giling, mentah dengan Tahu, mentah dan $sayur",
+                            "waktu_masak": "37 menit",
+                            "catatan": "",
                             "bumbu": [
                                 {
-                                    "nama": "Air jeruk nipis",
-                                    "satuan": "1 sdt (5g)"
-                                },
-                                {
                                     "nama": "Bawang putih",
-                                    "satuan": "1 siung (10g)"
-                                },
-                                {
-                                    "nama": "Jahe",
-                                    "satuan": "1/2 ruas (4g)"
-                                },
-                                {
-                                    "nama": "Bawang merah",
                                     "satuan": "1 siung (5g)"
-                                },
-                                {
-                                    "nama": "Merica",
-                                    "satuan": "sejumput (0.5g)"
                                 },
                                 {
                                     "nama": "Garam",
@@ -1299,40 +773,39 @@
                                 }
                             ],
                             "langkah": [
-                                "1. MARINASI Daging Sapi, segar: 1 sdt jeruk nipis, 1 siung bawang putih, 1/2 ruas jahe, 1 siung bawang merah, sejumput merica (opsional). Potong 2cm. Haluskan bumbu, lumuri daging. Diamkan 20 menit. Tumis atau rebus.",
-                                "2. Masak Beras giling, mentah jadi nasi biasa.",
-                                "3. Potong Daging Sapi, segar sesuai selera (2cm), yang sudah dimarinasi (lihat langkah 1).",
-                                "4. Tumis Daging Sapi, segar dengan Minyak zaitun (1.6 sdm (8g)) sampai matang kecokelatan (5 menit).",
-                                "5. Potong $sayur seukuran gigitan, tumis terpisah 3 menit.",
-                                "6. Sajikan nasi, Daging Sapi, segar, dan $sayur di piring. $buah dipotong sesuai selera sebagai penutup."
+                                "1. Masak Beras giling, mentah jadi nasi biasa.",
+                                "2. Potong Tahu, mentah sesuai selera (2cm), yang sudah dimarinasi (lihat langkah 1).",
+                                "3. Tumis Tahu, mentah dengan Minyak zaitun (1.6 sdm (8g)) sampai matang kecokelatan (5 menit).",
+                                "4. Potong $sayur seukuran gigitan, tumis terpisah 3 menit.",
+                                "5. Sajikan nasi, Tahu, mentah, dan $sayur di piring. $buah dipotong sesuai selera sebagai penutup."
                             ]
                         },
                         "makro": {
                             "energi": {
-                                "dapat": 303.3,
+                                "dapat": 257.3,
                                 "target": 500.0,
-                                "persen": 60.7
+                                "persen": 51.5
                             },
                             "protein": {
-                                "dapat": 8.0,
+                                "dapat": 6.0,
                                 "target": 10.0,
-                                "persen": 80.1
+                                "persen": 60.0
                             },
                             "lemak": {
-                                "dapat": 13.7,
+                                "dapat": 9.7,
                                 "target": 17.9,
-                                "persen": 76.6
+                                "persen": 54.3
                             },
                             "karbo": {
-                                "dapat": 38.9,
+                                "dapat": 39.0,
                                 "target": 74.8,
-                                "persen": 52.0
+                                "persen": 52.2
                             }
                         },
                         "pesan": [
-                            "energi hanya 61% (target >= 95%)",
-                            "protein hanya 80% (target >= 95%)",
-                            "lemak hanya 77% (target >= 95%)",
+                            "energi hanya 51% (target >= 95%)",
+                            "protein hanya 60% (target >= 95%)",
+                            "lemak hanya 54% (target >= 95%)",
                             "karbo hanya 52% (target >= 95%)"
                         ]
                     },
@@ -1391,42 +864,17 @@
                             },
                             {
                                 "slot": "protein",
-                                "kode": "FR024",
-                                "nama": "Daging Sapi, segar",
-                                "gram_mentah": 27.0,
+                                "kode": "CP061",
+                                "nama": "Tahu, mentah",
+                                "gram_mentah": 20.2,
                                 "gram_matang": 20.2,
-                                "satuan": "0.9 potong (27g)",
-                                "energi": 73.7,
-                                "protein": 4.7,
-                                "lemak": 5.9,
-                                "karbo": 0.0,
-                                "harga": "mahal",
-                                "pengganti": [
-                                    {
-                                        "kode": "FR016",
-                                        "nama": "Daging Domba, segar",
-                                        "gram_mentah": 27.0,
-                                        "gram_matang": 20.2,
-                                        "satuan": "0.9 potong (27g)",
-                                        "energi": 85.6,
-                                        "protein": 4.2,
-                                        "lemak": 7.5,
-                                        "karbo": 0.0,
-                                        "jarak": 0.32
-                                    },
-                                    {
-                                        "kode": "FR019",
-                                        "nama": "Daging Kambing, segar",
-                                        "gram_mentah": 27.0,
-                                        "gram_matang": 20.2,
-                                        "satuan": "0.9 potong (27g)",
-                                        "energi": 40.2,
-                                        "protein": 4.5,
-                                        "lemak": 2.5,
-                                        "karbo": 0.0,
-                                        "jarak": 0.74
-                                    }
-                                ]
+                                "satuan": "0.5 potong (20g)",
+                                "energi": 16.2,
+                                "protein": 2.2,
+                                "lemak": 0.9,
+                                "karbo": 0.2,
+                                "harga": "murah",
+                                "pengganti": []
                             },
                             {
                                 "slot": "lemak",
@@ -1523,29 +971,13 @@
                             "usia_label": "nasi biasa",
                             "tekstur": "nasi biasa",
                             "jenis_masakan": "Nasi & Lauk Lengkap",
-                            "resep_nama": "Bubur Beras giling, mentah dengan Daging Sapi, segar dan Daun kubis, segar",
-                            "waktu_masak": "52 menit",
-                            "catatan": "Marinasi: 1 sdt jeruk nipis, 1 siung bawang putih, 1/2 ruas jahe, 1 siung bawang merah, sejumput merica (opsional).",
+                            "resep_nama": "Bubur Beras giling, mentah dengan Tahu, mentah dan Daun kubis, segar",
+                            "waktu_masak": "37 menit",
+                            "catatan": "",
                             "bumbu": [
                                 {
-                                    "nama": "Air jeruk nipis",
-                                    "satuan": "1 sdt (5g)"
-                                },
-                                {
                                     "nama": "Bawang putih",
-                                    "satuan": "1 siung (10g)"
-                                },
-                                {
-                                    "nama": "Jahe",
-                                    "satuan": "1/2 ruas (4g)"
-                                },
-                                {
-                                    "nama": "Bawang merah",
                                     "satuan": "1 siung (5g)"
-                                },
-                                {
-                                    "nama": "Merica",
-                                    "satuan": "sejumput (0.5g)"
                                 },
                                 {
                                     "nama": "Garam",
@@ -1553,40 +985,39 @@
                                 }
                             ],
                             "langkah": [
-                                "1. MARINASI Daging Sapi, segar: 1 sdt jeruk nipis, 1 siung bawang putih, 1/2 ruas jahe, 1 siung bawang merah, sejumput merica (opsional). Potong 2cm. Haluskan bumbu, lumuri daging. Diamkan 20 menit. Tumis atau rebus.",
-                                "2. Masak Beras giling, mentah jadi nasi biasa.",
-                                "3. Potong Daging Sapi, segar sesuai selera (2cm), yang sudah dimarinasi (lihat langkah 1).",
-                                "4. Tumis Daging Sapi, segar dengan Minyak zaitun (1.6 sdm (8g)) sampai matang kecokelatan (5 menit).",
-                                "5. Potong Daun kubis, segar seukuran gigitan, tumis terpisah 3 menit.",
-                                "6. Sajikan nasi, Daging Sapi, segar, dan Daun kubis, segar di piring. $buah dipotong sesuai selera sebagai penutup."
+                                "1. Masak Beras giling, mentah jadi nasi biasa.",
+                                "2. Potong Tahu, mentah sesuai selera (2cm), yang sudah dimarinasi (lihat langkah 1).",
+                                "3. Tumis Tahu, mentah dengan Minyak zaitun (1.6 sdm (8g)) sampai matang kecokelatan (5 menit).",
+                                "4. Potong Daun kubis, segar seukuran gigitan, tumis terpisah 3 menit.",
+                                "5. Sajikan nasi, Tahu, mentah, dan Daun kubis, segar di piring. $buah dipotong sesuai selera sebagai penutup."
                             ]
                         },
                         "makro": {
                             "energi": {
-                                "dapat": 307.5,
+                                "dapat": 261.4,
                                 "target": 500.0,
-                                "persen": 61.5
+                                "persen": 52.3
                             },
                             "protein": {
-                                "dapat": 8.2,
+                                "dapat": 6.2,
                                 "target": 10.0,
-                                "persen": 82.2
+                                "persen": 62.0
                             },
                             "lemak": {
-                                "dapat": 13.8,
+                                "dapat": 9.8,
                                 "target": 17.9,
-                                "persen": 77.1
+                                "persen": 54.8
                             },
                             "karbo": {
-                                "dapat": 39.5,
+                                "dapat": 39.6,
                                 "target": 74.8,
-                                "persen": 52.8
+                                "persen": 53.0
                             }
                         },
                         "pesan": [
-                            "energi hanya 61% (target >= 95%)",
-                            "protein hanya 82% (target >= 95%)",
-                            "lemak hanya 77% (target >= 95%)",
+                            "energi hanya 52% (target >= 95%)",
+                            "protein hanya 62% (target >= 95%)",
+                            "lemak hanya 55% (target >= 95%)",
                             "karbo hanya 53% (target >= 95%)"
                         ]
                     }
@@ -1597,66 +1028,66 @@
                         "bahan": [
                             {
                                 "slot": "selingan",
-                                "kode": "ER001",
-                                "nama": "Alpukat, segar",
+                                "kode": "ER070",
+                                "nama": "Nanas, segar",
                                 "gram_mentah": 40.5,
                                 "gram_matang": 40.5,
-                                "satuan": "1.4 sdm (40g)",
-                                "energi": 34.4,
-                                "protein": 0.4,
-                                "lemak": 2.6,
-                                "karbo": 3.1,
-                                "harga": "mahal",
+                                "satuan": "1 potong (40g)",
+                                "energi": 16.2,
+                                "protein": 0.2,
+                                "lemak": 0.1,
+                                "karbo": 4.0,
+                                "harga": "murah",
                                 "pengganti": [
                                     {
-                                        "kode": "ER012",
-                                        "nama": "Buah Naga Merah, segar",
+                                        "kode": "ER035",
+                                        "nama": "Jeruk bali, segar",
                                         "gram_mentah": 40.5,
                                         "gram_matang": 40.5,
-                                        "satuan": "40.5g",
-                                        "energi": 28.8,
-                                        "protein": 0.7,
-                                        "lemak": 1.3,
-                                        "karbo": 3.7,
-                                        "jarak": 0.99
-                                    },
-                                    {
-                                        "kode": "ER052",
-                                        "nama": "Lemon, segar",
-                                        "gram_mentah": 40.5,
-                                        "gram_matang": 40.5,
-                                        "satuan": "8.1 sdt (40g)",
-                                        "energi": 13.8,
-                                        "protein": 0.2,
-                                        "lemak": 0.3,
-                                        "karbo": 2.5,
-                                        "jarak": 1.15
-                                    },
-                                    {
-                                        "kode": "ER070",
-                                        "nama": "Nanas, segar",
-                                        "gram_mentah": 40.5,
-                                        "gram_matang": 40.5,
-                                        "satuan": "1 potong (40g)",
-                                        "energi": 16.2,
+                                        "satuan": "0.8 buah (40g)",
+                                        "energi": 19.4,
                                         "protein": 0.2,
                                         "lemak": 0.1,
-                                        "karbo": 4.0,
-                                        "jarak": 1.17
+                                        "karbo": 5.0,
+                                        "jarak": 0.34
+                                    },
+                                    {
+                                        "kode": "ER039",
+                                        "nama": "Jeruk manis, segar",
+                                        "gram_mentah": 40.5,
+                                        "gram_matang": 40.5,
+                                        "satuan": "0.8 buah (40g)",
+                                        "energi": 18.2,
+                                        "protein": 0.4,
+                                        "lemak": 0.1,
+                                        "karbo": 4.5,
+                                        "jarak": 0.36
+                                    },
+                                    {
+                                        "kode": "ER031",
+                                        "nama": "Jambu biji",
+                                        "gram_mentah": 40.5,
+                                        "gram_matang": 40.5,
+                                        "satuan": "0.8 buah (40g)",
+                                        "energi": 19.8,
+                                        "protein": 0.4,
+                                        "lemak": 0.1,
+                                        "karbo": 4.9,
+                                        "jarak": 0.44
                                     }
                                 ]
                             }
                         ],
                         "makro": {
-                            "energi": 34.4,
-                            "protein": 0.4,
-                            "lemak": 2.6,
-                            "karbo": 3.1
+                            "energi": 16.2,
+                            "protein": 0.2,
+                            "lemak": 0.1,
+                            "karbo": 4.0
                         },
                         "resep": {
-                            "nama": "Selingan buah: Alpukat, segar",
+                            "nama": "Selingan buah: Nanas, segar",
                             "langkah": [
-                                "Kupas Alpukat, segar, potong sesuai selera. Sajikan."
+                                "Kupas Nanas, segar, potong sesuai selera. Sajikan."
                             ]
                         },
                         "fokus_mikro": ["vit_c", "serat"],
@@ -1667,71 +1098,58 @@
                         "bahan": [
                             {
                                 "slot": "selingan",
-                                "kode": "BR030",
-                                "nama": "Ubi jalar merah, segar",
-                                "gram_mentah": 36.8,
+                                "kode": "AR008",
+                                "nama": "Beras ketan putih tumbuk, mentah",
+                                "gram_mentah": 27.0,
                                 "gram_matang": 40.5,
-                                "satuan": "1.2 potong (37g)",
-                                "energi": 55.6,
-                                "protein": 0.6,
-                                "lemak": 0.1,
-                                "karbo": 13.0,
+                                "satuan": "2.7 sdm (27g)",
+                                "energi": 97.5,
+                                "protein": 2.0,
+                                "lemak": 0.2,
+                                "karbo": 21.2,
                                 "harga": "murah",
                                 "pengganti": [
                                     {
-                                        "kode": "BR016",
-                                        "nama": "Ketela pohon/ singkong, segar",
-                                        "gram_mentah": 36.8,
+                                        "kode": "AR013",
+                                        "nama": "Beras tumbuk merah, mentah",
+                                        "gram_mentah": 27.0,
                                         "gram_matang": 40.5,
-                                        "satuan": "1.5 potong (37g)",
-                                        "energi": 56.7,
-                                        "protein": 0.4,
-                                        "lemak": 0.1,
-                                        "karbo": 13.5,
-                                        "jarak": 0.38
+                                        "satuan": "2.7 sdm (27g)",
+                                        "energi": 95.0,
+                                        "protein": 2.0,
+                                        "lemak": 0.2,
+                                        "karbo": 20.6,
+                                        "jarak": 0.11
                                     },
                                     {
-                                        "kode": "BR013",
-                                        "nama": "Kentang, segar",
-                                        "gram_mentah": 36.8,
+                                        "kode": "AR001",
+                                        "nama": "Beras giling, mentah",
+                                        "gram_mentah": 27.0,
                                         "gram_matang": 40.5,
-                                        "satuan": "1.2 potong (37g)",
-                                        "energi": 22.8,
-                                        "protein": 0.8,
-                                        "lemak": 0.1,
-                                        "karbo": 5.0,
-                                        "jarak": 0.92
-                                    },
-                                    {
-                                        "kode": "BR031",
-                                        "nama": "Ubi jalar putih, segar",
-                                        "gram_mentah": 36.8,
-                                        "gram_matang": 40.5,
-                                        "satuan": "1.2 potong (37g)",
-                                        "energi": 32.4,
-                                        "protein": 0.1,
-                                        "lemak": 0.1,
-                                        "karbo": 7.6,
-                                        "jarak": 0.96
+                                        "satuan": "2.7 sdm (27g)",
+                                        "energi": 96.4,
+                                        "protein": 2.3,
+                                        "lemak": 0.5,
+                                        "karbo": 20.8,
+                                        "jarak": 0.91
                                     }
                                 ]
                             }
                         ],
                         "makro": {
-                            "energi": 55.6,
-                            "protein": 0.6,
-                            "lemak": 0.1,
-                            "karbo": 13.0
+                            "energi": 97.5,
+                            "protein": 2.0,
+                            "lemak": 0.2,
+                            "karbo": 21.2
                         },
                         "resep": {
-                            "nama": "Selingan penutup: Ubi jalar merah, segar",
+                            "nama": "Selingan penutup: Beras ketan putih tumbuk, mentah",
                             "langkah": [
                                 "[🔹 UNTUK USIA 12+ BULAN: sajikan dalam potongan kecil atau bentuk biasa]",
-                                "Kukus Ubi jalar merah, segar hingga empuk (10-15 menit).",
-                                "Haluskan dengan garpu, tambahkan sedikit tepung beras atau maizena (1 sdt) sebagai pengikat.",
-                                "Bentuk bulat-bulat kecil (seukuran kelereng atau lebih besar sesuai usia).",
-                                "Kukus kembali selama 5-7 menit hingga matang.",
-                                "Sajikan hangat sebagai bola-bola ubi/camilan."
+                                "Campurkan Beras ketan putih tumbuk, mentah dengan buah halus (pisang/pepaya) hingga membentuk adonan lembut.",
+                                "Bentuk bulat kecil atau pipih (sesuai kemampuan anak).",
+                                "Kukus selama 10-15 menit atau panggang di wajan anti lengket dengan api kecil.",
+                                "Sajikan hangat sebagai kue/camilan."
                             ]
                         },
                         "fokus_mikro": [],

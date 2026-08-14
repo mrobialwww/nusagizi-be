@@ -15,12 +15,12 @@ func NewNotificationService(repo *repository.NotificationRepository) *Notificati
 	return &NotificationService{repo: repo}
 }
 
-// GetNotifications (endpoint: 63)
+// GetNotifications (Endpoint: 62)
 func (s *NotificationService) GetNotifications(ctx context.Context, authUserID string) ([]notification.NotificationResponse, error) {
 	return s.repo.GetNotifications(ctx, authUserID)
 }
 
-// GetLatestNotification returns the most recent notification for a user. (Endpoint: 64)
+// GetLatestNotification returns the most recent notification for a user. (Endpoint: 63)
 func (s *NotificationService) GetLatestNotification(ctx context.Context, userID string) (*notification.NotificationResponse, error) {
 	return s.repo.GetLatestNotification(ctx, userID)
 }

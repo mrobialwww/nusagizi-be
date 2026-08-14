@@ -3,7 +3,17 @@
 -- Mapping: KODE -> id, NAMA BAHAN -> name, KATEGORI -> category, HARGA -> price
 -- ---------------------------------------------------------------------
 
-INSERT INTO ingredients (id, name, category, price) VALUES
+INSERT INTO ingredients (id, name, category, price, image_url)
+SELECT 
+    v.id, v.name, v.category, v.price,
+    (ARRAY[
+        'https://unsplash.com/photos/a-single-carrot-on-a-white-background-eJJ2316gOak',
+        'https://unsplash.com/photos/sliced-tomato-on-white-surface-sgmS2e95QO0',
+        'https://unsplash.com/photos/red-chili-on-white-background-nZUQgW0FVnc',
+        'https://unsplash.com/photos/raw-meat-on-brown-wooden-table-QH8SHBARVVk',
+        'https://unsplash.com/photos/pile-of-gray-fishes-vLQzopDRSNI'
+    ])[1 + floor(random() * 5)::int]
+FROM (VALUES 
     ('AR014', 'Cantel/Sorgum, mentah', 'Serealia', 'murah'),
     ('GR048', 'Ikan mujahir, segar', 'Hewan Air Tawar', 'sedang'),
     ('FR016', 'Daging Domba, segar', 'Mamalia', 'mahal'),
@@ -80,8 +90,10 @@ INSERT INTO ingredients (id, name, category, price) VALUES
     ('DR097', 'Kacang panjang, segar', 'Sayur', 'murah'),
     ('DR013', 'Buncis, segar', 'Sayur', 'murah'),
     ('DR113', 'Kool kembang', 'Sayur', 'murah')
+) AS v(id, name, category, price)
 ON CONFLICT (id) DO UPDATE SET
     name       = EXCLUDED.name,
     category   = EXCLUDED.category,
     price      = EXCLUDED.price,
+    image_url  = EXCLUDED.image_url,
     updated_at = now();

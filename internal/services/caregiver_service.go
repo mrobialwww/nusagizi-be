@@ -70,14 +70,3 @@ func (s *CaregiverService) DeleteCaregiverEngagement(ctx context.Context, userID
 
 	return s.repo.DeleteCaregiverEngagement(ctx, engagementID)
 }
-
-// GetCaregiverChildren (endpoint: 56)
-func (s *CaregiverService) GetCaregiverChildren(ctx context.Context, userID string) ([]caregiver.ChildSimpleResponse, error) {
-	// Automatically resolve caregiver profile from the logged-in user
-	caregiverProfileID, err := s.repo.GetByUserID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: caregiver profile not found", repository.ErrForbidden)
-	}
-
-	return s.repo.GetCaregiverChildren(ctx, caregiverProfileID)
-}

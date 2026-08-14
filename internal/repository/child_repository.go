@@ -348,8 +348,8 @@ func (r *ChildRepository) CheckOwnership(ctx context.Context, childID, motherPro
 	return exists, err
 }
 
-// GetSimpleByID returns simple child detail.
-func (r *ChildRepository) GetSimpleByID(ctx context.Context, childID uuid.UUID) (*models.ChildSimpleResponse, error) {
+// GetChild returns simple child detail.
+func (r *ChildRepository) GetChild(ctx context.Context, childID uuid.UUID) (*models.ChildSimpleResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -554,19 +554,34 @@ func (r *ChildRepository) populateChildStringProfiles(ctx context.Context, child
 	return nil
 }
 
-// GetByMotherProfileID returns a lightweight list of children for a mother.
-func (r *ChildRepository) GetByMotherProfileID(ctx context.Context, motherProfileID uuid.UUID) ([]models.ChildListItem, error) {
+// GetListChild returns a lightweight list of children for a user (Mother or Caregiver).
+func (r *ChildRepository) GetListChild(ctx context.Context, userID uuid.UUID) ([]models.ChildListItem, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var query string = `
-		SELECT id, full_name, birth_date, gender, photo_url
-		FROM children
-		WHERE mother_profile_id = $1 
-			AND deleted_at IS NULL
-		ORDER BY created_at ASC
-	`
-	rows, err := r.pool.Query(ctx, query, motherProfileID)
+		SELECT c.id, c.full_name, c.birth_date, c.gender, c.photo_url
+		FROM children c
+		WHERE c.deleted_at IS NULL
+				AND (
+						EXISTS (
+								SELECT 1 
+								FROM mother_profiles mp 
+								WHERE mp.id = c.mother_profile_id 
+										AND mp.user_id = $1
+						)
+						OR EXISTS (
+								SELECT 1 
+								FROM caregiver_engagements ce 
+								JOIN caregiver_profiles cp ON ce.caregiver_profile_id = cp.id 
+								WHERE ce.child_id = c.id 
+										AND ce.deleted_at IS NULL 
+										AND cp.user_id = $1
+						)
+				)
+		ORDER BY c.created_at ASC
+		`
+	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -642,7 +657,7 @@ func (r *ChildRepository) FetchAllergies(ctx context.Context, childIDs []uuid.UU
 		FROM child_allergy_profiles 
 		WHERE child_id = ANY($1)`
 
-	rows, err := r.pool.Query(ctx, query, childIDs)
+	rows, err := r.pool.Query(ctx, query, toUUIDStrings(childIDs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query allergies: %w", err)
 	}
@@ -667,17 +682,19 @@ func (r *ChildRepository) FetchAllergies(ctx context.Context, childIDs []uuid.UU
 // using a window function instead of one "ORDER BY ... LIMIT" query per child.
 func (r *ChildRepository) FetchGrowthHistory(ctx context.Context, childIDs []uuid.UUID) (map[uuid.UUID][]models.GrowthPoint, error) {
 	const query = `
-		SELECT child_id, measurement_date, weight_kg, height_cm, head_circumference_cm
+		SELECT child_id, measured_at, weight_kg, height_cm, head_circumference_cm
 		FROM (
 			SELECT
-				child_id, measurement_date, weight_kg, height_cm, head_circumference_cm,
-				ROW_NUMBER() OVER (PARTITION BY child_id ORDER BY measurement_date DESC) AS rn
+				child_id, measured_at, weight_kg, height_cm, head_circumference_cm,
+				ROW_NUMBER() OVER (
+					PARTITION BY child_id ORDER BY measured_at DESC
+				) AS rn
 			FROM child_growth_reports
 			WHERE child_id = ANY($1)
 		) ranked
 		WHERE rn <= 4
 		ORDER BY child_id, rn`
-	rows, err := r.pool.Query(ctx, query, childIDs)
+	rows, err := r.pool.Query(ctx, query, toUUIDStrings(childIDs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query growth history: %w", err)
 	}
@@ -706,14 +723,14 @@ func (r *ChildRepository) FetchActiveMedicalNotes(ctx context.Context, childIDs 
 		FROM (
 			SELECT
 				child_id, id, doctor_name, recommendation,
-				ROW_NUMBER() OVER (P
-					ARTITION BY child_id ORDER BY created_at DESC
+				ROW_NUMBER() OVER (
+					PARTITION BY child_id ORDER BY created_at DESC
 				) AS rn
 			FROM medical_notes
 			WHERE child_id = ANY($1) AND valid_until >= CURRENT_DATE
 		) ranked
 		WHERE rn = 1`
-	rows, err := r.pool.Query(ctx, query, childIDs)
+	rows, err := r.pool.Query(ctx, query, toUUIDStrings(childIDs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query medical notes: %w", err)
 	}
@@ -746,7 +763,7 @@ func (r *ChildRepository) FetchNutritionTargets(ctx context.Context, noteIDs []u
 		FROM daily_nutrition_targets 
 		WHERE medical_note_id = ANY($1)`
 
-	rows, err := r.pool.Query(ctx, query, noteIDs)
+	rows, err := r.pool.Query(ctx, query, toUUIDStrings(noteIDs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query nutrition targets: %w", err)
 	}
@@ -772,4 +789,13 @@ func (r *ChildRepository) FetchNutritionTargets(ctx context.Context, noteIDs []u
 		return nil, fmt.Errorf("error iterating nutrition target rows: %w", err)
 	}
 	return result, nil
+}
+
+// Helper function to convert []uuid.UUID to []string for pgx compatibility
+func toUUIDStrings(ids []uuid.UUID) []string {
+	strs := make([]string, len(ids))
+	for i, id := range ids {
+		strs[i] = id.String()
+	}
+	return strs
 }

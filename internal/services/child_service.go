@@ -61,23 +61,19 @@ func (s *ChildService) GetChildDetail(ctx context.Context, userID string, childI
 	return s.repo.GetByID(ctx, childID)
 }
 
-// GetChildSimple returns the simple child detail (Endpoint: 12 - Get profil anak versi ringan)
-func (s *ChildService) GetChildSimple(ctx context.Context, userID string, childID uuid.UUID) (*models.ChildSimpleResponse, error) {
-	return s.repo.GetSimpleByID(ctx, childID)
+// GetChild returns the simple child detail (Endpoint: 12 - Get lightweight child profile)
+func (s *ChildService) GetChild(ctx context.Context, userID string, childID uuid.UUID) (*models.ChildSimpleResponse, error) {
+	return s.repo.GetChild(ctx, childID)
 }
 
-// GetChildrenByMother returns the lightweight children list (Endpoint: 11)
-func (s *ChildService) GetChildrenByMother(ctx context.Context, userID string) ([]models.ChildListItem, error) {
-	// retrieve mother_profile_id from user_id
-	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
-	if errors.Is(err, repository.ErrNotFound) {
-		return nil, fmt.Errorf("%w: no mother profile associated with this account", repository.ErrForbidden)
-	}
+// GetListChild returns the lightweight children list (Endpoint: 11)
+func (s *ChildService) GetListChild(ctx context.Context, userID string) ([]models.ChildListItem, error) {
+	userUUID, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid user ID formatting")
 	}
 
-	children, err := s.repo.GetByMotherProfileID(ctx, motherProfileID)
+	children, err := s.repo.GetListChild(ctx, userUUID)
 	if err != nil {
 		return nil, err
 	}

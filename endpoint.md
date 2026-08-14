@@ -362,7 +362,7 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 
 ### 10. [BARU] Get detail profil anak
 
-- **Method & Path**: `GET /children/{child_id}`
+- **Method & Path**: `GET /children/{child_id}/profile`
 - **Authorization**: pastikan `child.mother_profile_id` milik `user_id` yang login (mother) atau ada `caregiver_engagements` aktif untuk `child_id` ini (caregiver)
 - **Path Params**:
 
@@ -410,10 +410,10 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 
 - **Catatan**: celah dari v2 — sebelumnya tidak ada endpoint untuk mengambil profil anak secara lengkap (yang ada hanya ringkasan dashboard di endpoint 65, yang fieldnya jauh lebih sedikit).
 
-### 11. [BARU] Get list anak milik mother (ringan)
+### 11. [BARU] GetListChild (berdasarkan user login (mother/caregiver))
 
 - **Method & Path**: `GET /children`
-- **Authorization**: `mother_profile_id` di-deduce dari `user_id` yang login
+- **Authorization**: Mengambil data anak milik mother profile atau yang sedang diasuh oleh caregiver profile dari `user_id` yang login
 - **Path Params**: `-` (tidak ada)
 
 - **Query Params**: `-` (tidak ada)
@@ -449,9 +449,9 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 
 - **Catatan**: versi ringan dari endpoint 65 (dashboard) — dipakai untuk kebutuhan seperti dropdown/switcher pilih anak, tanpa perlu join ke growth/nutrition/KPSP yang lebih berat. Bentuk response-nya sengaja disamakan dengan endpoint 57 (list anak versi caregiver) untuk konsistensi antar-role.
 
-### 12. [BARU] Get profil anak (ringan)
+### 12. [BARU] GetChild (ringan)
 
-- **Method & Path**: `GET /children/{child_id}/simple`
+- **Method & Path**: `GET /children/{child_id}`
 - **Authorization**: Bebas (selama token valid) — tidak ada cek ownership / engagement (agar caregiver bisa melihat profil anak saat validasi QR checkin)
 - **Path Params**:
 
@@ -872,9 +872,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     "kpsp_score": 8,
     "month_target": 24,
     "status": "Sesuai Usia",
-    "recommended_actions": [
-        { "id": "...", "title": "...", "action_text": "..." }
-    ],
+    "recommended_actions": [{ "id": "...", "title": "...", "action_text": "..." }],
     "domains": [
         {
             "developmental_domain": "Gross motor skills",
@@ -1106,10 +1104,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 ```json
 {
-    "checklist_milestone_task_ids": [
-        "b6f1e2d0-...-uuid-1",
-        "8a2c3f10-...-uuid-2"
-    ]
+    "checklist_milestone_task_ids": ["b6f1e2d0-...-uuid-1", "8a2c3f10-...-uuid-2"]
 }
 ```
 
@@ -1154,13 +1149,15 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 - **Method & Path**: `GET /children/{child_id}/nutrition/today`
 - **Path Params**: `child_id` (UUID)
-- **Query Params**: `-` (tidak ada)
+- **Query Params**: `date` (Wajib, format `YYYY-MM-DD`)
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**:
 
 ```json
 {
     "id": "...",
+    "report_date": "2026-08-14",
+    "can_regenerate": true,
     "calories": 0,
     "target_calories": 0,
     "protein": 0,
@@ -1197,51 +1194,52 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | Field                                                         | Type    | Keterangan                                                                                                                                                                          |
 | ------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | id                                                            | UUID    | `child_nutrition_reports.id`                                                                                                                                                        |
+| report_date                                                   | string  | Tanggal berlakunya laporan gizi (YYYY-MM-DD)                                                                                                                                        |
+| can_regenerate                                                | boolean | Indikator apakah menu hari ini bisa di-regenerate oleh AI (bernilai `false` jika resep hari ini adalah hasil 'reuse' dari hari sebelumnya)                                          |
 | calories/protein/fat/carbohydrate                             | integer | aktual                                                                                                                                                                              |
 | target_calories/target_protein/target_fat/target_carbohydrate | integer | target                                                                                                                                                                              |
 | status                                                        | string  | Ditentukan dari jumlah makronutrisi (kalori, protein, lemak, karbo) yang nilainya >= 90% dari targetnya. (4 = "normal", 3 = "kurang optimal", 2 = "Berisiko", <=1 = "sangat buruk") |
-| menu.id                                                       | UUID    | ID dari menu harian anak (`daily_menus.id`)                                                                                                                                         |
+| menu.id                                                       | UUID    | Identik dengan ID laporan (ini hanya properti penampung list recipes)                                                                                                               |
 | menu.recipes[]                                                | array   | Daftar resep/makanan yang ada di dalam menu hari ini                                                                                                                                |
 | shopping_list[]                                               | array   | Daftar bahan belanja dari menu (bahan utama / priority 1). Bahan yang sama (berdasarkan `ingredient_id`) akan digabung dan jumlah takarannya (unit) dijumlahkan secara otomatis     |
 
 - **Response Error**:
 
-| Status | Kasus                                              |
-| ------ | -------------------------------------------------- |
-| 403    | `child_id` bukan milik user yang login             |
-| 404    | belum ada `child_nutrition_reports` untuk hari ini |
+| Status | Kasus                                               |
+| ------ | --------------------------------------------------- |
+| 400    | Parameter `date` tidak dikirim atau formatnya salah |
+| 403    | `child_id` bukan milik user yang login              |
+| 404    | belum ada `child_nutrition_reports` untuk hari ini  |
 
-### 30. Get menu hari ini
+### 30. Reuse Recipe (Tukar Menu dengan Hari Lalu)
 
-- **Method & Path**: `GET /children/{child_id}/daily-menus/today`
+- **Method & Path**: `POST /children/{child_id}/nutrition/reuse-recipe`
 - **Path Params**: `child_id` (UUID)
 - **Query Params**: `-` (tidak ada)
-- **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: Detail `daily_menus` beserta list `recipes` (field sama seperti endpoint 28)
+- **Request Body**:
 
 ```json
 {
-    "id": "...",
-    "created_at": "...",
-    "recipes": [
-        {
-            "id": "...",
-            "name": "...",
-            "meal_time": "breakfast",
-            "meal_texture": "...",
-            "calories": 0,
-            "protein": 0
-        }
-    ]
+    "source_recipe_id": "uuid-dari-resep-yang-ingin-dipakai",
+    "report_date": "2026-08-14"
+}
+```
+
+- **Response Body (200)**:
+
+```json
+{
+    "message": "Recipe reused successfully"
 }
 ```
 
 - **Response Error**:
 
-| Status | Kasus                       |
-| ------ | --------------------------- |
-| 403    | bukan milik user yang login |
-| 404    | belum ada menu hari ini     |
+| Status | Kasus                                                                   |
+| ------ | ----------------------------------------------------------------------- |
+| 400    | format body salah / `child_id` tidak valid / format `report_date` salah |
+| 403    | bukan milik user yang login                                             |
+| 404    | laporan gizi tidak ditemukan / resep sumber tidak ditemukan             |
 
 ### 31. Update status selesai recipe
 
@@ -1251,12 +1249,16 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Request Body**:
 
 ```json
-{ "portions_consumed": 0.33 }
+{
+    "portions_consumed": 0.33,
+    "report_date": "2026-08-14"
+}
 ```
 
-| Field             | Type  | Wajib | Keterangan                                     |
-| ----------------- | ----- | ----- | ---------------------------------------------- |
-| portions_consumed | float | Ya    | hanya menerima nilai: `0`, `0.33`, `0.66`, `1` |
+| Field             | Type   | Wajib | Keterangan                          |
+| ----------------- | ------ | ----- | ----------------------------------- |
+| portions_consumed | float  | Ya    | Porsi makan (0, 0.33, 0.66, 1)      |
+| report_date       | string | Ya    | Tanggal laporan format "YYYY-MM-DD" |
 
 - **Response Body (200)**: `-` (body kosong)
 - **Response Error**:
@@ -1309,7 +1311,23 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
     "description": "Bubur lembut berbahan dasar kentang dan telur ayam, cocok untuk bayi 6-12 bulan.",
     "calories": 269,
     "protein": 6,
-    "main_ingredients": null,
+    "is_bookmarked": true,
+    "main_ingredients": [
+        {
+            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "recipe_id": "0454ed87-b1ca-4a91-afda-a876015dba7b",
+            "ingredient": {
+                "ingredient_id": "AR001",
+                "name": "Beras giling, mentah",
+                "image_url": "https://unsplash.com/photos/a-single-carrot-on-a-white-background-eJJ2316gOak",
+                "category": "Serealia",
+                "price": "murah"
+            },
+            "unit": "1.4 batang (14.0g)",
+            "priority": 1,
+            "slot": "karbohidrat"
+        }
+    ],
     "recipe_spices": [
         {
             "id": "b9ee2955-a41c-4776-ac3d-6b6e92842918",
@@ -1351,26 +1369,44 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 ### 34. Tukar prioritas main_ingredients
 
-- **Method & Path [FIX]**: `PATCH /recipes/{recipe_id}/main-ingredients/{main_ingredient_id}`
-- **Path Params**:
-
-| Field              | Type | Keterangan                                                                                                                |
-| ------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------- |
-| recipe_id          | UUID |                                                                                                                           |
-| main_ingredient_id | UUID | **[FIX]** sebelumnya tidak ada di spesifikasi endpoint — ditambahkan karena wajib untuk tahu ingredient mana yang ditukar |
-
+- **Method & Path**: `PATCH /recipes/main-ingredients/priority`
+- **Path Params**: `-` (tidak ada)
 - **Query Params**: `-` (tidak ada)
-- **Request Body**: `{ "slot": "Kategori Bahan" }` (Digunakan untuk membatasi ruang lingkup pergeseran prioritas hanya pada bahan dengan slot yang sama).
-- **Response Body (200)**: `-` (body kosong)
+- **Request Body**: Array of objects untuk melakukan swap priority pada satu atau beberapa resep sekaligus.
+
+```json
+[
+    {
+        "recipe_id": "da1828c5-e979-4877-ac60-93c771ce160c",
+        "slot": "karbohidrat",
+        "priority": 2
+    },
+    {
+        "recipe_id": "9f3c2e11-c1f0-4665-b1a8-c0b05b6b3e6c",
+        "slot": "protein",
+        "priority": 3
+    }
+]
+```
+
+| Field     | Type    | Wajib | Keterangan                                                             |
+| --------- | ------- | ----- | ---------------------------------------------------------------------- |
+| recipe_id | UUID    | Ya    | ID dari resep yang ingin diubah bahan utamanya                         |
+| slot      | string  | Ya    | Kategori slot (mis. `karbohidrat`, `protein`, `sayur`)                 |
+| priority  | integer | Ya    | Nilai priority target yang ingin ditukar menjadi priority 1 (harus >1) |
+
+- **Response Body (200)**: `-` (body kosong / 200 OK)
 - **Response Error**:
 
-| Status | Kasus                                                   |
-| ------ | ------------------------------------------------------- |
-| 400    | format body tidak sesuai (misal: slot kosong)           |
-| 403    | `recipe_id` bukan milik user yang login                 |
-| 404    | `main_ingredient_id` tidak ditemukan di `recipe_id` tsb |
+| Status | Kasus                                                                            |
+| ------ | -------------------------------------------------------------------------------- |
+| 400    | format body tidak valid / slot kosong / priority <= 1 / `recipe_id` invalid UUID |
+| 403    | salah satu `recipe_id` bukan milik user yang login                               |
+| 500    | Internal server error                                                            |
 
-- **Catatan [FIX v4]**: `main_ingredient_id` di path otomatis di-set jadi `priority = 1`. `main_ingredients` lain di recipe yang sama otomatis digeser +1 (yang sebelumnya `priority=1` jadi `2`, yang `2` jadi `3`, dst) **HANYA** jika mereka memiliki `slot` yang sama dengan yang dilempar di Request Body.
+- **Catatan**:
+    - Seluruh operasi swap ini bersifat **atomic** (dalam satu DB transaction). Jika salah satu gagal atau ditolak, seluruh operasi dibatalkan.
+    - Bahan dengan `slot` dan `priority` yang dikirim akan di-set menjadi `priority = 1`, sedangkan bahan lainnya pada slot tersebut akan digeser posisinya secara berurutan.
 
 ### 35. Get bookmark menu
 
@@ -1378,7 +1414,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Path Params**: `child_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**: Array dari `recipes` dengan `is_bookmarked = true`, di-join dari `child_nutrition_reports` -> `daily_menus` -> `recipes` untuk memastikan milik `child_id` ybs
+- **Response Body (200)**: Array dari `recipes` dengan `is_bookmarked = true`, di-join dari `child_nutrition_reports` -> `child_nutrition_recipes` -> `recipes` untuk memastikan milik `child_id` ybs
 
 ```json
 [
@@ -1418,7 +1454,6 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 [
     {
         "id": "...",
-        "daily_menu_id": "...",
         "created_at": "...",
         "calories": 800,
         "protein": 20,
@@ -1429,13 +1464,12 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 ]
 ```
 
-| Field                             | Type          | Keterangan                                                                                                                                                         |
-| --------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| id                                | UUID          | `child_nutrition_reports.id`                                                                                                                                       |
-| daily_menu_id                     | UUID          | `daily_menus.id` terkait (jika ada)                                                                                                                                |
-| created_at                        | datetime      |                                                                                                                                                                    |
-| calories/protein/fat/carbohydrate | integer       | aktual — **[FIX v4]** field `target_*` dihapus dari response ini                                                                                                   |
-| meal_times                        | array\<enum\> | **[FIX v4]** `recipes.meal_time` dari resep yang `portions_consumed > 0` pada `daily_menus` hari itu, join `child_nutrition_reports` -> `daily_menus` -> `recipes` |
+| Field                             | Type          | Keterangan                                                                                                                                                       |
+| --------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                                | UUID          | `child_nutrition_reports.id`                                                                                                                                     |
+| created_at                        | datetime      |                                                                                                                                                                  |
+| calories/protein/fat/carbohydrate | integer       | aktual — **[FIX v4]** field `target_*` dihapus dari response ini                                                                                                 |
+| meal_times                        | array\<enum\> | **[FIX v4]** `recipes.meal_time` dari resep yang `portions_consumed > 0` pada hari itu, join `child_nutrition_reports` -> `child_nutrition_recipes` -> `recipes` |
 
 - **Response Error**:
 
@@ -1451,7 +1485,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Method & Path**: `GET /menu/daily-shop`
 - **Authorization**: `user_id` diambil dari token (bisa mother atau caregiver)
 - **Path Params**: `-` (tidak ada)
-- **Query Params**: `-` (tidak ada)
+- **Query Params**: `date` (Wajib, format `YYYY-MM-DD`)
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**: Array dari object bahan utama (priority=1) dan bahan penggantinya (priority>=2) yang dikelompokkan per resep dan slot, digabung dari seluruh anak yang direlasikan ke user.
   _(Jika tidak ada menu hari ini, akan return array kosong `[]`)_
@@ -1460,22 +1494,19 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 [
     {
         "name": "Oat instan",
-        "ingredient_id": "OA005",
         "unit": "500g",
         "priority": 1,
-        "slot": "sereal",
+        "slot": "karbohidrat",
         "recipe_id": "da1828c5-e979-4877-ac60-93c771ce160c",
         "child_name": "yasa",
-        "pengganti": [
+        "substitutes": [
             {
                 "name": "havermout",
-                "ingredient_id": "HA001",
                 "unit": "500g",
                 "priority": 2
             },
             {
                 "name": "gandum",
-                "ingredient_id": "GA007",
                 "unit": "300g",
                 "priority": 3
             }
@@ -1492,14 +1523,14 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 403    | User bukan mother ataupun caregiver |
 | 500    | Internal server error               |
 
-- **Catatan**: Melakukan query JOIN kompleks dari `children` sampai `ingredients`. Menggunakan pola _grouping_ di layer Go untuk menyusun list `pengganti`.
+- **Catatan**: Melakukan query JOIN kompleks dari `children` sampai `ingredients`. Menggunakan pola _grouping_ di layer Go untuk menyusun list `substitutes`.
 
 ### 38. [BARU] Get menu hari ini + shopping list (POV caregiver)
 
-- **Method & Path**: `GET /children/{child_id}/daily-menus/today/shopping`
+- **Method & Path**: `GET /children/{child_id}/nutrition-reports/today/shopping`
 - **Authorization**: sesuai `child_id` (mother/caregiver)
 - **Path Params**: `child_id` (UUID)
-- **Query Params**: `-` (tidak ada)
+- **Query Params**: `date` (Wajib, format `YYYY-MM-DD`)
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**: Menu hari ini beserta daftar belanja, tanpa data kalori aktual/target `nutrition_report`.
   _(Jika tidak ada menu hari ini, akan return `menu` null/empty dan `shopping_list: []`)_
@@ -1545,7 +1576,14 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Authorization**: `user_id` diambil dari token (atau sesuai kebutuhan arsitektur)
 - **Path Params**: `-` (tidak ada)
 - **Query Params**: `-` (tidak ada)
-- **Request Body**: `-` (kosong, server akan otomatis merakit dari DB)
+- **Request Body**:
+
+```json
+{
+    "report_date": "2026-08-14"
+}
+```
+
 - **Response Body (201)**:
 
 ```json
@@ -1557,20 +1595,21 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 - **Response Error**:
 
-| Status | Kasus                                    |
-| ------ | ---------------------------------------- |
-| 502    | Food Engine gagal memproses / timeout AI |
-| 500    | Gagal menyimpan ke database              |
+| Status | Kasus                                                               |
+| ------ | ------------------------------------------------------------------- |
+| 400    | format body tidak valid / `report_date` tidak ada atau salah format |
+| 502    | Food Engine gagal memproses / timeout AI                            |
+| 500    | Gagal menyimpan ke database                                         |
 
-- **Catatan**: Endpoint ini adalah sebuah _Command_ yang memicu server untuk mem-_fetch_ profil anak dari DB, merakit payload `all_child.json`, mengirimnya ke AI (Food Engine), dan menyimpan hasilnya ke database (strategi _Replace_ menu hari ini). Setelah menerima respons sukses (201) dari endpoint ini, _client_ (Flutter) bertugas memanggil ulang **Endpoint 29** (`GET /menu/today`) untuk mengambil data terbaru dan me-render UI.
+- **Catatan**: Endpoint ini adalah sebuah _Command_ yang memicu server untuk mem-_fetch_ profil anak dari DB, merakit payload `all_child.json`, mengirimnya ke AI (Food Engine), dan menyimpan hasilnya ke database (strategi _Replace_ menu hari ini). Jika ada anak yang menu hari ininya berstatus `can_regenerate=false` (resep hasil reuse), backend otomatis akan men-skip anak tersebut secara aman dan melanjutkan generate menu untuk anak lainnya. Setelah menerima respons sukses (201) dari endpoint ini, _client_ (Flutter) bertugas memanggil ulang **Endpoint 29** (`GET /menu/today`) untuk mengambil data terbaru dan me-render UI.
 
-### 40. [BARU] Get daily menu by ID
+### 40. [BARU] Get report menu by ID
 
-- **Method & Path**: `GET /children/{child_id}/daily-menus/{daily_menu_id}`
+- **Method & Path**: `GET /children/{child_id}/nutrition-reports/{report_id}`
 - **Authorization**: `user_id` dari token (Mother/Caregiver) yang memiliki akses ke anak
 - **Path Params**:
     - `child_id` (UUID)
-    - `daily_menu_id` (UUID)
+    - `report_id` (UUID)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**: (Sama persis dengan Endpoint 30)
@@ -1600,10 +1639,8 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 | 400    | Format UUID invalid                |
 | 401    | Token tidak ada/tidak valid        |
 | 403    | User tidak punya akses ke anak ini |
-| 404    | `daily_menu_id` tidak ditemukan    |
+| 404    | `report_id` tidak ditemukan        |
 | 500    | Internal server error              |
-
-- **Catatan**: Endpoint ini hanya mengembalikan resep yang memiliki `portions_consumed > 0`.
 
 ---
 
@@ -2004,45 +2041,9 @@ WHERE c.mother_profile_id = ?
 
 - **Catatan [FIX v3]**: sebelumnya hanya "satu record `caregiver_profiles`" (yang tabelnya cuma punya `id`/`user_id`/timestamp, tidak berguna untuk UI profil). Sekarang eksplisit di-join ke `users`, konsisten dengan endpoint 6. Relasi `caregiver_profiles`<->`users` bersifat 1:1, jadi tidak ada makna "terbaru" — cukup 1 record per user.
 
-### 56. Get list child dari caregiver_engagement
-
-- **Method & Path [FIX]**: `GET /caregiver-profiles/children`
-- **Path Params**: `-` (tidak ada)
-- **Query Params**: `-` (tidak ada)
-- **Request Body**: `-` (tidak ada)
-- **Response Body [FIX v4] (200)**: Array dari `children` (`id, full_name, photo_url`)
-
-```json
-[
-    {
-        "id": "...",
-        "full_name": "...",
-        "photo_url": "..."
-    }
-]
-```
-
-- **Response Error**:
-
-| Status | Kasus                       |
-| ------ | --------------------------- |
-| 403    | bukan milik user yang login |
-
-- **Contoh query [FIX v4]**:
-
-```sql
-SELECT c.id, c.full_name, c.photo_url
-FROM caregiver_engagements ce
-JOIN child c ON c.id = ce.child_id
-WHERE ce.caregiver_profile_id = ?
-  AND ce.deleted_at IS NULL;
-```
-
----
-
 ## 8. Modul: Medical
 
-### 57. Get list medical_notes aktif per anak [FIX]
+### 56. Get list medical_notes aktif per anak [FIX]
 
 - **Method & Path**: `GET /medical-notes`
 - **Path Params**: `-` (tidak ada)
@@ -2079,7 +2080,7 @@ WHERE ce.caregiver_profile_id = ?
 
 - **Catatan [FIX v5]**: Filter `child_name` ditambahkan untuk menyortir berdasarkan nama anak langsung. Filter `month` tetap dipertahankan. `prohibition_count`/`allergy_count` tetap dihitung dari `medical_restrictions` per `medical_note_id`.
 
-### 58. Get riwayat medical_notes (sudah tidak aktif) [FIX]
+### 57. Get riwayat medical_notes (sudah tidak aktif) [FIX]
 
 - **Method & Path**: `GET /medical-notes`
 - **Path Params**: `-` (tidak ada)
@@ -2111,7 +2112,7 @@ WHERE ce.caregiver_profile_id = ?
 - **Response Error**: sama seperti endpoint 56
 - **Catatan**: sama seperti catatan endpoint 56.
 
-### 59. Get rincian medical_notes
+### 58. Get rincian medical_notes
 
 - **Method & Path [FIX]**: `GET /medical-notes/{medical_note_id}`
 - **Auth**: divalidasi lewat `medical_note_id` -> pastikan `child_id` pemilik note tsb dimiliki oleh mother/caregiver yang login.
@@ -2147,7 +2148,7 @@ WHERE ce.caregiver_profile_id = ?
 | 403    | bukan milik user yang login |
 | 404    | tidak ditemukan             |
 
-### 60. Tambah catatan dokter
+### 59. Tambah catatan dokter
 
 - **Method & Path [FIX v4]**: `POST /medical-notes`
 - **Path Params [FIX v4]**: `-` (tidak ada — `child_id` sekarang dikirim di body, bukan di path)
@@ -2197,7 +2198,7 @@ WHERE ce.caregiver_profile_id = ?
 
 - **Catatan**: `prohibitions[]` -> row `medical_restrictions` dengan `type = 'prohibition'`; `allergies[]` -> row `medical_restrictions` dengan `type = 'allergy'`.
 
-### 61. [BARU] Edit catatan dokter
+### 60. [BARU] Edit catatan dokter
 
 - **Method & Path**: `PATCH /medical-notes/{medical_note_id}`
 - **Authorization**: sama seperti endpoint 60
@@ -2238,7 +2239,7 @@ WHERE ce.caregiver_profile_id = ?
 
 - **Catatan**: `child_id` tidak bisa diubah lewat endpoint ini (catatan medis tidak bisa dipindah ke anak lain — kalau salah anak, hapus lalu buat ulang lewat endpoint 61). Untuk `daily_nutrition_targets`/`prohibitions`/`allergies`, strategi update replace-all (sama seperti pola di endpoint 8). Celah dari v2 — sebelumnya hanya bisa create (33), tidak bisa edit kalau ada salah input (mis. salah ketik `valid_date`).
 
-### 62. [BARU] Hapus catatan dokter
+### 61. [BARU] Hapus catatan dokter
 
 - **Method & Path**: `DELETE /medical-notes/{medical_note_id}`
 - **Authorization**: sama seperti endpoint 60
@@ -2259,7 +2260,7 @@ WHERE ce.caregiver_profile_id = ?
 
 ## 9. Modul: Notification
 
-### 63. Get seluruh notifikasi [FIX]
+### 62. Get seluruh notifikasi [FIX]
 
 - **Method & Path [FIX]**: `GET /notifications`
 - **Path Params**: `-` (tidak ada)
@@ -2280,7 +2281,7 @@ WHERE ce.caregiver_profile_id = ?
 ]
 ```
 
-### 64. Get notifikasi terbaru
+### 63. Get notifikasi terbaru
 
 - **Method & Path**: `GET /notifications/latest`
 - **Path Params**: `-` (tidak ada)
@@ -2308,7 +2309,7 @@ WHERE ce.caregiver_profile_id = ?
 
 ## 10. Modul: Dashboard (gabungan)
 
-### 65. Get seluruh anak + tinggi, berat, skor KPSP, protein
+### 64. Get seluruh anak + tinggi, berat, skor KPSP, protein
 
 - **Method & Path**: `GET /dashboard/children`
 - **Path Params**: `-` (tidak ada)
@@ -2371,7 +2372,7 @@ Berdasarkan parameter warna dari ketiga status (Hijau = Normal/Sesuai/Baik, Kuni
 
 ## 11. Modul: Checkin
 
-### 66. Generate Checkin QR Token (POV Ibu)
+### 65. Generate Checkin QR Token (POV Ibu)
 
 - **Method & Path [BARU]**: `POST /checkin/generate`
 - **Authorization**: `Bearer <token>` (Ibu)
@@ -2394,7 +2395,7 @@ Berdasarkan parameter warna dari ketiga status (Hijau = Normal/Sesuai/Baik, Kuni
 }
 ```
 
-### 67. Validate Checkin QR (POV Caregiver)
+### 66. Validate Checkin QR (POV Caregiver)
 
 - **Method & Path [BARU]**: `POST /checkin/validate`
 - **Authorization**: `Bearer <token>` (Caregiver)
@@ -2461,7 +2462,7 @@ Berdasarkan parameter warna dari ketiga status (Hijau = Normal/Sesuai/Baik, Kuni
 | 27  | Child Development (KPSP) | `PATCH /children/{child_id}/checklist-milestone-progress`                  | Tandai checklist milestone (Sync / UPSERT)                           |
 | 28  | Child Development (KPSP) | `DELETE /development-reports/{child_development_report_id}`                | [BARU] Hapus development-report (salah input)                        |
 | 29  | Child Nutrition          | `GET /children/{child_id}/nutrition/today`                                 | Get nutrition report + menu hari ini + shopping list (POV mother)    |
-| 30  | Child Nutrition          | `GET /children/{child_id}/daily-menus/today`                               | Get menu hari ini                                                    |
+| 30  | Child Nutrition          | `POST /children/{child_id}/nutrition/reuse-recipe`                         | Reuse Recipe (Tukar Menu dengan Hari Lalu)                           |
 | 31  | Child Nutrition          | `PATCH /recipes/{recipe_id}/complete`                                      | Update status selesai recipe                                         |
 | 32  | Child Nutrition          | `PATCH /recipes/{recipe_id}/bookmark`                                      | [BARU] Update bookmark recipe                                        |
 | 33  | Child Nutrition          | `GET /recipes/{recipe_id}`                                                 | Get detail recipe                                                    |
@@ -2469,9 +2470,9 @@ Berdasarkan parameter warna dari ketiga status (Hijau = Normal/Sesuai/Baik, Kuni
 | 35  | Child Nutrition          | `GET /children/{child_id}/recipes/bookmarked`                              | Get bookmark menu                                                    |
 | 36  | Child Nutrition          | `GET /children/{child_id}/nutrition-reports`                               | [BARU] Get riwayat nutrition report per bulan                        |
 | 37  | Child Nutrition          | `GET /menu/daily-shop`                                                     | [BARU] Get list ingredient untuk daily shop (POV Mother & Caregiver) |
-| 38  | Child Nutrition          | `GET /children/{child_id}/daily-menus/today/shopping`                      | [BARU] Get menu hari ini + shopping list (POV caregiver)             |
+| 38  | Child Nutrition          | `GET /children/{child_id}/nutrition-reports/today/shopping`                | [BARU] Get menu hari ini + shopping list (POV caregiver)             |
 | 39  | Child Nutrition          | `POST /menu/generate`                                                      | [BARU] Generate menu dari AI (Food Engine)                           |
-| 40  | Child Nutrition          | `GET /children/{child_id}/daily-menus/{daily_menu_id}`                     | [BARU] Get daily menu by ID                                          |
+| 40  | Child Nutrition          | `GET /children/{child_id}/nutrition-reports/{report_id}`                   | [BARU] Get report menu by ID                                         |
 | 41  | Photos & Contacts        | `GET /mother-profiles/contacts`                                            | Get list teman (contacts)                                            |
 | 42  | Photos & Contacts        | `DELETE /contacts/{contact_id}`                                            | Hapus teman                                                          |
 | 43  | Photos & Contacts        | `GET /mother-profiles/child-photos`                                        | Get semua foto anak milik mother                                     |
@@ -2487,15 +2488,14 @@ Berdasarkan parameter warna dari ketiga status (Hijau = Normal/Sesuai/Baik, Kuni
 | 53  | Caregiver                | `GET /mother-profiles/caregiver-engagements/revoked`                       | [BARU] Get riwayat akses caregiver yang sudah dicabut (POV mother)   |
 | 54  | Caregiver                | `DELETE /caregiver-engagements/{caregiver_engagement_id}`                  | Hapus akses caregiver                                                |
 | 55  | Caregiver                | `GET /caregiver-profiles`                                                  | Get profil caregiver [FIX]                                           |
-| 56  | Caregiver                | `GET /caregiver-profiles/children`                                         | Get list child dari caregiver_engagement                             |
-| 57  | Medical                  | `GET /mother-profiles/medical-notes`                                       | Get list medical_notes aktif per anak [FIX]                          |
-| 58  | Medical                  | `GET /mother-profiles/medical-notes`                                       | Get riwayat medical_notes (sudah tidak aktif) [FIX]                  |
-| 59  | Medical                  | `GET /medical-notes/{medical_note_id}`                                     | Get rincian medical_notes                                            |
-| 60  | Medical                  | `POST /medical-notes`                                                      | Tambah catatan dokter                                                |
-| 61  | Medical                  | `PATCH /medical-notes/{medical_note_id}`                                   | [BARU] Edit catatan dokter                                           |
-| 62  | Medical                  | `DELETE /medical-notes/{medical_note_id}`                                  | [BARU] Hapus catatan dokter                                          |
-| 63  | Notification             | `GET /notifications`                                                       | Get seluruh notifikasi [FIX]                                         |
-| 64  | Notification             | `GET /notifications/latest`                                                | Get notifikasi terbaru                                               |
-| 65  | Dashboard (gabungan)     | `GET /dashboard/children`                                                  | Get seluruh anak + tinggi, berat, skor KPSP, protein                 |
-| 66  | Checkin                  | `POST /checkin/generate`                                                   | Generate Checkin QR Token (POV Ibu)                                  |
-| 67  | Checkin                  | `POST /checkin/validate`                                                   | Validate Checkin QR (POV Caregiver)                                  |
+| 56  | Medical                  | `GET /mother-profiles/medical-notes`                                       | Get list medical_notes aktif per anak [FIX]                          |
+| 57  | Medical                  | `GET /mother-profiles/medical-notes`                                       | Get riwayat medical_notes (sudah tidak aktif) [FIX]                  |
+| 58  | Medical                  | `GET /medical-notes/{medical_note_id}`                                     | Get rincian medical_notes                                            |
+| 59  | Medical                  | `POST /medical-notes`                                                      | Tambah catatan dokter                                                |
+| 60  | Medical                  | `PATCH /medical-notes/{medical_note_id}`                                   | [BARU] Edit catatan dokter                                           |
+| 61  | Medical                  | `DELETE /medical-notes/{medical_note_id}`                                  | [BARU] Hapus catatan dokter                                          |
+| 62  | Notification             | `GET /notifications`                                                       | Get seluruh notifikasi [FIX]                                         |
+| 63  | Notification             | `GET /notifications/latest`                                                | Get notifikasi terbaru                                               |
+| 64  | Dashboard (gabungan)     | `GET /dashboard/children`                                                  | Get seluruh anak + tinggi, berat, skor KPSP, protein                 |
+| 65  | Checkin                  | `POST /checkin/generate`                                                   | Generate Checkin QR Token (POV Ibu)                                  |
+| 66  | Checkin                  | `POST /checkin/validate`                                                   | Validate Checkin QR (POV Caregiver)                                  |

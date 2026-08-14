@@ -23,7 +23,7 @@ func NewCheckinService(repo *repository.CheckinRepository, caregiverRepo *reposi
 	return &CheckinService{repo: repo, caregiverRepo: caregiverRepo}
 }
 
-// GenerateToken (Endpoint: 66)
+// GenerateToken (Endpoint: 65)
 func (s *CheckinService) GenerateToken(ctx context.Context, childID uuid.UUID) (string, time.Time, error) {
 	// Jalankan lazy cleanup secara asynchronous di background
 	go func() {
@@ -42,7 +42,7 @@ func (s *CheckinService) GenerateToken(ctx context.Context, childID uuid.UUID) (
 	return token, expiresAt, err
 }
 
-// ValidateToken (Endpoint: 67)
+// ValidateToken (Endpoint: 66)
 func (s *CheckinService) ValidateToken(ctx context.Context, token string, userID string) (uuid.UUID, error) {
 	// 1. Check if token exists
 	data, err := s.repo.GetToken(ctx, token)

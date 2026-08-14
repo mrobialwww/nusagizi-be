@@ -49,8 +49,8 @@ type FoodEnginePayloadKondisi struct {
 // -----------------------------------------------------------------------------
 
 type FoodEngineResponse struct {
-	Meta    FoodEngineMeta   `json:"meta"`
-	Anak    []FoodEngineAnak `json:"anak"`
+	Meta    FoodEngineMeta    `json:"meta"`
+	Anak    []FoodEngineAnak  `json:"anak"`
 	Catatan FoodEngineCatatan `json:"catatan"`
 }
 
@@ -140,15 +140,15 @@ type FoodEngineSelingan struct {
 }
 
 type FoodEngineBahan struct {
-	Slot       string                `json:"slot"`
-	Kode       string                `json:"kode"`
-	GramMentah float64               `json:"gram_mentah"`
-	GramMatang float64               `json:"gram_matang"`
-	Satuan     string                `json:"satuan"`
-	Pengganti  []FoodEnginePengganti `json:"pengganti"`
+	Slot        string                 `json:"slot"`
+	Kode        string                 `json:"kode"`
+	GramMentah  float64                `json:"gram_mentah"`
+	GramMatang  float64                `json:"gram_matang"`
+	Satuan      string                 `json:"satuan"`
+	Substitutes []FoodEngineSubstitute `json:"pengganti"`
 }
 
-type FoodEnginePengganti struct {
+type FoodEngineSubstitute struct {
 	Kode    string  `json:"kode"`
 	Satuan  string  `json:"satuan"`
 	Energi  float64 `json:"energi"`

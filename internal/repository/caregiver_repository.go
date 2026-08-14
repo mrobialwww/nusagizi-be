@@ -146,35 +146,6 @@ func (r *CaregiverRepository) GetCaregiverProfile(ctx context.Context, caregiver
 	return &profile, nil
 }
 
-// GetCaregiverChildren gets children associated with a caregiver engagement.
-func (r *CaregiverRepository) GetCaregiverChildren(ctx context.Context, caregiverProfileID uuid.UUID) ([]caregiver.ChildSimpleResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	query := `
-		SELECT c.id, c.full_name, c.photo_url
-		FROM caregiver_engagements ce
-		JOIN children c ON c.id = ce.child_id
-		WHERE ce.caregiver_profile_id = $1 
-			AND ce.deleted_at IS NULL
-	`
-	rows, err := r.pool.Query(ctx, query, caregiverProfileID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var children []caregiver.ChildSimpleResponse
-	for rows.Next() {
-		var c caregiver.ChildSimpleResponse
-		if err := rows.Scan(&c.ID, &c.FullName, &c.PhotoURL); err != nil {
-			return nil, err
-		}
-		children = append(children, c)
-	}
-	return children, rows.Err()
-}
-
 // CheckCaregiverAccess returns true if the child has an active engagement with the caregiver.
 func (r *CaregiverRepository) CheckCaregiverAccess(ctx context.Context, childID, caregiverProfileID uuid.UUID) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

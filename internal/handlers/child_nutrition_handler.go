@@ -6,13 +6,16 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"nusagizi_be/internal/models"
+	child_nutri "nusagizi_be/internal/models/child_nutrition"
 	"nusagizi_be/internal/repository"
 	"nusagizi_be/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type ChildNutritionHandler struct {
@@ -32,7 +35,19 @@ func (h *ChildNutritionHandler) GetDailyShopIngredients(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.service.GetDailyShopIngredients(c.Request.Context(), requester.ID)
+	// Validate and parse date query parameter
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "query parameter 'date' is required"}})
+		return
+	}
+	targetDate, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid date format, must be YYYY-MM-DD"}})
+		return
+	}
+
+	resp, err := h.service.GetDailyShopIngredients(c.Request.Context(), requester.ID, targetDate)
 	if err != nil {
 		if errors.Is(err, repository.ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this resource"}})
@@ -62,7 +77,19 @@ func (h *ChildNutritionHandler) GetTodayMenuShopping(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.service.GetTodayMenuShopping(c.Request.Context(), requester.ID, childID)
+	// Require and parse the 'date' query parameter (YYYY-MM-DD)
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "query parameter 'date' is required"}})
+		return
+	}
+	targetDate, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid date format, expected YYYY-MM-DD"}})
+		return
+	}
+
+	resp, err := h.service.GetTodayMenuShopping(c.Request.Context(), requester.ID, childID, targetDate)
 	if err != nil {
 		if errors.Is(err, repository.ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this child"}})
@@ -92,10 +119,28 @@ func (h *ChildNutritionHandler) GetTodayNutritionReport(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.service.GetTodayNutritionReport(c.Request.Context(), requester.ID, childID)
+	// Require and parse the 'date' query parameter (YYYY-MM-DD)
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "date query parameter is required"}})
+		return
+	}
+
+	// Parse date query parameter
+	today, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid date format, expected YYYY-MM-DD"}})
+		return
+	}
+
+	resp, err := h.service.GetTodayNutritionReport(c.Request.Context(), requester.ID, childID, today)
 	if err != nil {
 		if errors.Is(err, repository.ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this child"}})
+			return
+		}
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "no rows") || errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "today's nutrition report not found"}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
@@ -105,8 +150,8 @@ func (h *ChildNutritionHandler) GetTodayNutritionReport(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetTodayDailyMenu (Endpoint: 30)
-func (h *ChildNutritionHandler) GetTodayDailyMenu(c *gin.Context) {
+// GetReportMenuByID (Endpoint: 40)
+func (h *ChildNutritionHandler) GetReportMenuByID(c *gin.Context) {
 	v, exists := c.Get("user")
 	requester, ok := v.(*models.User)
 	if !exists || !ok {
@@ -121,50 +166,21 @@ func (h *ChildNutritionHandler) GetTodayDailyMenu(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.service.GetTodayDailyMenu(c.Request.Context(), requester.ID, childID)
+	reportIDStr := c.Param("report_id")
+	reportID, err := uuid.Parse(reportIDStr)
 	if err != nil {
-		if errors.Is(err, repository.ErrForbidden) {
-			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this child"}})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid report_id format"}})
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
-}
-
-// GetDailyMenuByID (Endpoint: 40)
-func (h *ChildNutritionHandler) GetDailyMenuByID(c *gin.Context) {
-	v, exists := c.Get("user")
-	requester, ok := v.(*models.User)
-	if !exists || !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
-		return
-	}
-
-	childIDStr := c.Param("child_id")
-	childID, err := uuid.Parse(childIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
-		return
-	}
-
-	dailyMenuIDStr := c.Param("daily_menu_id")
-	dailyMenuID, err := uuid.Parse(dailyMenuIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid daily_menu_id format"}})
-		return
-	}
-
-	resp, err := h.service.GetDailyMenuByID(c.Request.Context(), requester.ID, childID, dailyMenuID)
+	resp, err := h.service.GetReportMenuByID(c.Request.Context(), requester.ID, childID, reportID)
 	if err != nil {
 		if errors.Is(err, repository.ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this child"}})
 			return
 		}
 		if err.Error() == "not found" || strings.Contains(err.Error(), "no rows") || errors.Is(err, repository.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "daily menu not found"}})
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "nutrition report menu not found"}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
@@ -190,9 +206,10 @@ func (h *ChildNutritionHandler) UpdateRecipeCompleteStatus(c *gin.Context) {
 		return
 	}
 
-	// Get portions_consumed from request body
+	// Get portions_consumed and report_date from request body
 	var reqBody struct {
 		PortionsConsumed float64 `json:"portions_consumed"`
+		ReportDate       string  `json:"report_date" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&reqBody); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid request body"}})
@@ -207,7 +224,14 @@ func (h *ChildNutritionHandler) UpdateRecipeCompleteStatus(c *gin.Context) {
 		return
 	}
 
-	err = h.service.UpdateRecipeCompleteStatus(c.Request.Context(), requester.ID, recipeID, reqBody.PortionsConsumed)
+	// Parse report_date
+	reportDate, err := time.Parse("2006-01-02", reqBody.ReportDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid report_date format, must be YYYY-MM-DD"}})
+		return
+	}
+
+	err = h.service.UpdateRecipeCompleteStatus(c.Request.Context(), requester.ID, recipeID, reqBody.PortionsConsumed, reportDate)
 	if err != nil {
 		if errors.Is(err, repository.ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this recipe"}})
@@ -296,37 +320,37 @@ func (h *ChildNutritionHandler) SwapMainIngredientPriority(c *gin.Context) {
 		return
 	}
 
-	recipeIDStr := c.Param("recipe_id")
-	recipeID, err := uuid.Parse(recipeIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid recipe_id format"}})
-		return
-	}
-
-	// Get slot and priority from request body
-	var reqBody struct {
-		Slot     string `json:"slot"`
-		Priority int    `json:"priority"`
-	}
+	var reqBody []child_nutri.SwapPriorityRequest
 	if err := c.ShouldBindJSON(&reqBody); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid request body"}})
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid request body format"}})
 		return
 	}
 
-	// Validate requested slot and priority
-	if reqBody.Slot == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "slot is required"}})
-		return
-	}
-	if reqBody.Priority <= 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "priority must be greater than 1 to be swapped to main ingredient"}})
+	if len(reqBody) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "empty request body"}})
 		return
 	}
 
-	err = h.service.SwapMainIngredientPriority(c.Request.Context(), requester.ID, recipeID, reqBody.Slot, reqBody.Priority)
+	// Validate request body
+	for _, req := range reqBody {
+		if req.RecipeID == uuid.Nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "recipe_id is required for all items"}})
+			return
+		}
+		if req.Slot == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "slot is required for all items"}})
+			return
+		}
+		if req.Priority <= 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "priority must be greater than 1 to be swapped to main ingredient"}})
+			return
+		}
+	}
+
+	err := h.service.SwapMainIngredientPriority(c.Request.Context(), requester.ID, reqBody)
 	if err != nil {
 		if errors.Is(err, repository.ErrForbidden) {
-			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this recipe"}})
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to one or more recipes"}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
@@ -407,4 +431,57 @@ func (h *ChildNutritionHandler) GetNutritionReportsByMonth(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+// ReuseRecipe (Endpoint: 30)
+func (h *ChildNutritionHandler) ReuseRecipe(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
+	}
+
+	childIDStr := c.Param("child_id")
+	childID, err := uuid.Parse(childIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
+		return
+	}
+
+	var input child_nutri.ReuseRecipeInputDTO
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid request body"}})
+		return
+	}
+
+	targetDate, err := time.Parse("2006-01-02", input.ReportDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid report_date format, must be YYYY-MM-DD"}})
+		return
+	}
+
+	err = h.service.ReuseRecipe(c.Request.Context(), requester.ID, childID, input.SourceRecipeID, targetDate)
+	if err != nil {
+		if errors.Is(err, repository.ErrForbidden) {
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have access to this child"}})
+			return
+		}
+		if strings.Contains(err.Error(), "nutrition report not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": err.Error()}})
+			return
+		}
+		if strings.Contains(err.Error(), "recipe does not belong to this child") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "source recipe does not belong to this child"}})
+			return
+		}
+		if errors.Is(err, pgx.ErrNoRows) || strings.Contains(err.Error(), "failed to verify source recipe") || strings.Contains(err.Error(), "failed to get source recipe") {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "source recipe not found"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Recipe reused successfully"})
 }

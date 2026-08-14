@@ -3,7 +3,7 @@
 -- =========================================================================
 
 WITH child_ids(id) AS (
-    -- 1. Daftar 3 ID Anak
+    -- 1. Daftar 3 ID Anak dari children.sql
     VALUES 
     ('0c4b4722-a02d-46d4-8d25-d420ba2b7f89'::UUID),
     ('61fa1c7e-81f9-4960-b226-af43f57e8b62'::UUID),

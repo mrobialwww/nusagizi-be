@@ -107,30 +107,3 @@ func (h *CaregiverHandler) DeleteCaregiverEngagement(c *gin.Context) {
 
 	c.Status(http.StatusOK)
 }
-
-// GetCaregiverChildren (endpoint: 56)
-func (h *CaregiverHandler) GetCaregiverChildren(c *gin.Context) {
-	v, exists := c.Get("user")
-	requester, ok := v.(*models.User)
-	if !exists || !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
-		return
-	}
-
-	children, err := h.service.GetCaregiverChildren(c.Request.Context(), requester.ID)
-	if err != nil {
-		switch {
-		case errors.Is(err, repository.ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have a caregiver profile"}})
-		default:
-			slog.Error("GetCaregiverChildren failed", "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
-		}
-		return
-	}
-
-	if children == nil {
-		children = []caregiver.ChildSimpleResponse{}
-	}
-	c.JSON(http.StatusOK, children)
-}

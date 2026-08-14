@@ -2,7 +2,9 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	child_nutri "nusagizi_be/internal/models/child_nutrition"
 	"nusagizi_be/internal/repository"
@@ -32,38 +34,36 @@ func NewChildNutritionService(
 }
 
 // GetTodayNutritionReport (Endpoint: 29)
-func (s *ChildNutritionService) GetTodayNutritionReport(ctx context.Context, userID string, childID uuid.UUID) (*child_nutri.TodayNutritionReportResponse, error) {
+func (s *ChildNutritionService) GetTodayNutritionReport(ctx context.Context, userID string, childID uuid.UUID, reportDate time.Time) (*child_nutri.TodayNutritionReportResponse, error) {
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
 	}
-	resp, err := s.repo.GetTodayNutritionReport(ctx, childID)
+
+	resp, err := s.repo.GetTodayNutritionReport(ctx, childID, reportDate)
 	if err != nil {
 		return nil, err
 	}
+
+	// Add flag CanRegenerate based on IsReportReused
+	isReused, _ := s.repo.IsReportReused(ctx, resp.ID)
+	resp.CanRegenerate = !isReused
+
 	if resp != nil {
 		resp.Status = DetermineNutritionStatus(resp)
 	}
 	return resp, nil
 }
 
-// GetTodayDailyMenu (Endpoint: 30)
-func (s *ChildNutritionService) GetTodayDailyMenu(ctx context.Context, userID string, childID uuid.UUID) (*child_nutri.MenuResponse, error) {
+// GetReportMenuByID (Endpoint: 40)
+func (s *ChildNutritionService) GetReportMenuByID(ctx context.Context, userID string, childID uuid.UUID, reportID uuid.UUID) (*child_nutri.MenuResponse, error) {
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
 	}
-	return s.repo.GetTodayDailyMenu(ctx, childID)
-}
-
-// GetDailyMenuByID (Endpoint: 40)
-func (s *ChildNutritionService) GetDailyMenuByID(ctx context.Context, userID string, childID uuid.UUID, dailyMenuID uuid.UUID) (*child_nutri.MenuResponse, error) {
-	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
-		return nil, err
-	}
-	return s.repo.GetDailyMenuByID(ctx, childID, dailyMenuID)
+	return s.repo.GetReportMenuByID(ctx, childID, reportID)
 }
 
 // UpdateRecipeCompleteStatus (Endpoint: 31)
-func (s *ChildNutritionService) UpdateRecipeCompleteStatus(ctx context.Context, userID string, recipeID uuid.UUID, portionsConsumed float64) error {
+func (s *ChildNutritionService) UpdateRecipeCompleteStatus(ctx context.Context, userID string, recipeID uuid.UUID, portionsConsumed float64, reportDate time.Time) error {
 	childID, err := s.repo.GetChildIDByRecipeID(ctx, recipeID)
 	if err != nil {
 		return err
@@ -71,7 +71,13 @@ func (s *ChildNutritionService) UpdateRecipeCompleteStatus(ctx context.Context, 
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return err
 	}
-	return s.repo.UpdateRecipeCompleteStatus(ctx, recipeID, portionsConsumed)
+
+	todayReport, err := s.repo.GetReportByChildAndDate(ctx, childID, reportDate)
+	if err != nil {
+		return fmt.Errorf("failed to get nutrition report for the specified date: %w", err)
+	}
+
+	return s.repo.UpdateRecipeCompleteStatus(ctx, recipeID, todayReport.ID, portionsConsumed)
 }
 
 // UpdateRecipeBookmarkStatus (Endpoint: 32)
@@ -99,15 +105,25 @@ func (s *ChildNutritionService) GetRecipeDetail(ctx context.Context, userID stri
 }
 
 // SwapMainIngredientPriority (Endpoint: 34)
-func (s *ChildNutritionService) SwapMainIngredientPriority(ctx context.Context, userID string, recipeID uuid.UUID, slot string, priority int) error {
-	childID, err := s.repo.GetChildIDByRecipeID(ctx, recipeID)
-	if err != nil {
-		return err
+func (s *ChildNutritionService) SwapMainIngredientPriority(ctx context.Context, userID string, requests []child_nutri.SwapPriorityRequest) error {
+	// Phase 1: Pre-flight check (Access Validation)
+	recipeChildMap := make(map[uuid.UUID]uuid.UUID) // Cache childID per recipeID to avoid redundant queries for duplicate recipeIDs.
+
+	for _, req := range requests {
+		if _, exists := recipeChildMap[req.RecipeID]; !exists {
+			childID, err := s.repo.GetChildIDByRecipeID(ctx, req.RecipeID)
+			if err != nil {
+				return err
+			}
+			if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
+				return err
+			}
+			recipeChildMap[req.RecipeID] = childID
+		}
 	}
-	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
-		return err
-	}
-	return s.repo.SwapMainIngredientPriority(ctx, recipeID, slot, priority)
+
+	// Phase 2: Atomic Execution
+	return s.repo.SwapMainIngredientPriority(ctx, requests)
 }
 
 // GetBookmarkedRecipes (Endpoint: 35)
@@ -133,27 +149,61 @@ func (s *ChildNutritionService) GetNutritionReportsByMonth(ctx context.Context, 
 }
 
 // GetDailyShopIngredients (Endpoint: 37)
-func (s *ChildNutritionService) GetDailyShopIngredients(ctx context.Context, userID string) ([]child_nutri.DailyShopIngredient, error) {
-	// 1. Coba mother profile terlebih dahulu
+func (s *ChildNutritionService) GetDailyShopIngredients(ctx context.Context, userID string, targetDate time.Time) ([]child_nutri.DailyShopIngredient, error) {
+	// Try mother profile first
 	if motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID); err == nil {
-		return s.repo.GetDailyShopByMother(ctx, motherProfileID)
+		return s.repo.GetDailyShopByMother(ctx, motherProfileID, targetDate)
 	}
 
-	// 2. Jika bukan mother, coba caregiver profile
+	// If not mother, try caregiver profile
 	if caregiverProfileID, err := s.caregiverRepo.GetByUserID(ctx, userID); err == nil {
-		return s.repo.GetDailyShopByCaregiver(ctx, caregiverProfileID)
+		return s.repo.GetDailyShopByCaregiver(ctx, caregiverProfileID, targetDate)
 	}
 
-	// 3. Jika bukan keduanya, return error
+	// If neither, return error
 	return nil, fmt.Errorf("%w: user has no access (must be mother or caregiver)", repository.ErrForbidden)
 }
 
 // GetTodayMenuShopping (Endpoint: 38)
-func (s *ChildNutritionService) GetTodayMenuShopping(ctx context.Context, userID string, childID uuid.UUID) (*child_nutri.MenuShoppingResponse, error) {
+func (s *ChildNutritionService) GetTodayMenuShopping(ctx context.Context, userID string, childID uuid.UUID, targetDate time.Time) (*child_nutri.MenuShoppingResponse, error) {
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
 	}
-	return s.repo.GetTodayMenuShopping(ctx, childID)
+	return s.repo.GetTodayMenuShopping(ctx, childID, targetDate)
+}
+
+// ReuseRecipe (Endpoint: 30)
+func (s *ChildNutritionService) ReuseRecipe(ctx context.Context, requesterID string, childID uuid.UUID, sourceRecipeID uuid.UUID, targetDate time.Time) error {
+	if err := checkChildAccess(ctx, requesterID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
+		return err
+	}
+
+	// Get target CNR
+	targetCNR, err := s.repo.GetReportByChildAndDate(ctx, childID, targetDate)
+	if err != nil {
+		return fmt.Errorf("failed to get target nutrition report: %w", err)
+	}
+	if targetCNR == nil {
+		return errors.New("nutrition report not found for the specified date")
+	}
+
+	// Ensure the source recipe actually belongs to the target child
+	sourceChildID, err := s.repo.GetChildIDByRecipeID(ctx, sourceRecipeID)
+	if err != nil {
+		return fmt.Errorf("failed to verify source recipe: %w", err)
+	}
+	if sourceChildID != childID {
+		return errors.New("invalid source recipe: recipe does not belong to this child")
+	}
+
+	// Get source recipe meal_time
+	targetMealTime, err := s.repo.GetRecipeMealTime(ctx, sourceRecipeID)
+	if err != nil {
+		return fmt.Errorf("failed to get source recipe meal time: %w", err)
+	}
+
+	// Execute Repo Tx
+	return s.repo.ReuseRecipeTx(ctx, targetCNR.ID, sourceRecipeID, targetMealTime)
 }
 
 // ================================== HELPER FUNCTION ===================================
