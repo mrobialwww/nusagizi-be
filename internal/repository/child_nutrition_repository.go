@@ -283,24 +283,58 @@ func (r *ChildNutritionRepository) GetChildIDByRecipeID(ctx context.Context, rec
 	return childID, nil
 }
 
-// UpdateRecipeCompleteStatus updates a recipe's completion status through portions consumed in junction table.
+// UpdateRecipeCompleteStatus updates a recipe's completion status through portions consumed in junction table,
+// and automatically updates the total daily macronutrients in the parent report table.
 func (r *ChildNutritionRepository) UpdateRecipeCompleteStatus(ctx context.Context, recipeID uuid.UUID, reportID uuid.UUID, portionsConsumed float64) error {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	queryUpdate := `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) // no-op if committed
+
+	// Update recipe consumption in junction table
+	queryUpdateJunction := `
 		UPDATE child_nutrition_recipes
 		SET portions_consumed = $1
 		WHERE recipe_id = $2 AND child_nutrition_report_id = $3
 	`
-	tag, err := r.pool.Exec(ctx, queryUpdate, portionsConsumed, recipeID, reportID)
+	tag, err := tx.Exec(ctx, queryUpdateJunction, portionsConsumed, recipeID, reportID)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("recipe junction not found")
 	}
-	return nil
+
+	// Recalculate daily totals and update parent report table atomically
+	queryUpdateReport := `
+		WITH recipe_totals AS (
+			SELECT
+				COALESCE(SUM(r.calories * cnr.portions_consumed), 0)     AS total_calories,
+				COALESCE(SUM(r.protein * cnr.portions_consumed), 0)      AS total_protein,
+				COALESCE(SUM(r.fat * cnr.portions_consumed), 0)          AS total_fat,
+				COALESCE(SUM(r.carbohydrate * cnr.portions_consumed), 0) AS total_carbohydrate
+			FROM child_nutrition_recipes cnr
+			JOIN recipes r ON r.id = cnr.recipe_id
+			WHERE cnr.child_nutrition_report_id = $1
+		)
+		UPDATE child_nutrition_reports AS report
+		SET
+			calories     = recipe_totals.total_calories,
+			protein      = recipe_totals.total_protein,
+			fat          = recipe_totals.total_fat,
+			carbohydrate = recipe_totals.total_carbohydrate
+		FROM recipe_totals
+		WHERE report.id = $1
+		`
+	if _, err := tx.Exec(ctx, queryUpdateReport, reportID); err != nil {
+		return fmt.Errorf("failed to update daily nutrition totals: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }
 
 // UpdateRecipeBookmarkStatus updates a recipe's bookmark status.
