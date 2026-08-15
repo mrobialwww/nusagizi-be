@@ -68,15 +68,19 @@ func (r *MenuRepository) ReplaceTodayMenu(
 
 		// Delete Orphan Recipes
 		if len(oldRecipeIDs) > 0 {
+			var recipeIDStrs []string
+			for _, id := range oldRecipeIDs {
+				recipeIDStrs = append(recipeIDStrs, id.String())
+			}
 			const deleteOrphans = `
 				DELETE FROM recipes 
-				WHERE id = ANY($1) 
+				WHERE id = ANY($1::uuid[]) 
 					AND NOT EXISTS (
 						SELECT 1 
 						FROM child_nutrition_recipes 
 						WHERE recipe_id = recipes.id
 					)`
-			if _, err := tx.Exec(ctx, deleteOrphans, oldRecipeIDs); err != nil {
+			if _, err := tx.Exec(ctx, deleteOrphans, recipeIDStrs); err != nil {
 				return fmt.Errorf("failed to delete orphan recipes: %w", err)
 			}
 		}
