@@ -29,15 +29,18 @@ func (r *ChildDevelopmentRepository) GetLatestDevelopmentReport(ctx context.Cont
 	var reportID uuid.UUID
 
 	queryReport := `
-		SELECT id, kpsp_score, next_check_date, created_at
-		FROM child_development_reports
-		WHERE child_id = $1
-		ORDER BY created_at DESC
+		SELECT 
+			cdr.id, cdr.kpsp_score, cdr.next_check_date, cdr.created_at,
+			(SELECT COUNT(*) FROM assessment_kpsp_answers aka WHERE aka.child_development_report_id = cdr.id) as kpsp_answers_count
+		FROM child_development_reports cdr
+		WHERE cdr.child_id = $1
+		ORDER BY cdr.created_at DESC
 		LIMIT 1
 	`
 	var nextCheckDate *time.Time
 	var createdAt time.Time
-	err := r.pool.QueryRow(ctx, queryReport, childID).Scan(&reportID, &report.KPSPScore, &nextCheckDate, &createdAt)
+	var kpspAnswersCount int
+	err := r.pool.QueryRow(ctx, queryReport, childID).Scan(&reportID, &report.KPSPScore, &nextCheckDate, &createdAt, &kpspAnswersCount)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("record not found")
@@ -55,13 +58,14 @@ func (r *ChildDevelopmentRepository) GetLatestDevelopmentReport(ctx context.Cont
 	}
 
 	report.CreatedAt = &createdAt
+	report.KPSPAnswersCount = &kpspAnswersCount
 
 	// Fetch domains aggregation
 	queryDomains := `
 		SELECT 
 			q.developmental_domain,
 			COUNT(q.id) as total_question,
-			COUNT(a.id) FILTER (WHERE a.assessment_kpsp_answer = true) as true_answer
+			COUNT(a.id) FILTER (WHERE a.answer = true) as true_answer
 		FROM assessment_kpsp_answers a
 		JOIN assessment_kpsp_questions q ON a.assessment_kpsp_question_id = q.id
 		WHERE a.child_development_report_id = $1
@@ -126,24 +130,30 @@ func (r *ChildDevelopmentRepository) GetDevelopmentReportByID(ctx context.Contex
 
 	// Fetch specific report by ID
 	queryReport := `
-		SELECT id, kpsp_score, month_target
-		FROM child_development_reports
-		WHERE id = $1
+		SELECT 
+			cdr.id, cdr.child_id, cdr.kpsp_score, cdr.month_target,
+			(SELECT COUNT(*) FROM assessment_kpsp_answers aka WHERE aka.child_development_report_id = cdr.id) as kpsp_answers_count
+		FROM child_development_reports cdr
+		WHERE cdr.id = $1
 	`
 	var monthTarget int
+	var kpspAnswersCount int
+	var childID uuid.UUID
 
-	err := r.pool.QueryRow(ctx, queryReport, reportID).Scan(&report.ID, &report.KPSPScore, &monthTarget)
+	err := r.pool.QueryRow(ctx, queryReport, reportID).Scan(&report.ID, &childID, &report.KPSPScore, &monthTarget, &kpspAnswersCount)
 	if err != nil {
 		return nil, err
 	}
 	report.MonthTarget = &monthTarget
+	report.KPSPAnswersCount = &kpspAnswersCount
+	report.ChildID = &childID
 
 	// Fetch domains
 	queryDomains := `
 		SELECT 
 			q.developmental_domain,
 			COUNT(q.id) as total_question,
-			COUNT(a.id) FILTER (WHERE a.assessment_kpsp_answer = true) as true_answer
+			COUNT(a.id) FILTER (WHERE a.answer = true) as true_answer
 		FROM assessment_kpsp_answers a
 		JOIN assessment_kpsp_questions q ON a.assessment_kpsp_question_id = q.id
 		WHERE a.child_development_report_id = $1
@@ -169,7 +179,7 @@ func (r *ChildDevelopmentRepository) GetRecommendationsByDevelopmentalDomain(ctx
 	var recs []child_dev.RecommendedAction
 
 	queryRecs := `
-		SELECT ra.id, ra.assessment_kpsp_question_id, ra.title, ra.action_text
+		SELECT ra.id, ra.title, ra.action_text
 		FROM development_report_recommendations aar
 		JOIN recommended_actions ra ON aar.recommended_action_id = ra.id
 		JOIN assessment_kpsp_questions q ON ra.assessment_kpsp_question_id = q.id
@@ -184,7 +194,7 @@ func (r *ChildDevelopmentRepository) GetRecommendationsByDevelopmentalDomain(ctx
 
 	for rows.Next() {
 		var rec child_dev.RecommendedAction
-		if err := rows.Scan(&rec.ID, &rec.AssessmentKPSPQuestionID, &rec.Title, &rec.ActionText); err != nil {
+		if err := rows.Scan(&rec.ID, &rec.Title, &rec.ActionText); err != nil {
 			return nil, err
 		}
 		recs = append(recs, rec)
@@ -198,10 +208,10 @@ func (r *ChildDevelopmentRepository) GetKPSPQuestions(ctx context.Context, month
 	defer cancel()
 
 	query := `
-		SELECT id, "order", developmental_domain, month_target, question, created_at, updated_at
+		SELECT id, developmental_domain, month_target, question_text, image_url, created_at, updated_at
 		FROM assessment_kpsp_questions
 		WHERE month_target = $1
-		ORDER BY "order" ASC`
+		ORDER BY created_at ASC`
 
 	rows, err := r.pool.Query(ctx, query, monthTarget)
 	if err != nil {
@@ -213,8 +223,8 @@ func (r *ChildDevelopmentRepository) GetKPSPQuestions(ctx context.Context, month
 	for rows.Next() {
 		var q child_dev.AssessmentKPSPQuestion
 		if err := rows.Scan(
-			&q.ID, &q.Order, &q.DevelopmentalDomain, &q.MonthTarget, 
-			&q.Question, &q.CreatedAt, &q.UpdatedAt,
+			&q.ID, &q.DevelopmentalDomain, &q.MonthTarget,
+			&q.QuestionText, &q.ImageURL, &q.CreatedAt, &q.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -254,7 +264,7 @@ func (r *ChildDevelopmentRepository) CreateDevelopmentReport(
 
 	// Insert answers and conditionally fetch recommendations for false answers
 	queryAnswer := `
-		INSERT INTO assessment_kpsp_answers (id, child_development_report_id, assessment_kpsp_question_id, assessment_kpsp_answer)
+		INSERT INTO assessment_kpsp_answers (id, child_development_report_id, assessment_kpsp_question_id, answer)
 		VALUES ($1, $2, $3, $4)
 	`
 	queryRecFetch := `
@@ -302,27 +312,27 @@ func (r *ChildDevelopmentRepository) UpdateDevelopmentReport(
 	reportID uuid.UUID,
 	answers []child_dev.KPSPAnswerInput,
 	nextCheckDate *time.Time,
-) error {
+) (uuid.UUID, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	defer tx.Rollback(ctx)
 
 	// Update the answers. We just update existing ones based on question_id
 	updateAnswerQuery := `
 		UPDATE assessment_kpsp_answers 
-		SET assessment_kpsp_answer = $1 
+		SET answer = $1 
 		WHERE child_development_report_id = $2 
 			AND assessment_kpsp_question_id = $3
 	`
 	for _, ans := range answers {
 		_, err = tx.Exec(ctx, updateAnswerQuery, ans.Answer, reportID, ans.AssessmentKPSPQuestionID)
 		if err != nil {
-			return err
+			return uuid.Nil, err
 		}
 	}
 
@@ -332,11 +342,11 @@ func (r *ChildDevelopmentRepository) UpdateDevelopmentReport(
 		SELECT COUNT(*) 
 		FROM assessment_kpsp_answers 
 		WHERE child_development_report_id = $1 
-			AND assessment_kpsp_answer = true
+			AND answer = true
 	`
 	err = tx.QueryRow(ctx, queryRecalculateScore, reportID).Scan(&newScore)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	// Delete all existing recommendations for this report to regenerate them
@@ -346,7 +356,7 @@ func (r *ChildDevelopmentRepository) UpdateDevelopmentReport(
 	`
 	_, err = tx.Exec(ctx, queryDeleteRecs, reportID)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	// Regenerate recommendations for current false answers
@@ -354,17 +364,17 @@ func (r *ChildDevelopmentRepository) UpdateDevelopmentReport(
 		SELECT assessment_kpsp_question_id 
 		FROM assessment_kpsp_answers 
 		WHERE child_development_report_id = $1 
-			AND assessment_kpsp_answer = false`
+			AND answer = false`
 	rows, err := tx.Query(ctx, queryFalseAnswers, reportID)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	var falseQuestions []uuid.UUID
 	for rows.Next() {
 		var qID uuid.UUID
 		if err := rows.Scan(&qID); err != nil {
 			rows.Close()
-			return err
+			return uuid.Nil, err
 		}
 		falseQuestions = append(falseQuestions, qID)
 	}
@@ -386,7 +396,7 @@ func (r *ChildDevelopmentRepository) UpdateDevelopmentReport(
 		if err == nil {
 			_, err = tx.Exec(ctx, queryRecInsert, reportID, recID)
 			if err != nil {
-				return err
+				return uuid.Nil, err
 			}
 		}
 	}
@@ -399,10 +409,13 @@ func (r *ChildDevelopmentRepository) UpdateDevelopmentReport(
 	`
 	_, err = tx.Exec(ctx, queryUpdateScore, newScore, nextCheckDate, reportID)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, err
+	}
+	return reportID, nil
 }
 
 // DeleteDevelopmentReport performs a hard delete on a development report.
@@ -425,19 +438,20 @@ func (r *ChildDevelopmentRepository) DeleteDevelopmentReport(ctx context.Context
 }
 
 // GetChecklistMilestoneTasks returns checklist tasks with an is_checked boolean via LEFT JOIN.
-func (r *ChildDevelopmentRepository) GetChecklistMilestoneTasks(ctx context.Context, childID uuid.UUID, monthTarget int) ([]child_dev.ChecklistMilestoneTaskResponse, error) {
+func (r *ChildDevelopmentRepository) GetChecklistMilestoneTasks(ctx context.Context, childID uuid.UUID, monthTarget int) ([]child_dev.ChecklistMilestoneResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	query := `
 		SELECT 
-			t.id, t.developmental_domain, t.task_description,
-			CASE WHEN p.checklist_milestone_task_id IS NOT NULL THEN true ELSE false END as is_checked
-		FROM checklist_milestone_tasks t
+			q.id, q.developmental_domain, q.question_text,
+			CASE WHEN p.assessment_kpsp_question_id IS NOT NULL THEN true ELSE false END as is_checked
+		FROM assessment_kpsp_questions q
 		LEFT JOIN checklist_milestone_progress p 
-			ON t.id = p.checklist_milestone_task_id 
+			ON q.id = p.assessment_kpsp_question_id 
 			AND p.child_id = $1
-		WHERE t.month_target = $2
+		WHERE q.month_target = $2
+		ORDER BY q.created_at ASC
 	`
 	rows, err := r.pool.Query(ctx, query, childID, monthTarget)
 	if err != nil {
@@ -445,11 +459,11 @@ func (r *ChildDevelopmentRepository) GetChecklistMilestoneTasks(ctx context.Cont
 	}
 	defer rows.Close()
 
-	var tasks []child_dev.ChecklistMilestoneTaskResponse
+	var tasks []child_dev.ChecklistMilestoneResponse
 	for rows.Next() {
-		var t child_dev.ChecklistMilestoneTaskResponse
+		var t child_dev.ChecklistMilestoneResponse
 		if err := rows.Scan(
-			&t.ID, &t.DevelopmentalDomain, &t.TaskDescription, &t.IsChecked,
+			&t.ID, &t.DevelopmentalDomain, &t.QuestionText, &t.IsChecked,
 		); err != nil {
 			return nil, err
 		}
@@ -459,7 +473,7 @@ func (r *ChildDevelopmentRepository) GetChecklistMilestoneTasks(ctx context.Cont
 }
 
 // UpdateChecklistMilestone performs a replace-all operation on checklist progress for a child.
-func (r *ChildDevelopmentRepository) UpdateChecklistMilestone(ctx context.Context, childID uuid.UUID, taskIDs []uuid.UUID) error {
+func (r *ChildDevelopmentRepository) UpdateChecklistMilestone(ctx context.Context, childID uuid.UUID, questionIDs []uuid.UUID) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -469,7 +483,7 @@ func (r *ChildDevelopmentRepository) UpdateChecklistMilestone(ctx context.Contex
 	}
 	defer tx.Rollback(ctx)
 
-	if len(taskIDs) == 0 {
+	if len(questionIDs) == 0 {
 		// If empty, just delete all for this child
 		queryDeleteAll := `
 			DELETE FROM checklist_milestone_progress 
@@ -480,25 +494,31 @@ func (r *ChildDevelopmentRepository) UpdateChecklistMilestone(ctx context.Contex
 			return err
 		}
 	} else {
+		// Convert UUID array to string array to fix pgx array encoding bug
+		strIDs := make([]string, len(questionIDs))
+		for i, id := range questionIDs {
+			strIDs[i] = id.String()
+		}
+
 		// 1. Delete tasks that are NOT in the new list (un-checked by user)
 		queryDeleteUnchecked := `
 			DELETE FROM checklist_milestone_progress 
 			WHERE child_id = $1 
-				AND checklist_milestone_task_id != ALL($2)
+				AND assessment_kpsp_question_id != ALL($2::uuid[])
 		`
-		_, err = tx.Exec(ctx, queryDeleteUnchecked, childID, taskIDs)
+		_, err = tx.Exec(ctx, queryDeleteUnchecked, childID, strIDs)
 		if err != nil {
 			return err
 		}
 
 		// 2. Insert the new ones, ignoring if they already exist (ON CONFLICT DO NOTHING)
 		queryInsertProgress := `
-			INSERT INTO checklist_milestone_progress (child_id, checklist_milestone_task_id) 
+			INSERT INTO checklist_milestone_progress (child_id, assessment_kpsp_question_id) 
 			VALUES ($1, $2)
-			ON CONFLICT (child_id, checklist_milestone_task_id) DO NOTHING
+			ON CONFLICT (child_id, assessment_kpsp_question_id) DO NOTHING
 		`
-		for _, taskID := range taskIDs {
-			_, err = tx.Exec(ctx, queryInsertProgress, childID, taskID)
+		for _, questionID := range questionIDs {
+			_, err = tx.Exec(ctx, queryInsertProgress, childID, questionID)
 			if err != nil {
 				return err
 			}

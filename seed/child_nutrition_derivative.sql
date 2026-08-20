@@ -26,9 +26,9 @@ $$ LANGUAGE plpgsql;
 
 DO $$
 DECLARE
-    mother_id UUID := '8bdee998-ad6e-46ba-bf57-2e69afaeef78';
+    mother_id UUID := 'f545662d-feca-453d-bfa2-a19aab224a16';
     d1 DATE := '2026-08-01'; 
-    d2 DATE := '2026-08-25';
+    d2 DATE := '2026-08-20';
     meals TEXT[] := ARRAY[
         'breakfast:0.25:Bubur',
         'morning_snack:0.10:Camilan',
@@ -99,6 +99,7 @@ DECLARE
     karbo_chosen TEXT[];
     protein_chosen TEXT[];
     sayur_chosen TEXT[];
+    img_url TEXT;
 BEGIN
     FOR c IN
         SELECT id, full_name,
@@ -164,13 +165,23 @@ BEGIN
 
                 port := (ARRAY[0, 0.33, 0.66, 1])[1 + floor(random() * 4)::int];
                 
+                IF nm ILIKE '%nasi%' THEN
+                    img_url := 'recipes/nasi-gurih.png';
+                ELSIF nm ILIKE '%camilan%' THEN
+                    img_url := 'recipes/bola-bola.png';
+                ELSIF nm ILIKE '%sup%' THEN
+                    img_url := 'recipes/sup.png';
+                ELSE
+                    img_url := 'recipes/tumis.png';
+                END IF;
+
                 INSERT INTO recipes (
                     id, name, meal_time, meal_texture, calories, 
-                    protein, carbohydrate, fat, description, cooking_time, is_bookmarked,
+                    protein, carbohydrate, fat, description, cooking_time, is_bookmarked, image_url,
                     created_at, updated_at
                 ) VALUES (
                     recid, nm, mt::meal_time_type, tex, cal, prot, carb, fat, ds,
-                    (10 + floor(random() * 4) * 10) || ' menit', random() < 0.2,
+                    (10 + floor(random() * 4) * 10) || ' menit', random() < 0.2, img_url,
                     dt + TIME '08:00', dt + TIME '08:00'
                 );
 

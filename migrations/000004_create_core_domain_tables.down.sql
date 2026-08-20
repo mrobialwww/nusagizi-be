@@ -57,8 +57,6 @@ DROP TABLE IF EXISTS child_nutrition_reports;
 -- ---------------------------------------------------------------------
 DROP TABLE IF EXISTS checklist_milestone_progress;
 
-DROP TABLE IF EXISTS checklist_milestone_tasks;
-
 DROP TABLE IF EXISTS development_report_recommendations;
 
 DROP TABLE IF EXISTS recommended_actions;

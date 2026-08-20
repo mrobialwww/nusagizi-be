@@ -97,20 +97,13 @@ func (h *ChildDevelopmentHandler) GetDevelopmentReportByID(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
-
-	childID, err := uuid.Parse(c.Param("child_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
-		return
-	}
-
 	reportID, err := uuid.Parse(c.Param("child_development_report_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid report_id format"}})
 		return
 	}
 
-	resp, err := h.service.GetDevelopmentReportByID(c.Request.Context(), requester.ID, childID, reportID)
+	resp, err := h.service.GetDevelopmentReportByID(c.Request.Context(), requester.ID, reportID)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrForbidden):
@@ -242,7 +235,7 @@ func (h *ChildDevelopmentHandler) UpdateDevelopmentReport(c *gin.Context) {
 		return
 	}
 
-	err = h.service.UpdateDevelopmentReport(c.Request.Context(), requester.ID, childID, reportID, &input)
+	updatedID, err := h.service.UpdateDevelopmentReport(c.Request.Context(), requester.ID, childID, reportID, &input)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrForbidden):
@@ -256,7 +249,7 @@ func (h *ChildDevelopmentHandler) UpdateDevelopmentReport(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusOK)
+	c.JSON(http.StatusOK, gin.H{"id": updatedID})
 }
 
 // GetChecklistMilestoneTasks (Endpoint: 25)
@@ -361,14 +354,14 @@ func (h *ChildDevelopmentHandler) UpdateChecklistMilestone(c *gin.Context) {
 
 	// Empty array is explicitly allowed to enable clearing all tasks
 	var input struct {
-		ChecklistMilestoneTaskIDs []uuid.UUID `json:"checklist_milestone_task_ids"`
+		AssessmentKPSPQuestionIDs []uuid.UUID `json:"assessment_kpsp_question_ids"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": err.Error()}})
 		return
 	}
 
-	err = h.service.UpdateChecklistMilestone(c.Request.Context(), requester.ID, childID, input.ChecklistMilestoneTaskIDs)
+	err = h.service.UpdateChecklistMilestone(c.Request.Context(), requester.ID, childID, input.AssessmentKPSPQuestionIDs)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrForbidden):
@@ -393,20 +386,13 @@ func (h *ChildDevelopmentHandler) DeleteDevelopmentReport(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
 		return
 	}
-
-	childID, err := uuid.Parse(c.Param("child_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
-		return
-	}
-
 	reportID, err := uuid.Parse(c.Param("child_development_report_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_development_report_id format"}})
 		return
 	}
 
-	err = h.service.DeleteDevelopmentReport(c.Request.Context(), requester.ID, childID, reportID)
+	err = h.service.DeleteDevelopmentReport(c.Request.Context(), requester.ID, reportID)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrForbidden):

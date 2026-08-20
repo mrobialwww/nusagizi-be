@@ -54,17 +54,18 @@ func (r *ChildNutritionRepository) GetTodayNutritionReport(ctx context.Context, 
 
 	// Fetch Recipes from Junction
 	queryRecipes := `
-		SELECT r.id, r.name, r.meal_time, r.meal_texture, r.calories, r.protein, cnr.portions_consumed, r.is_bookmarked
+		SELECT r.id, r.name, r.meal_time, r.meal_texture, r.calories, r.protein, cnr.portions_consumed, r.is_bookmarked, r.image_url
 		FROM recipes r
 		JOIN child_nutrition_recipes cnr ON cnr.recipe_id = r.id
 		WHERE cnr.child_nutrition_report_id = $1
+		LIMIT 2
 	`
 	rows, err := r.pool.Query(ctx, queryRecipes, report.ID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var rec child_nutri.RecipeResponse
-			if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed, &rec.IsBookmarked); err == nil {
+			if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed, &rec.IsBookmarked, &rec.ImageURL); err == nil {
 				report.Menu.Recipes = append(report.Menu.Recipes, rec)
 			}
 		}
@@ -129,7 +130,7 @@ func (r *ChildNutritionRepository) GetReportMenuByID(ctx context.Context, childI
 
 	// Fetch Recipes
 	queryRecipes := `
-		SELECT r.id, r.name, r.meal_time, r.meal_texture, r.calories, r.protein, cnr.portions_consumed
+		SELECT r.id, r.name, r.meal_time, r.meal_texture, r.calories, r.protein, cnr.portions_consumed, r.image_url
 		FROM recipes r
 		JOIN child_nutrition_recipes cnr ON cnr.recipe_id = r.id
 		WHERE cnr.child_nutrition_report_id = $1
@@ -142,7 +143,7 @@ func (r *ChildNutritionRepository) GetReportMenuByID(ctx context.Context, childI
 
 	for rows.Next() {
 		var rec child_nutri.RecipeResponse
-		if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed); err == nil {
+		if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed, &rec.ImageURL); err == nil {
 			menu.Recipes = append(menu.Recipes, rec)
 		}
 	}
@@ -175,7 +176,7 @@ func (r *ChildNutritionRepository) GetTodayMenuShopping(ctx context.Context, chi
 
 	// Fetch Recipes
 	queryRecipes := `
-		SELECT r.id, r.name, r.meal_time, r.meal_texture, r.calories, r.protein, cnr.portions_consumed
+		SELECT r.id, r.name, r.meal_time, r.meal_texture, r.calories, r.protein, cnr.portions_consumed, r.image_url
 		FROM recipes r
 		JOIN child_nutrition_recipes cnr ON cnr.recipe_id = r.id
 		WHERE cnr.child_nutrition_report_id = $1
@@ -185,7 +186,7 @@ func (r *ChildNutritionRepository) GetTodayMenuShopping(ctx context.Context, chi
 		defer rows.Close()
 		for rows.Next() {
 			var rec child_nutri.RecipeResponse
-			if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed); err == nil {
+			if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.PortionsConsumed, &rec.ImageURL); err == nil {
 				res.Menu.Recipes = append(res.Menu.Recipes, rec)
 			}
 		}
@@ -364,11 +365,11 @@ func (r *ChildNutritionRepository) GetRecipeDetail(ctx context.Context, recipeID
 
 	// Fetch Recipe
 	queryRecipe := `
-		SELECT id, name, meal_time, meal_texture, cooking_time, description, calories, protein, is_bookmarked
+		SELECT id, name, meal_time, meal_texture, cooking_time, description, calories, protein, fat, carbohydrate, is_bookmarked, image_url
 		FROM recipes
 		WHERE id = $1
 	`
-	err := r.pool.QueryRow(ctx, queryRecipe, recipeID).Scan(&detail.ID, &detail.Name, &detail.MealTime, &detail.MealTexture, &detail.CookingTime, &detail.Description, &detail.Calories, &detail.Protein, &detail.IsBookmarked)
+	err := r.pool.QueryRow(ctx, queryRecipe, recipeID).Scan(&detail.ID, &detail.Name, &detail.MealTime, &detail.MealTexture, &detail.CookingTime, &detail.Description, &detail.Calories, &detail.Protein, &detail.Fat, &detail.Carbohydrate, &detail.IsBookmarked, &detail.ImageURL)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +497,8 @@ func (r *ChildNutritionRepository) GetBookmarkedRecipes(ctx context.Context, chi
 			r.meal_texture, 
 			r.calories, 
 			r.protein, 
-			r.is_bookmarked
+			r.is_bookmarked,
+			r.image_url
 		FROM recipes r
 		JOIN child_nutrition_recipes cj ON r.id = cj.recipe_id
 		JOIN child_nutrition_reports cnr ON cj.child_nutrition_report_id = cnr.id
@@ -513,7 +515,7 @@ func (r *ChildNutritionRepository) GetBookmarkedRecipes(ctx context.Context, chi
 	var recipes []child_nutri.RecipeResponse
 	for rows.Next() {
 		var rec child_nutri.RecipeResponse
-		if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.IsBookmarked); err == nil {
+		if err := rows.Scan(&rec.ID, &rec.Name, &rec.MealTime, &rec.MealTexture, &rec.Calories, &rec.Protein, &rec.IsBookmarked, &rec.ImageURL); err == nil {
 			recipes = append(recipes, rec)
 		}
 	}

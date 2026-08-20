@@ -15,6 +15,7 @@ type RecipeResponse struct {
 	Protein          float64   `json:"protein"`
 	PortionsConsumed float64   `json:"portions_consumed"`
 	IsBookmarked     bool      `json:"is_bookmarked,omitempty"`
+	ImageURL         *string   `json:"image_url"`
 }
 
 type MenuResponse struct {
@@ -75,6 +76,9 @@ type RecipeDetailResponse struct {
 	Description     string                   `json:"description"`
 	Calories        float64                  `json:"calories"`
 	Protein         float64                  `json:"protein"`
+	Fat             float64                  `json:"fat"`
+	Carbohydrate    float64                  `json:"carbohydrate"`
+	ImageURL        *string                  `json:"image_url"`
 	IsBookmarked    bool                     `json:"is_bookmarked"`
 	MainIngredients []MainIngredientResponse `json:"main_ingredients"`
 	RecipeSpices    []RecipeSpice            `json:"recipe_spices"`

@@ -6,6 +6,7 @@ import (
 
 	"nusagizi_be/internal/models/photos_contacts"
 	"nusagizi_be/internal/repository"
+	"nusagizi_be/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -15,6 +16,7 @@ type PhotosContactsService struct {
 	motherRepo    *repository.MotherProfileRepository
 	childRepo     *repository.ChildRepository
 	caregiverRepo *repository.CaregiverRepository
+	r2PublicURL   string
 }
 
 func NewPhotosContactsService(
@@ -22,12 +24,14 @@ func NewPhotosContactsService(
 	motherRepo *repository.MotherProfileRepository,
 	childRepo *repository.ChildRepository,
 	caregiverRepo *repository.CaregiverRepository,
+	r2PublicURL string,
 ) *PhotosContactsService {
 	return &PhotosContactsService{
 		repo:          repo,
 		motherRepo:    motherRepo,
 		childRepo:     childRepo,
 		caregiverRepo: caregiverRepo,
+		r2PublicURL:   r2PublicURL,
 	}
 }
 
@@ -37,7 +41,14 @@ func (s *PhotosContactsService) GetContacts(ctx context.Context, userID string) 
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetContacts(ctx, motherProfileID)
+	contacts, err := s.repo.GetContacts(ctx, motherProfileID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range contacts {
+		contacts[i].PhotoURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, contacts[i].PhotoURL)
+	}
+	return contacts, nil
 }
 
 // AddContact (endpoint: 49)
@@ -63,12 +74,22 @@ func (s *PhotosContactsService) DeleteContact(ctx context.Context, userID string
 }
 
 // GetMotherChildPhotos (Endpoint: 43)
-func (s *PhotosContactsService) GetMotherChildPhotos(ctx context.Context, userID string) ([]photos_contacts.ChildPhotoResponse, error) {
+func (s *PhotosContactsService) GetMotherChildPhotos(ctx context.Context, userID string, childID *uuid.UUID, latestPerChild bool) ([]photos_contacts.ChildPhotoResponse, error) {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetMotherChildPhotos(ctx, motherProfileID)
+
+	photos, err := s.repo.GetMotherChildPhotos(ctx, motherProfileID, childID, latestPerChild)
+	if err != nil {
+		return nil, err
+	}
+	for i := range photos {
+		if resolved := utils.ResolvePublicPhotoURL(s.r2PublicURL, &photos[i].PhotoURL); resolved != nil {
+			photos[i].PhotoURL = *resolved
+		}
+	}
+	return photos, nil
 }
 
 // GetContactChildPhotos (Endpoint: 44)
@@ -96,7 +117,16 @@ func (s *PhotosContactsService) GetContactChildPhotos(ctx context.Context, userI
 	}
 
 	// Fetch photos of children from the contact
-	return s.repo.GetContactChildPhotos(ctx, contactID)
+	photos, err := s.repo.GetContactChildPhotos(ctx, contactID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range photos {
+		if resolved := utils.ResolvePublicPhotoURL(s.r2PublicURL, &photos[i].PhotoURL); resolved != nil {
+			photos[i].PhotoURL = *resolved
+		}
+	}
+	return photos, nil
 }
 
 // GetAllChildPhotos (Endpoint: 45)
@@ -105,7 +135,16 @@ func (s *PhotosContactsService) GetAllChildPhotos(ctx context.Context, userID st
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetAllChildPhotos(ctx, motherProfileID)
+	photos, err := s.repo.GetAllChildPhotos(ctx, motherProfileID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range photos {
+		if resolved := utils.ResolvePublicPhotoURL(s.r2PublicURL, &photos[i].PhotoURL); resolved != nil {
+			photos[i].PhotoURL = *resolved
+		}
+	}
+	return photos, nil
 }
 
 // GetPhotoDetail (Endpoint: 46)
@@ -135,6 +174,9 @@ func (s *PhotosContactsService) GetPhotoDetail(ctx context.Context, userID strin
 		return nil, fmt.Errorf("%w: user does not have permission to view this photo", repository.ErrForbidden)
 	}
 
+	if resolved := utils.ResolvePublicPhotoURL(s.r2PublicURL, &photo.PhotoURL); resolved != nil {
+		photo.PhotoURL = *resolved
+	}
 	return photo, nil
 }
 
@@ -148,14 +190,14 @@ func (s *PhotosContactsService) AddPhotoMother(ctx context.Context, userID strin
 		return uuid.Nil, fmt.Errorf("caption is required")
 	}
 
-	if input.Visibility == "only" && len(input.ListVisibility) == 0 {
-		return uuid.Nil, fmt.Errorf("list_visibility is required when visibility is 'only'")
+	if input.Visibility == "selected_only" && len(input.ListVisibility) == 0 {
+		return uuid.Nil, fmt.Errorf("list_visibility is required when visibility is 'selected_only'")
 	}
 
 	// Force is_review_required to false
 	input.IsReviewRequired = false
 
-	return s.repo.CreatePhoto(ctx, childID, input)
+	return s.repo.CreatePhotoWithStreak(ctx, childID, input)
 }
 
 // AddPhotoCaregiver (Endpoint: 48)
@@ -174,20 +216,23 @@ func (s *PhotosContactsService) AddPhotoCaregiver(ctx context.Context, userID st
 }
 
 // UpdatePhoto (endpoint: 50)
-func (s *PhotosContactsService) UpdatePhoto(ctx context.Context, userID string, photoID uuid.UUID, input *photos_contacts.UpdatePhotoInput) error {
+func (s *PhotosContactsService) UpdatePhoto(ctx context.Context, userID string, childID uuid.UUID, photoID uuid.UUID, input *photos_contacts.UpdatePhotoInput) error {
 	// Access control: photo must belong to mother's child
 	// Fetch photo to get childID
 	photo, err := s.repo.GetPhotoDetail(ctx, photoID)
 	if err != nil {
 		return err
 	}
+	if photo.ChildID != childID {
+		return fmt.Errorf("%w: photo does not belong to the specified child", repository.ErrNotFound)
+	}
 	if err := checkMotherOwnership(ctx, userID, photo.ChildID, s.motherRepo, s.childRepo); err != nil {
 		return err
 	}
 
-	if input.Visibility != nil && *input.Visibility == "only" {
+	if input.Visibility != nil && *input.Visibility == "selected_only" {
 		if input.ListVisibility == nil || len(*input.ListVisibility) == 0 {
-			return fmt.Errorf("list_visibility is required when visibility is 'only'")
+			return fmt.Errorf("list_visibility is required when visibility is 'selected_only'")
 		}
 	}
 

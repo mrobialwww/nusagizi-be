@@ -8,6 +8,7 @@ import (
 	"nusagizi_be/internal/config"
 	"nusagizi_be/internal/database"
 	"nusagizi_be/internal/handlers"
+	"nusagizi_be/internal/infrastructure/storage/r2"
 	"nusagizi_be/internal/middleware"
 	"nusagizi_be/internal/repository"
 	"nusagizi_be/internal/services"
@@ -52,6 +53,14 @@ func main() {
 	}
 	managementClient := auth0client.NewManagementClient(cfg.Auth0Domain, cfg.M2MClientID, cfg.M2MClientSecret)
 
+	// Cloudflare R2 Client Init
+	r2Client, err := r2.New(context.Background(),
+		cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2Bucket,
+	)
+	if err != nil {
+		log.Fatal("Failed to connect to R2:", err)
+	}
+
 	// 5. DI Wiring: Repositories -> Services -> Handlers
 
 	// Repositories
@@ -71,22 +80,24 @@ func main() {
 
 	// Services
 	emailOTPSvc := services.NewEmailOTPService(idTokenVerifier, managementClient)
-	userSvc := services.NewUserService(userRepo, motherRepo, caregiverRepo)
-	childSvc := services.NewChildService(childRepo, motherRepo, caregiverRepo)
-	childDevSvc := services.NewChildDevelopmentService(childDevRepo, childRepo, motherRepo)
+	imageSvc := services.NewImageService(r2Client, motherRepo, childRepo, caregiverRepo)
+	userSvc := services.NewUserService(userRepo, motherRepo, caregiverRepo, cfg.R2PublicURL)
+	childSvc := services.NewChildService(childRepo, motherRepo, caregiverRepo, cfg.R2PublicURL)
+	childDevSvc := services.NewChildDevelopmentService(childDevRepo, childRepo, motherRepo, cfg.R2PublicURL)
 	menuSvc := services.NewMenuService(cfg, menuRepo, motherRepo, childRepo, childNutriRepo)
-	childNutriSvc := services.NewChildNutritionService(childNutriRepo, childRepo, motherRepo, caregiverRepo)
+	childNutriSvc := services.NewChildNutritionService(childNutriRepo, childRepo, motherRepo, caregiverRepo, cfg.R2PublicURL)
 	childGrowthSvc := services.NewChildGrowthService(childGrowthRepo, childRepo, motherRepo)
 	caregiverSvc := services.NewCaregiverService(caregiverRepo, motherRepo)
 	dashboardSvc := services.NewDashboardService(dashboardRepo, motherRepo)
 	medicalSvc := services.NewMedicalService(medicalRepo, motherRepo, childRepo)
-	photosContactsSvc := services.NewPhotosContactsService(photosContactsRepo, motherRepo, childRepo, caregiverRepo)
+	photosContactsSvc := services.NewPhotosContactsService(photosContactsRepo, motherRepo, childRepo, caregiverRepo, cfg.R2PublicURL)
 	notificationSvc := services.NewNotificationService(notificationRepo)
 	checkinSvc := services.NewCheckinService(checkinRepo, caregiverRepo)
 
 	// Handlers
 	emailOTPHandler := handlers.NewConfirmEmailHandler(emailOTPSvc)
 	onboardHandler := handlers.NewOnboardingHandler(userRepo, cfg)
+	imageHandler := handlers.NewImageHandler(imageSvc)
 	userHandler := handlers.NewUserHandler(userSvc)
 	childHandler := handlers.NewChildHandler(childSvc)
 	childDevHandler := handlers.NewChildDevelopmentHandler(childDevSvc)
@@ -132,6 +143,10 @@ func main() {
 		protected.POST("/caregiver-profiles", userHandler.CreateCaregiverProfile)
 		protected.GET("/caregiver-profiles", userHandler.GetCaregiverProfile)
 
+		// Modul 1.5: Upload Photo (R2)
+		protected.POST("/images/presign-upload", imageHandler.PresignUpload)
+		protected.POST("/images/confirm", imageHandler.Confirm)
+
 		// Modul 11: Checkin
 		protected.POST("/checkin/generate", checkinHandler.Generate)
 		protected.POST("/checkin/validate", checkinHandler.Validate)
@@ -158,7 +173,7 @@ func main() {
 		protected.GET("/development-reports/:child_development_report_id", childDevHandler.GetDevelopmentReportByID)
 		protected.GET("/assessment-kpsp-questions", childDevHandler.GetKPSPQuestions)
 		protected.POST("/children/:child_id/development-reports", childDevHandler.CreateDevelopmentReport)
-		protected.PATCH("/development-reports/:child_development_report_id", childDevHandler.UpdateDevelopmentReport)
+		protected.PATCH("/children/:child_id/development-reports/:child_development_report_id", childDevHandler.UpdateDevelopmentReport)
 		protected.GET("/checklist-milestone-tasks", childDevHandler.GetChecklistMilestoneTasks)
 		protected.GET("/children/:child_id/development-reports/:report_id/recommendations", childDevHandler.GetRecommendations)
 		protected.PATCH("/children/:child_id/checklist-milestone-progress", childDevHandler.UpdateChecklistMilestone)
@@ -188,7 +203,7 @@ func main() {
 		protected.GET("/child-photos/:child_photo_id", photosContactsHandler.GetPhotoDetail)
 		protected.POST("/children/:child_id/photos/mother", photosContactsHandler.AddPhotoMother)
 		protected.POST("/children/:child_id/photos/caregiver", photosContactsHandler.AddPhotoCaregiver)
-		protected.PATCH("/child-photos/:child_photo_id", photosContactsHandler.UpdatePhoto)
+		protected.PATCH("/children/:child_id/photos/:child_photo_id", photosContactsHandler.UpdatePhoto)
 		protected.DELETE("/child-photos/:child_photo_id", photosContactsHandler.DeletePhoto)
 
 		// Modul 7: Caregiver

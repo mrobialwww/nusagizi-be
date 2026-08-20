@@ -1,6 +1,8 @@
 package photos_contacts
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -19,7 +21,8 @@ type ChildPhotoResponse struct {
 	PhotoURL         string    `json:"photo_url"`
 	Caption          string    `json:"caption,omitempty"`
 	Visibility       string    `json:"visibility,omitempty"`
-	IsReviewRequired bool      `json:"is_review_required,omitempty"`
+	IsReviewRequired bool      `json:"is_review_required"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 // CreatePhotoInput is the payload for adding a new photo.

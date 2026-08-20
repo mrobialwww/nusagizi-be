@@ -35,6 +35,7 @@ type UpdateUserInput struct {
 	Email       *string `json:"email"`
 	PhoneNumber *string `json:"phone_number"`
 	Gender      *string `json:"gender"`
+	PhotoURL    *string `json:"photo_url"`
 }
 
 // MotherProfileResponse is the response body

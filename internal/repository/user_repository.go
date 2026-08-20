@@ -146,6 +146,11 @@ func (r *UserRepository) Update(ctx context.Context, userID string, input models
 		args = append(args, *input.Gender)
 		idx++
 	}
+	if input.PhotoURL != nil {
+		setParts = append(setParts, fmt.Sprintf("photo_url = $%d", idx))
+		args = append(args, *input.PhotoURL)
+		idx++
+	}
 
 	if len(setParts) == 0 {
 		return nil // nothing to update

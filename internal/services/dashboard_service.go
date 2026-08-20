@@ -38,6 +38,18 @@ func (s *DashboardService) GetDashboardSummary(ctx context.Context, userID strin
 	}
 
 	for i := range results {
+		// Calculate Valid Streak
+		if results[i].LastStreakDateRaw != nil {
+			today := time.Now().UTC().Truncate(24 * time.Hour)
+			lastDate := (*results[i].LastStreakDateRaw).UTC().Truncate(24 * time.Hour)
+			diff := today.Sub(lastDate).Hours() / 24
+			if diff > 1 {
+				results[i].Streak = 0
+			}
+		} else {
+			results[i].Streak = 0
+		}
+
 		// Calculate AgeMonths
 		birthDate := results[i].BirthDateRaw
 		results[i].Age = utils.FormatAgeString(birthDate)

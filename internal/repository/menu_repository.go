@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"nusagizi_be/internal/models/menu"
@@ -49,14 +50,20 @@ func (r *MenuRepository) ReplaceTodayMenu(
 	if err == nil && existingCNR_ID != uuid.Nil {
 		// Collect old recipe IDs
 		var oldRecipeIDs []uuid.UUID
-		rows, _ := tx.Query(ctx, "SELECT recipe_id FROM child_nutrition_recipes WHERE child_nutrition_report_id = $1", existingCNR_ID)
-		defer rows.Close()
+
+		const selectRecipeQuery = `
+			SELECT recipe_id 
+			FROM child_nutrition_recipes 
+			WHERE child_nutrition_report_id = $1`
+
+		rows, _ := tx.Query(ctx, selectRecipeQuery, existingCNR_ID)
 		for rows.Next() {
 			var id uuid.UUID
 			if rows.Scan(&id) == nil {
 				oldRecipeIDs = append(oldRecipeIDs, id)
 			}
 		}
+		rows.Close()
 
 		// Delete existing menu for today (CASCADE automatically removes relations in junction)
 		const deleteQuery = `
@@ -121,13 +128,15 @@ func (r *MenuRepository) ReplaceTodayMenu(
 		// Insert new recipe into the 'recipes' table.
 		const recipeQuery = `
 			INSERT INTO recipes
-			(name, description, meal_time, meal_texture, cooking_time, calories, protein, fat, carbohydrate, is_bookmarked)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false) RETURNING id`
+			(name, description, meal_time, meal_texture, cooking_time, calories, protein, fat, carbohydrate, is_bookmarked, image_url)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10) RETURNING id`
+
+		imageURL := getDefaultRecipeImage(sesi.PanduanMasak.ResepNama)
 
 		var recipeID uuid.UUID
 		err = tx.QueryRow(ctx, recipeQuery,
 			sesi.PanduanMasak.ResepNama, sesi.PanduanMasak.Catatan, dbMealTime, sesi.PanduanMasak.Tekstur, waktuMasak,
-			cal, pro, fat, car,
+			cal, pro, fat, car, imageURL,
 		).Scan(&recipeID)
 		if err != nil {
 			return fmt.Errorf("failed to insert recipe %s: %w", mealTime, err)
@@ -154,13 +163,15 @@ func (r *MenuRepository) ReplaceTodayMenu(
 		// Insert new snack recipe into the 'recipes' table.
 		const selinganRecipeQuery = `
 			INSERT INTO recipes
-			(name, description, meal_time, meal_texture, cooking_time, calories, protein, fat, carbohydrate, is_bookmarked)
-			VALUES ($1, $2, $3, '', '', $4, $5, $6, $7, false) RETURNING id`
+			(name, description, meal_time, meal_texture, cooking_time, calories, protein, fat, carbohydrate, is_bookmarked, image_url)
+			VALUES ($1, $2, $3, '', '', $4, $5, $6, $7, false, $8) RETURNING id`
+
+		imageURL := getDefaultRecipeImage(selingan.Resep.Nama)
 
 		var recipeID uuid.UUID
 		err = tx.QueryRow(ctx, selinganRecipeQuery,
 			selingan.Resep.Nama, desc, dbMealTime,
-			selingan.Makro.Energi, selingan.Makro.Protein, selingan.Makro.Lemak, selingan.Makro.Karbo,
+			selingan.Makro.Energi, selingan.Makro.Protein, selingan.Makro.Lemak, selingan.Makro.Karbo, imageURL,
 		).Scan(&recipeID)
 		if err != nil {
 			return fmt.Errorf("failed to insert recipe selingan %s: %w", mealTime, err)
@@ -182,6 +193,21 @@ func (r *MenuRepository) ReplaceTodayMenu(
 }
 
 // ================================== HELPER FUNCTION ===================================
+// getDefaultRecipeImage provides a default image based on the recipe name's keywords.
+func getDefaultRecipeImage(recipeName string) string {
+	nameLower := strings.ToLower(recipeName)
+	if strings.Contains(nameLower, "nasi") {
+		return "recipes/nasi-gurih.png"
+	}
+	if strings.Contains(nameLower, "camilan") {
+		return "recipes/bola-bola.png"
+	}
+	if strings.Contains(nameLower, "sup") {
+		return "recipes/sup.png"
+	}
+	return "recipes/tumis.png"
+}
+
 // mapMealTime maps the AI response meal time keys to the database ENUM values.
 func mapMealTime(aiKey string) string {
 	switch aiKey {

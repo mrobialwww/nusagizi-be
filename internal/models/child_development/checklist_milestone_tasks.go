@@ -4,9 +4,9 @@ import (
 	"github.com/google/uuid"
 )
 
-type ChecklistMilestoneTaskResponse struct {
+type ChecklistMilestoneResponse struct {
 	ID                  uuid.UUID `json:"id"`
 	DevelopmentalDomain string    `json:"developmental_domain"`
-	TaskDescription     string    `json:"task_description"`
+	QuestionText        string    `json:"question_text"`
 	IsChecked           bool      `json:"is_checked"`
 }

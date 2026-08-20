@@ -30,6 +30,7 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 			c.birth_date, 
 			c.gender,
 			c.streak_days,
+			c.last_streak_date,
 			gr.height_cm, 
 			gr.weight_kg,
 			gr.head_circumference_cm,
@@ -77,7 +78,7 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 		var res dashboard.ChildSummaryResponse
 		var birthDate time.Time
 		if err := rows.Scan(
-			&res.ID, &res.FullName, &res.PhotoUrl, &birthDate, &res.Gender, &res.Streak,
+			&res.ID, &res.FullName, &res.PhotoUrl, &birthDate, &res.Gender, &res.Streak, &res.LastStreakDateRaw,
 			&res.HeightCm, &res.WeightKg, &res.HeadCircumferenceCm, &res.GrowthMeasuredAt,
 			&res.KpspScore, &res.KpspAnswersCount,
 			&res.Calories, &res.TargetCalories,

@@ -13,7 +13,7 @@ INSERT INTO
 VALUES
     (
         '0c4b4722-a02d-46d4-8d25-d420ba2b7f89',
-        '8bdee998-ad6e-46ba-bf57-2e69afaeef78',
+        'f545662d-feca-453d-bfa2-a19aab224a16',
         'M. Razky',
         'male',
         '2024-05-07',
@@ -24,7 +24,7 @@ VALUES
     ),
     (
         '61fa1c7e-81f9-4960-b226-af43f57e8b62',
-        '8bdee998-ad6e-46ba-bf57-2e69afaeef78',
+        'f545662d-feca-453d-bfa2-a19aab224a16',
         'Budi',
         'male',
         '2025-03-07',
@@ -35,7 +35,7 @@ VALUES
     ),
     (
         '88e88505-c619-4e95-9e7a-7749d9539468',
-        '8bdee998-ad6e-46ba-bf57-2e69afaeef78',
+        'f545662d-feca-453d-bfa2-a19aab224a16',
         'Ani',
         'female',
         '2023-07-07',

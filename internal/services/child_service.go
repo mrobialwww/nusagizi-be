@@ -16,10 +16,16 @@ type ChildService struct {
 	repo          *repository.ChildRepository
 	motherRepo    *repository.MotherProfileRepository
 	caregiverRepo *repository.CaregiverRepository
+	r2PublicURL   string
 }
 
-func NewChildService(repo *repository.ChildRepository, motherRepo *repository.MotherProfileRepository, caregiverRepo *repository.CaregiverRepository) *ChildService {
-	return &ChildService{repo: repo, motherRepo: motherRepo, caregiverRepo: caregiverRepo}
+func NewChildService(
+	repo *repository.ChildRepository,
+	motherRepo *repository.MotherProfileRepository,
+	caregiverRepo *repository.CaregiverRepository,
+	r2PublicURL string,
+) *ChildService {
+	return &ChildService{repo: repo, motherRepo: motherRepo, caregiverRepo: caregiverRepo, r2PublicURL: r2PublicURL}
 }
 
 // CreateChild creates a new child profile within a DB transaction (Endpoint: 7)
@@ -58,12 +64,22 @@ func (s *ChildService) GetChildDetail(ctx context.Context, userID string, childI
 		return nil, err
 	}
 
-	return s.repo.GetByID(ctx, childID)
+	resp, err := s.repo.GetByID(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+	resp.PhotoURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp.PhotoURL)
+	return resp, nil
 }
 
 // GetChild returns the simple child detail (Endpoint: 12 - Get lightweight child profile)
 func (s *ChildService) GetChild(ctx context.Context, userID string, childID uuid.UUID) (*models.ChildSimpleResponse, error) {
-	return s.repo.GetChild(ctx, childID)
+	resp, err := s.repo.GetChild(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+	resp.PhotoURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp.PhotoURL)
+	return resp, nil
 }
 
 // GetListChild returns the lightweight children list (Endpoint: 11)
@@ -80,6 +96,7 @@ func (s *ChildService) GetListChild(ctx context.Context, userID string) ([]model
 
 	for i, c := range children {
 		children[i].Age = utils.FormatAgeString(c.BirthDate)
+		children[i].PhotoURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, c.PhotoURL)
 	}
 
 	return children, nil

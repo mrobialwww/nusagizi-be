@@ -132,7 +132,19 @@ func (h *PhotosContactsHandler) GetMotherChildPhotos(c *gin.Context) {
 		return
 	}
 
-	photos, err := h.service.GetMotherChildPhotos(c.Request.Context(), requester.ID)
+	var childIDPtr *uuid.UUID
+	if childIDStr := c.Query("child_id"); childIDStr != "" {
+		childID, err := uuid.Parse(childIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
+			return
+		}
+		childIDPtr = &childID
+	}
+
+	latestPerChild := c.Query("latest_per_child") == "true"
+
+	photos, err := h.service.GetMotherChildPhotos(c.Request.Context(), requester.ID, childIDPtr, latestPerChild)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrForbidden):
@@ -277,15 +289,15 @@ func (h *PhotosContactsHandler) AddPhotoMother(c *gin.Context) {
 
 	// Validate input visibility
 	switch input.Visibility {
-	case "all", "private", "only":
+	case "all", "private", "selected_only":
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "visibility must be all, private, or only"}})
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "visibility must be all, private, or selected_only"}})
 		return
 	}
 
 	// Validate input list_visibility
-	if input.Visibility == "only" && len(input.ListVisibility) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "list_visibility cannot be empty if visibility is only"}})
+	if input.Visibility == "selected_only" && len(input.ListVisibility) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "list_visibility cannot be empty if visibility is selected_only"}})
 		return
 	}
 
@@ -365,6 +377,12 @@ func (h *PhotosContactsHandler) UpdatePhoto(c *gin.Context) {
 		return
 	}
 
+	childID, err := uuid.Parse(c.Param("child_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_id format"}})
+		return
+	}
+
 	photoID, err := uuid.Parse(c.Param("child_photo_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid child_photo_id format"}})
@@ -380,22 +398,22 @@ func (h *PhotosContactsHandler) UpdatePhoto(c *gin.Context) {
 	// Validate input visibility
 	if input.Visibility != nil {
 		switch *input.Visibility {
-		case "all", "private", "only":
+		case "all", "private", "selected_only":
 		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "visibility must be all, private, or only"}})
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "visibility must be all, private, or selected_only"}})
 			return
 		}
 
 		// Validate input list_visibility
-		if *input.Visibility == "only" {
+		if *input.Visibility == "selected_only" {
 			if input.ListVisibility == nil || len(*input.ListVisibility) == 0 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "list_visibility cannot be empty if visibility is only"}})
+				c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "list_visibility cannot be empty if visibility is selected_only"}})
 				return
 			}
 		}
 	}
 
-	err = h.service.UpdatePhoto(c.Request.Context(), requester.ID, photoID, &input)
+	err = h.service.UpdatePhoto(c.Request.Context(), requester.ID, childID, photoID, &input)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrForbidden):

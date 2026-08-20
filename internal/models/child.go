@@ -16,6 +16,7 @@ type Child struct {
 	PhotoURL        *string    `json:"photo_url" db:"photo_url"`
 	NotesProfile    *string    `json:"notes" db:"notes_profile"`
 	StreakDays      int        `json:"streak_days" db:"streak_days"`
+	LastStreakDate  *time.Time `json:"last_streak_date" db:"last_streak_date"`
 	DeletedAt       *time.Time `json:"-" db:"deleted_at"`
 	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`

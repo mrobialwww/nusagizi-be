@@ -1,0 +1,428 @@
+# Implementasi R2 Object Storage + Update Endpoint 1, 7, 8
+
+## Latar Belakang & Pemahaman Arsitektur
+
+Sesuai [r2object_connect.md](file:///f:/Project/ProjectLomba/nusagizi_be/r2object_connect.md), pola yang digunakan adalah **Presigned URL 3-tahap**:
+1. Flutter → `POST /images/presign-upload` → Backend generate presigned PUT URL + `object_key`
+2. Flutter → `PUT <presigned_url>` → Upload file **langsung ke R2** (bukan lewat backend)
+3. Flutter → panggil endpoint **1 / 7 / 8** seperti biasa, cukup sisipkan `object_key` ke field `photo_url` dalam JSON body
+
+**Yang berubah di endpoint 1, 7, 8:** Bukan format request-nya (tetap JSON seperti biasa). Yang berubah adalah:
+- Backend **menyimpan `object_key`** ke kolom `photo_url` di DB (bukan URL lengkap)
+- Response GET yang mengandung `photo_url` → backend **generate presigned GET URL** on-the-fly sebelum dikembalikan ke Flutter
+
+> [!NOTE]
+> Kolom `photo_url` di tabel `users` dan `children` sudah ada dari migration awal. Yang disimpan di sana berubah dari URL sembarang menjadi `object_key` R2 (format: `profile/{user_id}/{uuid}.webp`).
+
+---
+
+## Proposed Changes
+
+---
+
+### A. Migration Database
+
+#### [MODIFY] [migrations/000004_create_core_domain_tables.up.sql](file:///f:/Project/ProjectLomba/nusagizi_be/migrations/000004_create_core_domain_tables.up.sql)
+
+Tambahkan kolom `image_url TEXT` (nullable) pada `assessment_kpsp_questions`, sesuai [r2object_connect.md](file:///f:/Project/ProjectLomba/nusagizi_be/r2object_connect.md) Bagian 7:
+
+```diff
+ CREATE TABLE assessment_kpsp_questions (
+     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     month_target            INTEGER NOT NULL CHECK (month_target IN (3,6,9,12,15,18,21,24,30,36,42,48,54,60)),
+     developmental_domain    developmental_domain NOT NULL,
+     question_text           TEXT NOT NULL,
++    image_url               TEXT,
+     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+ );
+```
+
+> [!IMPORTANT]
+> Tabel `users` (kolom `photo_url TEXT` — migration 000004 line 54) dan `children` (kolom `photo_url TEXT` — migration 000004 line 108) **tidak perlu diubah strukturnya**. Kedua kolom sudah ada dan bertipe `TEXT`, yang memang cocok untuk menyimpan `object_key`.
+
+Tabel lain (`ingredients.image_url`, `cooking_steps.image_url`, `child_photos.photo_url`) juga tidak perlu diubah — sudah ada kolom medianya.
+
+---
+
+### B. Infrastructure: R2 Client & Interface
+
+#### [NEW] `internal/infrastructure/storage/object_storage.go`
+
+Interface decoupling agar usecase/service tidak bergantung langsung ke R2:
+
+```go
+package storage
+
+import (
+    "context"
+    "io"
+    "time"
+)
+
+type ObjectStorage interface {
+    PresignPutURL(ctx context.Context, key, contentType string, expires time.Duration) (string, error)
+    PresignGetURL(ctx context.Context, key string, expires time.Duration) (string, error)
+    Delete(ctx context.Context, key string) error
+}
+```
+
+#### [NEW] `internal/infrastructure/storage/r2/client.go`
+
+Implementasi `ObjectStorage` — persis seperti contoh di [r2object_connect.md](file:///f:/Project/ProjectLomba/nusagizi_be/r2object_connect.md) Bagian 4:
+
+```go
+package r2
+
+import (
+    "context"
+    "fmt"
+    "time"
+
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/config"
+    "github.com/aws/aws-sdk-go-v2/credentials"
+    "github.com/aws/aws-sdk-go-v2/service/s3"
+)
+
+type Client struct {
+    s3        *s3.Client
+    presigner *s3.PresignClient
+    bucket    string
+}
+
+func New(ctx context.Context, accountID, accessKeyID, secretAccessKey, bucket string) (*Client, error) {
+    cfg, err := config.LoadDefaultConfig(ctx,
+        config.WithCredentialsProvider(
+            credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, ""),
+        ),
+        config.WithRegion("auto"),
+    )
+    if err != nil {
+        return nil, err
+    }
+    s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+        o.BaseEndpoint = aws.String(fmt.Sprintf("https://%s.r2.cloudflarestorage.com", accountID))
+    })
+    return &Client{
+        s3:        s3Client,
+        presigner: s3.NewPresignClient(s3Client),
+        bucket:    bucket,
+    }, nil
+}
+
+func (c *Client) PresignPutURL(ctx context.Context, key, contentType string, expires time.Duration) (string, error) {
+    req, err := c.presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+        Bucket:      aws.String(c.bucket),
+        Key:         aws.String(key),
+        ContentType: aws.String(contentType),
+    }, s3.WithPresignExpires(expires))
+    if err != nil {
+        return "", err
+    }
+    return req.URL, nil
+}
+
+func (c *Client) PresignGetURL(ctx context.Context, key string, expires time.Duration) (string, error) {
+    req, err := c.presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+        Bucket: aws.String(c.bucket),
+        Key:    aws.String(key),
+    }, s3.WithPresignExpires(expires))
+    if err != nil {
+        return "", err
+    }
+    return req.URL, nil
+}
+
+func (c *Client) Delete(ctx context.Context, key string) error {
+    _, err := c.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+        Bucket: aws.String(c.bucket),
+        Key:    aws.String(key),
+    })
+    return err
+}
+```
+
+---
+
+### C. Config
+
+#### [MODIFY] [config.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/config/config.go)
+
+Tambah field R2 ke struct [Config](file:///f:/Project/ProjectLomba/nusagizi_be/internal/config/config.go#10-33) dan load dari env:
+
+```go
+// Cloudflare R2
+R2AccountID        string
+R2AccessKeyID      string
+R2SecretAccessKey  string
+R2Bucket           string
+```
+
+Di fungsi [Load()](file:///f:/Project/ProjectLomba/nusagizi_be/internal/config/config.go#34-62):
+```go
+R2AccountID:       os.Getenv("R2_ACCOUNT_ID"),
+R2AccessKeyID:     os.Getenv("R2_ACCESS_KEY_ID"),
+R2SecretAccessKey: os.Getenv("R2_SECRET_ACCESS_KEY"),
+R2Bucket:          os.Getenv("R2_BUCKET"),
+```
+
+#### [MODIFY] [.env](file:///f:/Project/ProjectLomba/nusagizi_be/.env)
+
+Tambahkan 4 variabel baru:
+```
+R2_ACCOUNT_ID=<isi dari Cloudflare dashboard>
+R2_ACCESS_KEY_ID=<isi dari R2 API Token>
+R2_SECRET_ACCESS_KEY=<isi dari R2 API Token>
+R2_BUCKET=<nama bucket>
+```
+
+---
+
+### D. Image Handler (Presigned URL — Endpoint Generik)
+
+Dua endpoint baru ini adalah **pondasi arsitektur R2** yang akan dipakai Flutter sebelum memanggil endpoint 1/7/8:
+
+#### [NEW] `internal/handlers/image_handler.go`
+
+**`POST /images/presign-upload`**
+- Request body: `{ "category": "profile", "owner_id": "<user_id atau child_id>", "content_type": "image/webp" }`
+- Validasi `content_type` hanya boleh: `image/webp`, `image/jpeg`, `image/png`
+- Validasi `category` hanya boleh: `profile`, `child-profile`
+- Generate `object_key`: `{category}/{owner_id}/{uuid}.webp`
+- Generate presigned PUT URL (expiry 10 menit) via `ObjectStorage.PresignPutURL`
+- Response: `{ "upload_url": "...", "object_key": "..." }`
+
+**`POST /images/confirm`** *(opsional, validasi keberadaan object)*
+- Request body: `{ "object_key": "..." }`
+- Response: `200 OK`, atau `404` jika key tidak ada
+
+#### [NEW] `internal/services/image_service.go`
+
+```go
+type ImageService struct {
+    storage storage.ObjectStorage
+}
+
+func (s *ImageService) GeneratePresignPutURL(ctx context.Context, category, ownerID, contentType string) (uploadURL, objectKey string, err error) {
+    // Validasi category & contentType
+    // Generate objectKey = "category/ownerID/uuid.webp"
+    // Call storage.PresignPutURL(ctx, objectKey, contentType, 10*time.Minute)
+}
+```
+
+---
+
+### E. Konvensi Object Key & Cara Serve Photo
+
+Sesuai [r2object_connect.md](file:///f:/Project/ProjectLomba/nusagizi_be/r2object_connect.md) Bagian 6:
+
+| Kategori | Format Object Key |
+|---|---|
+| Foto profil user | `profile/{user_id}/{uuid}.webp` |
+| Foto profil anak | `child-profile/{child_id}/{uuid}.webp` |
+
+**Aturan saat return response GET:**
+- Jika `photo_url` di DB adalah `nil` → return `null`
+- Jika `photo_url` diawali `http` (URL lama/legacy) → return as-is *(backward compat, tidak perlu migrasi data)*
+- Jika `photo_url` adalah `object_key` (tidak diawali `http`) → generate presigned GET URL (expiry 15 menit) via `storage.PresignGetURL` dan return hasilnya
+
+Helper ini akan dibuat di:
+
+#### [NEW] `internal/utils/r2_url.go`
+
+```go
+// ResolvePhotoURL converts an object_key stored in DB to a presigned GET URL.
+// If the value looks like a full URL (starts with "http"), it's returned as-is.
+func ResolvePhotoURL(ctx context.Context, key *string, storage storage.ObjectStorage) *string {
+    if key == nil || *key == "" {
+        return nil
+    }
+    if strings.HasPrefix(*key, "http") {
+        return key // legacy URL or external, return as-is
+    }
+    url, err := storage.PresignGetURL(ctx, *key, 15*time.Minute)
+    if err != nil {
+        return key // fallback: return key as-is on error
+    }
+    return &url
+}
+```
+
+---
+
+### F. Endpoint 1 — Update Profil User (`PATCH /users`)
+
+**Perubahan:** Format request **tidak berubah** (tetap JSON). Hanya behavior penyimpanan `photo_url` yang berubah.
+
+#### [MODIFY] [models/user.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/models/user.go)
+
+Tambah `PhotoURL *string` ke [UpdateUserInput](file:///f:/Project/ProjectLomba/nusagizi_be/internal/models/user.go#33-39) (sudah bisa dikirim Flutter sebagai `object_key`):
+
+```diff
+ type UpdateUserInput struct {
+     FullName    *string `json:"full_name"`
+     Email       *string `json:"email"`
+     PhoneNumber *string `json:"phone_number"`
+     Gender      *string `json:"gender"`
++    PhotoURL    *string `json:"photo_url"`
+ }
+```
+
+#### [MODIFY] [repository/user_repository.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/repository/user_repository.go)
+
+Tambah `photo_url` ke dynamic SET clause di method [Update](file:///f:/Project/ProjectLomba/nusagizi_be/internal/repository/user_repository.go#120-177):
+
+```go
+if input.PhotoURL != nil {
+    setParts = append(setParts, fmt.Sprintf("photo_url = $%d", idx))
+    args = append(args, *input.PhotoURL)
+    idx++
+}
+```
+
+#### [MODIFY] [services/user_service.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/user_service.go)
+
+- Inject `ObjectStorage` ke [UserService](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/user_service.go#11-16)
+- Method [GetUser](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/user_service.go#21-25): panggil `ResolvePhotoURL` pada `PhotoURL` sebelum return response
+- Method [GetMotherProfile](file:///f:/Project/ProjectLomba/nusagizi_be/internal/handlers/user_handler.go#137-162): panggil `ResolvePhotoURL` pada `PhotoURL` sebelum return response
+- Method [GetCaregiverProfile](file:///f:/Project/ProjectLomba/nusagizi_be/internal/handlers/user_handler.go#163-188): panggil `ResolvePhotoURL` pada `PhotoURL` sebelum return response
+
+**Tidak perlu perubahan di `handler/user_handler.go`** — handler sudah memanggil `c.ShouldBindJSON(&input)` yang otomatis akan membaca field `photo_url` baru dari JSON.
+
+---
+
+### G. Endpoint 7 — Tambah Profil Anak (`POST /children`)
+
+**Perubahan:** Format request **tidak berubah**. Field `photo_url` sudah ada di [CreateChildInput](file:///f:/Project/ProjectLomba/nusagizi_be/internal/models/child_profile_input.go#17-29). Flutter tinggal isi dengan `object_key`. Backend menyimpannya ke DB.
+
+**Yang perlu diubah:** Hanya bagian GET response (endpoint 10, 11, 12) yang perlu generate presigned URL.
+
+#### [MODIFY] [services/child_service.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/child_service.go)
+
+- Inject `ObjectStorage` ke [ChildService](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/child_service.go#15-20)
+- Method [GetChildDetail](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/child_service.go#55-63) (endpoint 10): panggil `ResolvePhotoURL` pada `resp.PhotoURL`
+- Method [GetChild](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/child_service.go#64-68) (endpoint 12): panggil `ResolvePhotoURL` pada `resp.PhotoURL`
+- Method [GetListChild](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/child_service.go#69-87) (endpoint 11): loop setiap item, panggil `ResolvePhotoURL` pada `item.PhotoURL`
+
+**Tidak perlu perubahan di `handler/child_handler.go`** untuk endpoint 7 — sudah handle `photo_url` dari JSON body.
+
+**Tidak perlu perubahan di [repository/child_repository.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/repository/child_repository.go)** untuk Create — sudah menyimpan `input.PhotoURL` ke kolom `photo_url` (line 61).
+
+---
+
+### H. Endpoint 8 — Update Profil Anak (`PATCH /children/{child_id}`)
+
+**Perubahan:** Format request **tidak berubah**. Field `photo_url` sudah ada di [UpdateChildInput](file:///f:/Project/ProjectLomba/nusagizi_be/internal/models/child_profile_input.go#32-44). Flutter tinggal isi dengan `object_key` baru.
+
+**Repository sudah handle:** [updateChildRow](file:///f:/Project/ProjectLomba/nusagizi_be/internal/repository/child_repository.go#272-332) sudah ada blok `if input.PhotoURL != nil` (line 297–301 [child_repository.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/repository/child_repository.go)).
+
+**Tidak ada perubahan yang diperlukan di handler/repository untuk endpoint 8.**
+
+Satu-satunya perubahan adalah di **service layer** (sudah dicakup di bagian G di atas): GET endpoints akan mengembalikan presigned URL.
+
+---
+
+### I. Wiring DI di [main.go](file:///f:/Project/ProjectLomba/nusagizi_be/cmd/api/main.go)
+
+#### [MODIFY] [main.go](file:///f:/Project/ProjectLomba/nusagizi_be/cmd/api/main.go)
+
+```go
+// 3. Init R2 client
+r2Client, err := r2.New(context.Background(),
+    cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2Bucket,
+)
+if err != nil {
+    log.Fatal("Failed to connect to R2:", err)
+}
+
+// 5. Services (tambah inject r2Client)
+imageSvc  := services.NewImageService(r2Client)
+userSvc   := services.NewUserService(userRepo, motherRepo, caregiverRepo, r2Client)
+childSvc  := services.NewChildService(childRepo, motherRepo, caregiverRepo, r2Client)
+
+// 7. Routes (tambah 2 endpoint baru)
+protected.POST("/images/presign-upload", imageHandler.PresignUpload)
+protected.POST("/images/confirm", imageHandler.Confirm)
+```
+
+---
+
+### J. Dependency Baru ([go.mod](file:///f:/Project/ProjectLomba/nusagizi_be/go.mod))
+
+```bash
+go get github.com/aws/aws-sdk-go-v2
+go get github.com/aws/aws-sdk-go-v2/config
+go get github.com/aws/aws-sdk-go-v2/credentials
+go get github.com/aws/aws-sdk-go-v2/service/s3
+```
+
+---
+
+## Ringkasan File yang Diubah/Dibuat
+
+| File | Status | Keterangan |
+|---|---|---|
+| [migrations/000004_create_core_domain_tables.up.sql](file:///f:/Project/ProjectLomba/nusagizi_be/migrations/000004_create_core_domain_tables.up.sql) | MODIFY | Tambah `image_url` ke `assessment_kpsp_questions` |
+| `internal/infrastructure/storage/object_storage.go` | NEW | Interface `ObjectStorage` |
+| `internal/infrastructure/storage/r2/client.go` | NEW | Implementasi R2 client (aws-sdk-go-v2) |
+| [internal/config/config.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/config/config.go) | MODIFY | Tambah 4 field R2 |
+| [.env](file:///f:/Project/ProjectLomba/nusagizi_be/.env) | MODIFY | Tambah 4 env var R2 |
+| `internal/handlers/image_handler.go` | NEW | Handler untuk presign-upload & confirm |
+| `internal/services/image_service.go` | NEW | Service generate presigned URL |
+| `internal/utils/r2_url.go` | NEW | Helper `ResolvePhotoURL` |
+| [internal/models/user.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/models/user.go) | MODIFY | Tambah `PhotoURL` ke [UpdateUserInput](file:///f:/Project/ProjectLomba/nusagizi_be/internal/models/user.go#33-39) |
+| [internal/repository/user_repository.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/repository/user_repository.go) | MODIFY | Tambah `photo_url` ke SET clause Update |
+| [internal/services/user_service.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/user_service.go) | MODIFY | Inject storage, resolve URL di GET methods |
+| [internal/services/child_service.go](file:///f:/Project/ProjectLomba/nusagizi_be/internal/services/child_service.go) | MODIFY | Inject storage, resolve URL di GetChild/GetListChild/GetChildDetail |
+| [cmd/api/main.go](file:///f:/Project/ProjectLomba/nusagizi_be/cmd/api/main.go) | MODIFY | Init R2 client, inject ke services, register 2 route baru |
+
+---
+
+## Verification Plan
+
+### 1. Build Check
+```bash
+go build ./...
+```
+
+### 2. Test Flow Presigned URL (Postman)
+
+**Step 1 — Dapat presigned PUT URL:**
+```
+POST /images/presign-upload
+Authorization: Bearer <token>
+Body: { "category": "profile", "owner_id": "<user_id>", "content_type": "image/webp" }
+→ Expect 200: { "upload_url": "https://...", "object_key": "profile/<user_id>/<uuid>.webp" }
+```
+
+**Step 2 — Upload langsung ke R2:**
+```
+PUT <upload_url dari Step 1>
+Header: Content-Type: image/webp
+Body: <binary file>
+→ Expect 200 dari Cloudflare R2
+```
+
+**Step 3a — Update profil user dengan photo:**
+```
+PATCH /users
+Authorization: Bearer <token>
+Body: { "photo_url": "profile/<user_id>/<uuid>.webp" }
+→ Expect 200 OK
+```
+
+**Step 3b — Verifikasi GET mengembalikan presigned URL:**
+```
+GET /users
+→ Expect photo_url berisi URL https://...r2.cloudflarestorage.com/... (bukan object_key mentah)
+```
+
+**Step 3c — Tambah anak dengan photo:**
+```
+POST /children
+Body: { "full_name": "...", "birth_date": "...", "gender": "...", "photo_url": "child-profile/<child_id>/<uuid>.webp" }
+→ Expect 201 dengan child_id
+GET /children/<child_id>/profile
+→ Expect photo_url berisi presigned GET URL
+```

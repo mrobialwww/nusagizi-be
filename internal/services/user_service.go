@@ -4,6 +4,7 @@ import (
 	"context"
 	"nusagizi_be/internal/models"
 	"nusagizi_be/internal/repository"
+	"nusagizi_be/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -12,15 +13,26 @@ type UserService struct {
 	repo          *repository.UserRepository
 	motherRepo    *repository.MotherProfileRepository
 	caregiverRepo *repository.CaregiverRepository
+	r2PublicURL   string
 }
 
-func NewUserService(repo *repository.UserRepository, motherRepo *repository.MotherProfileRepository, caregiverRepo *repository.CaregiverRepository) *UserService {
-	return &UserService{repo: repo, motherRepo: motherRepo, caregiverRepo: caregiverRepo}
+func NewUserService(
+	repo *repository.UserRepository,
+	motherRepo *repository.MotherProfileRepository,
+	caregiverRepo *repository.CaregiverRepository,
+	r2PublicURL string,
+) *UserService {
+	return &UserService{repo: repo, motherRepo: motherRepo, caregiverRepo: caregiverRepo, r2PublicURL: r2PublicURL}
 }
 
 // GetUser returns a user's profile (Endpoint: 3)
 func (s *UserService) GetUser(ctx context.Context, userID string) (*models.UserProfileResponse, error) {
-	return s.repo.GetProfileByID(ctx, userID)
+	resp, err := s.repo.GetProfileByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp.PhotoURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp.PhotoURL)
+	return resp, nil
 }
 
 // UpdateUser partially updates a user's profile (Endpoint: 1)
@@ -64,7 +76,7 @@ func (s *UserService) GetMotherProfile(ctx context.Context, userID string) (*mod
 		FullName:    userProfile.FullName,
 		Email:       userProfile.Email,
 		PhoneNumber: userProfile.PhoneNumber,
-		PhotoURL:    userProfile.PhotoURL,
+		PhotoURL:    utils.ResolvePublicPhotoURL(s.r2PublicURL, userProfile.PhotoURL),
 	}, nil
 }
 
@@ -89,6 +101,6 @@ func (s *UserService) GetCaregiverProfile(ctx context.Context, userID string) (*
 		FullName:    userProfile.FullName,
 		Email:       userProfile.Email,
 		PhoneNumber: userProfile.PhoneNumber,
-		PhotoURL:    userProfile.PhotoURL,
+		PhotoURL:    utils.ResolvePublicPhotoURL(s.r2PublicURL, userProfile.PhotoURL),
 	}, nil
 }

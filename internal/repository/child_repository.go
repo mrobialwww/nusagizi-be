@@ -385,6 +385,24 @@ func (r *ChildRepository) GetChild(ctx context.Context, childID uuid.UUID) (*mod
 	return &child, nil
 }
 
+// GetMotherProfileID returns the mother_profile_id of the given child.
+func (r *ChildRepository) GetMotherProfileID(ctx context.Context, childID uuid.UUID) (uuid.UUID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var motherProfileID uuid.UUID
+	var query string = `
+		SELECT mother_profile_id 
+		FROM children 
+		WHERE id = $1 AND deleted_at IS NULL`
+
+	err := r.pool.QueryRow(ctx, query, childID).Scan(&motherProfileID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, ErrNotFound
+	}
+	return motherProfileID, err
+}
+
 // GetByID returns full child detail with all sub-profiles assembled.
 func (r *ChildRepository) GetByID(ctx context.Context, childID uuid.UUID) (*models.ChildDetailResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

@@ -108,6 +108,7 @@ CREATE TABLE children (
     photo_url               TEXT,
     notes_profile           TEXT,
     streak_days             INTEGER NOT NULL CHECK (streak_days >= 0),
+    last_streak_date        DATE,
     deleted_at              TIMESTAMPTZ,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -227,6 +228,7 @@ CREATE TABLE assessment_kpsp_questions (
     month_target            INTEGER NOT NULL CHECK (month_target IN (3,6,9,12,15,18,21,24,30,36,42,48,54,60)),
     developmental_domain    developmental_domain NOT NULL,
     question_text           TEXT NOT NULL,
+    image_url               TEXT,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -277,30 +279,17 @@ CREATE INDEX idx_attempt_recomendations_report_id ON development_report_recommen
 CREATE INDEX idx_attempt_recomendations_action_id ON development_report_recommendations(recommended_action_id);
 
 
--- Master table for developmental milestone tasks based on target age
-CREATE TABLE checklist_milestone_tasks (
-    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    month_target     INTEGER NOT NULL CHECK (month_target IN (3,6,9,12,15,18,21,24,30,36,42,48,54,60)),
-    developmental_domain       developmental_domain NOT NULL,
-    task_description TEXT NOT NULL,
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX idx_checklist_milestone_tasks_month_target ON checklist_milestone_tasks(month_target);
-CREATE TRIGGER trg_checklist_milestone_tasks_updated_at BEFORE UPDATE ON checklist_milestone_tasks
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- Junction N:M: child <-> checklist_milestone_tasks
+-- Junction N:M: child <-> assessment_kpsp_questions
 -- Junction table tracking a child's progress on specific milestone tasks
 CREATE TABLE checklist_milestone_progress (
-    child_id                      UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
-    checklist_milestone_task_id   UUID NOT NULL REFERENCES checklist_milestone_tasks(id) ON DELETE CASCADE,
-    created_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (child_id, checklist_milestone_task_id)
+    child_id                    UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+    assessment_kpsp_question_id UUID NOT NULL REFERENCES assessment_kpsp_questions(id) ON DELETE CASCADE,
+    created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (child_id, assessment_kpsp_question_id)
 );
 CREATE INDEX idx_checklist_milestone_progress_child_id ON checklist_milestone_progress(child_id);
-CREATE INDEX idx_checklist_milestone_progress_task_id ON checklist_milestone_progress(checklist_milestone_task_id);
+CREATE INDEX idx_checklist_milestone_progress_question_id ON checklist_milestone_progress(assessment_kpsp_question_id);
 CREATE TRIGGER trg_checklist_milestone_progress_updated_at BEFORE UPDATE ON checklist_milestone_progress
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -341,6 +330,7 @@ CREATE TABLE recipes (
     carbohydrate        NUMERIC(6,2) NOT NULL CHECK (carbohydrate >= 0),
     fat                 NUMERIC(6,2) NOT NULL CHECK (fat >= 0),
     description         TEXT NOT NULL,
+    image_url           TEXT,
     cooking_time        VARCHAR(100) NOT NULL,
     is_bookmarked       BOOLEAN NOT NULL,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),

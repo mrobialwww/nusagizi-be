@@ -28,6 +28,7 @@ type ChildSummaryResponse struct {
 	Carbohydrate        *float64   `json:"-"`
 	TargetCarbohydrate  *float64   `json:"-"`
 	Streak              int        `json:"streak"`
+	LastStreakDateRaw   *time.Time `json:"-"`
 	StatusGrowth        string     `json:"status_growth"`
 	StatusDevelopment   string     `json:"status_development"`
 	StatusNutrition     string     `json:"status_nutrition"`

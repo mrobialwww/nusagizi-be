@@ -155,17 +155,54 @@ func (r *PhotosContactsRepository) DeleteContact(ctx context.Context, contactID 
 }
 
 // GetMotherChildPhotos gets all photos for a mother's children.
-func (r *PhotosContactsRepository) GetMotherChildPhotos(ctx context.Context, motherProfileID uuid.UUID) ([]photos_contacts.ChildPhotoResponse, error) {
+func (r *PhotosContactsRepository) GetMotherChildPhotos(ctx context.Context, motherProfileID uuid.UUID, childID *uuid.UUID, latestPerChild bool) ([]photos_contacts.ChildPhotoResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	query := `
-		SELECT p.id, p.child_id, p.photo_url, p.is_review_required
+
+	motherChildPhotosQuery := `
+		SELECT p.id, p.child_id, p.photo_url, p.is_review_required, p.created_at
 		FROM child_photos p
 		JOIN children c ON p.child_id = c.id
 		WHERE c.mother_profile_id = $1
 		ORDER BY p.created_at DESC
 	`
-	rows, err := r.pool.Query(ctx, query, motherProfileID)
+
+	// motherChildDailyPhotoQuery returns one photo per day (the latest that
+	// day) for a single child — used for daily/timeline views.
+	motherChildDailyPhotoQuery := `
+		SELECT DISTINCT ON (DATE(p.created_at AT TIME ZONE 'UTC'))
+			p.id, p.child_id, p.photo_url, p.is_review_required, p.created_at
+		FROM child_photos p
+		JOIN children c ON p.child_id = c.id
+		WHERE c.mother_profile_id = $1 AND c.id = $2
+		ORDER BY DATE(p.created_at AT TIME ZONE 'UTC') DESC, p.created_at DESC
+	`
+
+	// motherChildLatestPerChildQuery returns the single latest photo per child across all children
+	motherChildLatestPerChildQuery := `
+		SELECT DISTINCT ON (c.id)
+			p.id, p.child_id, p.photo_url, p.is_review_required, p.created_at
+		FROM child_photos p
+		JOIN children c ON p.child_id = c.id
+		WHERE c.mother_profile_id = $1
+		ORDER BY c.id, p.created_at DESC
+	`
+
+	var query string
+	var args []any
+
+	if childID != nil {
+		query = motherChildDailyPhotoQuery
+		args = []any{motherProfileID, *childID}
+	} else if latestPerChild {
+		query = motherChildLatestPerChildQuery
+		args = []any{motherProfileID}
+	} else {
+		query = motherChildPhotosQuery
+		args = []any{motherProfileID}
+	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +211,7 @@ func (r *PhotosContactsRepository) GetMotherChildPhotos(ctx context.Context, mot
 	var photos []photos_contacts.ChildPhotoResponse
 	for rows.Next() {
 		var p photos_contacts.ChildPhotoResponse
-		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.IsReviewRequired); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.IsReviewRequired, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		photos = append(photos, p)
@@ -187,7 +224,7 @@ func (r *PhotosContactsRepository) GetContactChildPhotos(ctx context.Context, co
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	query := `
-		SELECT p.id, p.child_id, p.photo_url
+		SELECT p.id, p.child_id, p.photo_url, p.created_at
 		FROM child_photos p
 		LEFT JOIN photo_shares psw ON psw.child_photo_id = p.id
 		JOIN children c ON p.child_id = c.id
@@ -197,7 +234,7 @@ func (r *PhotosContactsRepository) GetContactChildPhotos(ctx context.Context, co
 			AND p.is_review_required = false
 			AND (
 				p.visibility = 'all' 
-				OR (p.visibility = 'only' 
+				OR (p.visibility = 'selected_only' 
 				AND psw.contact_id = $1)
 			)
 		ORDER BY p.created_at DESC
@@ -211,7 +248,7 @@ func (r *PhotosContactsRepository) GetContactChildPhotos(ctx context.Context, co
 	var photos []photos_contacts.ChildPhotoResponse
 	for rows.Next() {
 		var p photos_contacts.ChildPhotoResponse
-		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		photos = append(photos, p)
@@ -240,7 +277,7 @@ func (r *PhotosContactsRepository) GetAllChildPhotos(ctx context.Context, mother
 					ct.id IS NOT NULL 
 					AND (
 						p.visibility = 'all' 
-						OR (p.visibility = 'only' AND psw.contact_id = ct.id)
+						OR (p.visibility = 'selected_only' AND psw.contact_id = ct.id)
 					)
 				)
 			)
@@ -255,8 +292,7 @@ func (r *PhotosContactsRepository) GetAllChildPhotos(ctx context.Context, mother
 	var photos []photos_contacts.ChildPhotoResponse
 	for rows.Next() {
 		var p photos_contacts.ChildPhotoResponse
-		var createdAt time.Time
-		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &createdAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		photos = append(photos, p)
@@ -270,11 +306,11 @@ func (r *PhotosContactsRepository) GetPhotoDetail(ctx context.Context, photoID u
 	defer cancel()
 	var p photos_contacts.ChildPhotoResponse
 	query := `
-		SELECT id, child_id, photo_url, caption
+		SELECT id, child_id, photo_url, caption, created_at
 		FROM child_photos
 		WHERE id = $1
 	`
-	err := r.pool.QueryRow(ctx, query, photoID).Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.Caption)
+	err := r.pool.QueryRow(ctx, query, photoID).Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.Caption, &p.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("record not found")
@@ -302,7 +338,7 @@ func (r *PhotosContactsRepository) CheckContactPhotoAccess(ctx context.Context, 
 				AND p.is_review_required = false
 				AND (
 					p.visibility = 'all'
-					OR (p.visibility = 'only' AND psw.contact_id = ct.id)
+					OR (p.visibility = 'selected_only' AND psw.contact_id = ct.id)
 				)
 		)
 	`
@@ -334,7 +370,7 @@ func (r *PhotosContactsRepository) CreatePhoto(ctx context.Context, childID uuid
 	}
 
 	// Insert photo shared with
-	if input.Visibility == "only" && len(input.ListVisibility) > 0 {
+	if input.Visibility == "selected_only" && len(input.ListVisibility) > 0 {
 		queryShared := `
 			INSERT INTO photo_shares (child_photo_id, contact_id)
 			VALUES ($1, $2)
@@ -345,6 +381,91 @@ func (r *PhotosContactsRepository) CreatePhoto(ctx context.Context, childID uuid
 				return uuid.Nil, err
 			}
 		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, err
+	}
+
+	return newID, nil
+}
+
+// CreatePhotoWithStreak adds a new photo and its visibility list, and updates the child's streak.
+func (r *PhotosContactsRepository) CreatePhotoWithStreak(ctx context.Context, childID uuid.UUID, input *photos_contacts.CreatePhotoInput) (uuid.UUID, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Lock the child row
+	var currentStreak int
+	var lastStreakDate *time.Time
+	queryLock := `
+		SELECT streak_days, last_streak_date 
+		FROM children 
+		WHERE id = $1 FOR UPDATE`
+	err = tx.QueryRow(ctx, queryLock, childID).Scan(&currentStreak, &lastStreakDate)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	// 2. Calculate new streak securely
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	newStreak := currentStreak
+
+	if lastStreakDate == nil {
+		newStreak = 1
+	} else {
+		lastDate := lastStreakDate.UTC().Truncate(24 * time.Hour)
+		diff := today.Sub(lastDate).Hours() / 24
+
+		if diff == 1 {
+			newStreak = currentStreak + 1
+		} else if diff > 1 {
+			newStreak = 1
+		}
+		// if diff == 0, newStreak remains currentStreak
+	}
+
+	newID := uuid.New()
+
+	// 3. Insert photo
+	queryInsert := `
+		INSERT INTO child_photos (id, child_id, photo_url, caption, visibility, is_review_required)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	_, err = tx.Exec(ctx, queryInsert, newID, childID, input.URL, input.Caption, input.Visibility, input.IsReviewRequired)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	// 4. Insert photo shared with
+	if input.Visibility == "selected_only" && len(input.ListVisibility) > 0 {
+		queryShared := `
+			INSERT INTO photo_shares (child_photo_id, contact_id)
+			VALUES ($1, $2)
+		`
+		for _, contactID := range input.ListVisibility {
+			_, err = tx.Exec(ctx, queryShared, newID, contactID)
+			if err != nil {
+				return uuid.Nil, err
+			}
+		}
+	}
+
+	// 5. Update children streak
+	queryUpdateChild := `
+		UPDATE children
+		SET streak_days = $1, last_streak_date = $2
+		WHERE id = $3
+	`
+	_, err = tx.Exec(ctx, queryUpdateChild, newStreak, today, childID)
+	if err != nil {
+		return uuid.Nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -400,9 +521,16 @@ func (r *PhotosContactsRepository) UpdatePhoto(ctx context.Context, photoID uuid
 			queryDeleteUnchecked := `
 				DELETE FROM photo_shares 
 				WHERE child_photo_id = $1 
-					AND contact_id != ALL($2)
+					AND contact_id != ALL($2::uuid[])
 			`
-			_, err = tx.Exec(ctx, queryDeleteUnchecked, photoID, *input.ListVisibility)
+
+			// pgx array encoding workaround for []uuid.UUID
+			var listVisibilityStrings []string
+			for _, id := range *input.ListVisibility {
+				listVisibilityStrings = append(listVisibilityStrings, id.String())
+			}
+
+			_, err = tx.Exec(ctx, queryDeleteUnchecked, photoID, listVisibilityStrings)
 			if err != nil {
 				return err
 			}

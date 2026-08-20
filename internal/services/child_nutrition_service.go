@@ -8,6 +8,7 @@ import (
 
 	child_nutri "nusagizi_be/internal/models/child_nutrition"
 	"nusagizi_be/internal/repository"
+	"nusagizi_be/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -17,6 +18,7 @@ type ChildNutritionService struct {
 	childRepo     *repository.ChildRepository
 	motherRepo    *repository.MotherProfileRepository
 	caregiverRepo *repository.CaregiverRepository
+	r2PublicURL   string
 }
 
 func NewChildNutritionService(
@@ -24,12 +26,14 @@ func NewChildNutritionService(
 	childRepo *repository.ChildRepository,
 	motherRepo *repository.MotherProfileRepository,
 	caregiverRepo *repository.CaregiverRepository,
+	r2PublicURL string,
 ) *ChildNutritionService {
 	return &ChildNutritionService{
 		repo:          repo,
 		childRepo:     childRepo,
 		motherRepo:    motherRepo,
 		caregiverRepo: caregiverRepo,
+		r2PublicURL:   r2PublicURL,
 	}
 }
 
@@ -50,6 +54,10 @@ func (s *ChildNutritionService) GetTodayNutritionReport(ctx context.Context, use
 
 	if resp != nil {
 		resp.Status = DetermineNutritionStatus(resp)
+		// Resolve images
+		for i := range resp.Menu.Recipes {
+			resp.Menu.Recipes[i].ImageURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp.Menu.Recipes[i].ImageURL)
+		}
 	}
 	return resp, nil
 }
@@ -59,7 +67,14 @@ func (s *ChildNutritionService) GetReportMenuByID(ctx context.Context, userID st
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
 	}
-	return s.repo.GetReportMenuByID(ctx, childID, reportID)
+	resp, err := s.repo.GetReportMenuByID(ctx, childID, reportID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range resp.Recipes {
+		resp.Recipes[i].ImageURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp.Recipes[i].ImageURL)
+	}
+	return resp, nil
 }
 
 // UpdateRecipeCompleteStatus (Endpoint: 31)
@@ -101,7 +116,21 @@ func (s *ChildNutritionService) GetRecipeDetail(ctx context.Context, userID stri
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
 	}
-	return s.repo.GetRecipeDetail(ctx, recipeID)
+	resp, err := s.repo.GetRecipeDetail(ctx, recipeID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp.ImageURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp.ImageURL)
+	for i := range resp.MainIngredients {
+		resp.MainIngredients[i].Ingredient.ImageURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp.MainIngredients[i].Ingredient.ImageURL)
+	}
+	for i := range resp.CookingSteps {
+		if resolved := utils.ResolvePublicPhotoURL(s.r2PublicURL, &resp.CookingSteps[i].ImageURL); resolved != nil {
+			resp.CookingSteps[i].ImageURL = *resolved
+		}
+	}
+	return resp, nil
 }
 
 // SwapMainIngredientPriority (Endpoint: 34)
@@ -131,7 +160,14 @@ func (s *ChildNutritionService) GetBookmarkedRecipes(ctx context.Context, userID
 	if err := checkChildAccess(ctx, userID, childID, s.motherRepo, s.caregiverRepo, s.childRepo); err != nil {
 		return nil, err
 	}
-	return s.repo.GetBookmarkedRecipes(ctx, childID)
+	resp, err := s.repo.GetBookmarkedRecipes(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range resp {
+		resp[i].ImageURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp[i].ImageURL)
+	}
+	return resp, nil
 }
 
 // GetNutritionReportsByMonth (Endpoint: 36)

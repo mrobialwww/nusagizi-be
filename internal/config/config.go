@@ -29,6 +29,13 @@ type Config struct {
 	// To Communicate with Auth0 APIs
 	M2MClientID     string
 	M2MClientSecret string
+
+	// Cloudflare R2
+	R2AccountID       string
+	R2AccessKeyID     string
+	R2SecretAccessKey string
+	R2Bucket          string
+	R2PublicURL       string
 }
 
 func Load() (*Config, error) {
@@ -55,6 +62,13 @@ func Load() (*Config, error) {
 
 		M2MClientID:     os.Getenv("AUTH0_M2M_CLIENT_ID"),
 		M2MClientSecret: os.Getenv("AUTH0_M2M_CLIENT_SECRET"),
+
+		// Cloudflare R2
+		R2AccountID:       os.Getenv("R2_ACCOUNT_ID"),
+		R2AccessKeyID:     os.Getenv("R2_ACCESS_KEY_ID"),
+		R2SecretAccessKey: os.Getenv("R2_SECRET_ACCESS_KEY"),
+		R2Bucket:          os.Getenv("R2_BUCKET"),
+		R2PublicURL:       os.Getenv("R2_PUBLIC_URL"),
 	}
 
 	return config, nil

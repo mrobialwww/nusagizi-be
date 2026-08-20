@@ -8,25 +8,29 @@ import (
 	"nusagizi_be/internal/models"
 	child_dev "nusagizi_be/internal/models/child_development"
 	"nusagizi_be/internal/repository"
+	"nusagizi_be/internal/utils"
 
 	"github.com/google/uuid"
 )
 
 type ChildDevelopmentService struct {
-	repo       *repository.ChildDevelopmentRepository
-	childRepo  *repository.ChildRepository
-	motherRepo *repository.MotherProfileRepository
+	repo        *repository.ChildDevelopmentRepository
+	childRepo   *repository.ChildRepository
+	motherRepo  *repository.MotherProfileRepository
+	r2PublicURL string
 }
 
 func NewChildDevelopmentService(
 	repo *repository.ChildDevelopmentRepository,
 	childRepo *repository.ChildRepository,
 	motherRepo *repository.MotherProfileRepository,
+	r2PublicURL string,
 ) *ChildDevelopmentService {
 	return &ChildDevelopmentService{
-		repo:       repo,
-		childRepo:  childRepo,
-		motherRepo: motherRepo,
+		repo:        repo,
+		childRepo:   childRepo,
+		motherRepo:  motherRepo,
+		r2PublicURL: r2PublicURL,
 	}
 }
 
@@ -62,12 +66,18 @@ func (s *ChildDevelopmentService) GetDevelopmentReports(ctx context.Context, use
 }
 
 // GetDevelopmentReportByID (Endpoint: 21)
-func (s *ChildDevelopmentService) GetDevelopmentReportByID(ctx context.Context, userID string, childID uuid.UUID, reportID uuid.UUID) (*child_dev.DevelopmentReportResponse, error) {
-	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
-		return nil, err
-	}
+func (s *ChildDevelopmentService) GetDevelopmentReportByID(ctx context.Context, userID string, reportID uuid.UUID) (*child_dev.DevelopmentReportResponse, error) {
+	// Fetch report first (child_id is embedded in the response)
 	report, err := s.repo.GetDevelopmentReportByID(ctx, reportID)
 	if err != nil {
+		return nil, err
+	}
+
+	// Use child_id from the report itself for ownership check
+	if report.ChildID == nil {
+		return nil, fmt.Errorf("record not found")
+	}
+	if err := checkMotherOwnership(ctx, userID, *report.ChildID, s.motherRepo, s.childRepo); err != nil {
 		return nil, err
 	}
 
@@ -100,7 +110,14 @@ func (s *ChildDevelopmentService) GetDevelopmentReportByID(ctx context.Context, 
 
 // GetKPSPQuestions (Endpoint: 22 - Global Data, no childID required)
 func (s *ChildDevelopmentService) GetKPSPQuestions(ctx context.Context, monthTarget int) ([]child_dev.AssessmentKPSPQuestion, error) {
-	return s.repo.GetKPSPQuestions(ctx, monthTarget)
+	resp, err := s.repo.GetKPSPQuestions(ctx, monthTarget)
+	if err != nil {
+		return nil, err
+	}
+	for i := range resp {
+		resp[i].ImageURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp[i].ImageURL)
+	}
+	return resp, nil
 }
 
 // CreateDevelopmentReport (Endpoint: 23)
@@ -139,32 +156,43 @@ func (s *ChildDevelopmentService) CreateDevelopmentReport(ctx context.Context, u
 }
 
 // UpdateDevelopmentReport (Endpoint: 24)
-func (s *ChildDevelopmentService) UpdateDevelopmentReport(ctx context.Context, userID string, childID uuid.UUID, reportID uuid.UUID, input *child_dev.UpdateDevelopmentReportInput) error {
+func (s *ChildDevelopmentService) UpdateDevelopmentReport(ctx context.Context, userID string, childID uuid.UUID, reportID uuid.UUID, input *child_dev.UpdateDevelopmentReportInput) (uuid.UUID, error) {
 	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	if len(input.ListAnswer) == 0 {
-		return fmt.Errorf("answers cannot be empty")
+		return uuid.Nil, fmt.Errorf("answers cannot be empty")
 	}
 
 	childInfo, err := s.childRepo.GetChild(ctx, childID)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	birthDate, err := time.Parse(models.DateLayout, childInfo.BirthDate)
 	if err != nil {
-		return fmt.Errorf("invalid birth_date format in db: %w", err)
+		return uuid.Nil, fmt.Errorf("invalid birth_date format in db: %w", err)
 	}
 
 	_, nextCheckDate := calculateKPSPParams(birthDate)
 
-	return s.repo.UpdateDevelopmentReport(ctx, reportID, input.ListAnswer, nextCheckDate)
+	if _, err := s.repo.UpdateDevelopmentReport(ctx, reportID, input.ListAnswer, nextCheckDate); err != nil {
+		return uuid.Nil, err
+	}
+	return reportID, nil
 }
 
 // DeleteDevelopmentReport (Endpoint: 28)
-func (s *ChildDevelopmentService) DeleteDevelopmentReport(ctx context.Context, userID string, childID uuid.UUID, reportID uuid.UUID) error {
-	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
+func (s *ChildDevelopmentService) DeleteDevelopmentReport(ctx context.Context, userID string, reportID uuid.UUID) error {
+	report, err := s.repo.GetDevelopmentReportByID(ctx, reportID)
+	if err != nil {
+		return err
+	}
+	if report.ChildID == nil {
+		return fmt.Errorf("record not found")
+	}
+
+	if err := checkMotherOwnership(ctx, userID, *report.ChildID, s.motherRepo, s.childRepo); err != nil {
 		return err
 	}
 
@@ -172,7 +200,7 @@ func (s *ChildDevelopmentService) DeleteDevelopmentReport(ctx context.Context, u
 }
 
 // GetChecklistMilestoneTasks (Endpoint: 25)
-func (s *ChildDevelopmentService) GetChecklistMilestoneTasks(ctx context.Context, userID string, childID uuid.UUID, monthTarget int) ([]child_dev.ChecklistMilestoneTaskResponse, error) {
+func (s *ChildDevelopmentService) GetChecklistMilestoneTasks(ctx context.Context, userID string, childID uuid.UUID, monthTarget int) ([]child_dev.ChecklistMilestoneResponse, error) {
 	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
 		return nil, err
 	}
@@ -180,11 +208,11 @@ func (s *ChildDevelopmentService) GetChecklistMilestoneTasks(ctx context.Context
 }
 
 // UpdateChecklistMilestone (Endpoint: 27)
-func (s *ChildDevelopmentService) UpdateChecklistMilestone(ctx context.Context, userID string, childID uuid.UUID, taskIDs []uuid.UUID) error {
+func (s *ChildDevelopmentService) UpdateChecklistMilestone(ctx context.Context, userID string, childID uuid.UUID, questionIDs []uuid.UUID) error {
 	if err := checkMotherOwnership(ctx, userID, childID, s.motherRepo, s.childRepo); err != nil {
 		return err
 	}
-	return s.repo.UpdateChecklistMilestone(ctx, childID, taskIDs)
+	return s.repo.UpdateChecklistMilestone(ctx, childID, questionIDs)
 }
 
 // GetRecommendations (Endpoint: 26)

@@ -14,11 +14,13 @@ type DomainAggregate struct {
 
 type DevelopmentReportResponse struct {
 	ID                 uuid.UUID           `json:"id"`
+	ChildID            *uuid.UUID          `json:"-"` // internal only, not exposed in JSON
 	KPSPScore          int                 `json:"kpsp_score"`
 	MonthTarget        *int                `json:"month_target,omitempty"`
 	NextCheckDate      *string             `json:"next_check_date,omitempty"`
 	Status             *string             `json:"status,omitempty"`
 	CreatedAt          *time.Time          `json:"created_at,omitempty"`
+	KPSPAnswersCount   *int                `json:"kpsp_answers_count,omitempty"`
 	Domains            []DomainAggregate   `json:"domains,omitempty"`
 	RecommendedActions []RecommendedAction `json:"recommended_actions,omitempty"`
 }

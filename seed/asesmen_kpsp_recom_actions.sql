@@ -744,8 +744,13 @@ WITH data AS (
 ),
 
 inserted_questions AS (
-    INSERT INTO assessment_kpsp_questions (month_target, developmental_domain, question_text)
-    SELECT month_target, CAST(developmental_domain AS developmental_domain), question_text
+    INSERT INTO assessment_kpsp_questions (month_target, developmental_domain, question_text, image_url)
+    SELECT 
+        month_target, 
+        CAST(developmental_domain AS developmental_domain), 
+        question_text,
+        'assessment-kpsp-questions/' || developmental_domain || '-' || 
+        ((ROW_NUMBER() OVER (PARTITION BY developmental_domain ORDER BY month_target, question_text) - 1) % 4 + 1)::text || '.png'
     FROM data
     RETURNING id, month_target, question_text
 )
