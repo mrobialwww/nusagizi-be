@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	child_nutri "nusagizi_be/internal/models/child_nutrition"
 	"nusagizi_be/internal/models/dashboard"
 	"nusagizi_be/internal/repository"
 	"nusagizi_be/internal/utils"
@@ -84,27 +83,12 @@ func (s *DashboardService) GetDashboardSummary(ctx context.Context, userID strin
 			results[i].StatusDevelopment = "Tidak Diketahui"
 		}
 
-		// Calculate Nutrition Status
-		if results[i].TargetCalories != nil && results[i].Calories != nil &&
-			results[i].TargetProtein != nil && results[i].Protein != nil &&
-			results[i].TargetFat != nil && results[i].Fat != nil &&
-			results[i].TargetCarbohydrate != nil && results[i].Carbohydrate != nil {
-
-			// Reuse helper from child_nutrition_service by building a temporary struct
-			dummyResp := &child_nutri.TodayNutritionReportResponse{
-				Calories:           *results[i].Calories,
-				TargetCalories:     *results[i].TargetCalories,
-				Protein:            *results[i].Protein,
-				TargetProtein:      *results[i].TargetProtein,
-				Fat:                *results[i].Fat,
-				TargetFat:          *results[i].TargetFat,
-				Carbohydrate:       *results[i].Carbohydrate,
-				TargetCarbohydrate: *results[i].TargetCarbohydrate,
-			}
-			results[i].StatusNutrition = DetermineNutritionStatus(dummyResp)
-		} else {
-			results[i].StatusNutrition = "Tidak Diketahui"
-		}
+		results[i].StatusNutrition = DetermineNutritionStatus(
+			*results[i].Calories, *results[i].TargetCalories,
+			*results[i].Protein, *results[i].TargetProtein,
+			*results[i].Fat, *results[i].TargetFat,
+			*results[i].Carbohydrate, *results[i].TargetCarbohydrate,
+		)
 
 		// Calculate Combined Status
 		redCount, yellowCount := 0, 0

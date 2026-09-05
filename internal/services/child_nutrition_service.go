@@ -53,7 +53,7 @@ func (s *ChildNutritionService) GetTodayNutritionReport(ctx context.Context, use
 	resp.CanRegenerate = !isReused
 
 	if resp != nil {
-		resp.Status = DetermineNutritionStatus(resp)
+		resp.Status = DetermineNutritionStatus(resp.Calories, resp.TargetCalories, resp.Protein, resp.TargetProtein, resp.Fat, resp.TargetFat, resp.Carbohydrate, resp.TargetCarbohydrate)
 		// Resolve images
 		for i := range resp.Menu.Recipes {
 			resp.Menu.Recipes[i].ImageURL = utils.ResolvePublicPhotoURL(s.r2PublicURL, resp.Menu.Recipes[i].ImageURL)
@@ -181,7 +181,15 @@ func (s *ChildNutritionService) GetNutritionReportsByMonth(ctx context.Context, 
 	if year < 2000 {
 		return nil, fmt.Errorf("invalid year")
 	}
-	return s.repo.GetNutritionReportsByMonth(ctx, childID, month, year)
+	results, err := s.repo.GetNutritionReportsByMonth(ctx, childID, month, year)
+	if err != nil {
+		return nil, err
+	}
+	for i := range results {
+		res := &results[i]
+		res.Status = DetermineNutritionStatus(res.Calories, res.TargetCalories, res.Protein, res.TargetProtein, res.Fat, res.TargetFat, res.Carbohydrate, res.TargetCarbohydrate)
+	}
+	return results, nil
 }
 
 // GetDailyShopIngredients (Endpoint: 37)
@@ -243,22 +251,20 @@ func (s *ChildNutritionService) ReuseRecipe(ctx context.Context, requesterID str
 }
 
 // ================================== HELPER FUNCTION ===================================
-// DetermineNutritionStatus evaluates macro targets and returns a descriptive status
-func DetermineNutritionStatus(resp *child_nutri.TodayNutritionReportResponse) string {
-	if resp == nil {
-		return "Sangat Buruk"
-	}
+// DetermineNutritionStatus evaluates macro targets and returns a descriptive status.
+// (4 macros >= 90% target = Normal, 3 = Kurang Optimal, 2 = Berisiko, <=1 = Sangat Buruk)
+func DetermineNutritionStatus(calories, targetCalories, protein, targetProtein, fat, targetFat, carbohydrate, targetCarbohydrate float64) string {
 	count := 0
-	if resp.TargetCalories > 0 && float64(resp.Calories) >= 0.9*float64(resp.TargetCalories) {
+	if targetCalories > 0 && calories >= 0.9*targetCalories {
 		count++
 	}
-	if resp.TargetProtein > 0 && float64(resp.Protein) >= 0.9*float64(resp.TargetProtein) {
+	if targetProtein > 0 && protein >= 0.9*targetProtein {
 		count++
 	}
-	if resp.TargetFat > 0 && float64(resp.Fat) >= 0.9*float64(resp.TargetFat) {
+	if targetFat > 0 && fat >= 0.9*targetFat {
 		count++
 	}
-	if resp.TargetCarbohydrate > 0 && float64(resp.Carbohydrate) >= 0.9*float64(resp.TargetCarbohydrate) {
+	if targetCarbohydrate > 0 && carbohydrate >= 0.9*targetCarbohydrate {
 		count++
 	}
 

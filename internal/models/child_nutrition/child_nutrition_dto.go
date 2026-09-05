@@ -86,14 +86,19 @@ type RecipeDetailResponse struct {
 }
 
 type NutritionReportSummaryResponse struct {
-	ID           uuid.UUID `json:"id"`
-	Calories     float64   `json:"calories"`
-	Protein      float64   `json:"protein"`
-	Fat          float64   `json:"fat"`
-	Carbohydrate float64   `json:"carbohydrate"`
-	MealTimes    []string  `json:"meal_times"`
-	CreatedAt    time.Time `json:"created_at"`
-	ReportDate   string    `json:"report_date"`
+	ID                 uuid.UUID `json:"id"`
+	Calories           float64   `json:"calories"`
+	TargetCalories     float64   `json:"-"`
+	Protein            float64   `json:"protein"`
+	TargetProtein      float64   `json:"-"`
+	Fat                float64   `json:"fat"`
+	TargetFat          float64   `json:"-"`
+	Carbohydrate       float64   `json:"carbohydrate"`
+	TargetCarbohydrate float64   `json:"-"`
+	Status             string    `json:"status"`
+	MealTimes          []string  `json:"meal_times"`
+	CreatedAt          time.Time `json:"created_at"`
+	ReportDate         string    `json:"report_date"`
 }
 
 type SwapIngredientPriorityInput struct {

@@ -532,9 +532,13 @@ func (r *ChildNutritionRepository) GetNutritionReportsByMonth(ctx context.Contex
 			r.created_at, 
 			r.report_date,
 			r.calories, 
+			r.target_calories,
 			r.protein, 
+			r.target_protein,
 			r.fat, 
+			r.target_fat,
 			r.carbohydrate,
+			r.target_carbohydrate,
 			COALESCE(
 				ARRAY_AGG(rec.meal_time) FILTER (WHERE cnr.portions_consumed > 0), 
 				'{}'
@@ -559,7 +563,14 @@ func (r *ChildNutritionRepository) GetNutritionReportsByMonth(ctx context.Contex
 	for rows.Next() {
 		var res child_nutri.NutritionReportSummaryResponse
 		var rDate time.Time
-		if err := rows.Scan(&res.ID, &res.CreatedAt, &rDate, &res.Calories, &res.Protein, &res.Fat, &res.Carbohydrate, &res.MealTimes); err == nil {
+		if err := rows.Scan(
+			&res.ID, &res.CreatedAt, &rDate,
+			&res.Calories, &res.TargetCalories,
+			&res.Protein, &res.TargetProtein,
+			&res.Fat, &res.TargetFat,
+			&res.Carbohydrate, &res.TargetCarbohydrate,
+			&res.MealTimes,
+		); err == nil {
 			res.ReportDate = rDate.Format("2006-01-02")
 			results = append(results, res)
 		}
