@@ -773,6 +773,7 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
 - **Response Body (200)**:
+  _Jika data ditemukan:_
 
 ```json
 {
@@ -807,6 +808,12 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 }
 ```
 
+_Jika belum ada laporan perkembangan sama sekali:_
+
+```json
+null
+```
+
 | Field                          | Type           | Keterangan                                                                                 |
 | ------------------------------ | -------------- | ------------------------------------------------------------------------------------------ |
 | id                             | UUID           |                                                                                            |
@@ -820,12 +827,11 @@ Contoh: usia 7 bulan -> `month_target=6`, `next_check_date` = usia 9 bulan (2 bu
 
 - **Response Error**:
 
-| Status | Kasus                                             |
-| ------ | ------------------------------------------------- |
-| 403    | `child_id` bukan milik user yang login            |
-| 404    | belum ada `child_development_reports` sama sekali |
+| Status | Kasus                                  |
+| ------ | -------------------------------------- |
+| 403    | `child_id` bukan milik user yang login |
 
-- **Catatan [FIX v4]**: v3 mengembalikan raw list jawaban per domain lalu FE yang menghitung `total_question`/`true_answer`. Diubah jadi agregasi di query (`GROUP BY developmental_domain`, `COUNT(*)` untuk `total_question`, `COUNT(*) FILTER (WHERE answer = true)` untuk `true_answer`) — lebih baik dari sisi performa karena payload jauh lebih kecil dan logic agregasi cukup ditulis sekali di backend, tidak diulang di tiap platform client (mobile/web).
+- **Catatan [FIX v4]**: v3 mengembalikan raw list jawaban per domain lalu FE yang menghitung `total_question`/`true_answer`. Diubah jadi agregasi di query (`GROUP BY developmental_domain`, `COUNT(*)` untuk `total_question`, `COUNT(*) FILTER (WHERE answer = true)` untuk `true_answer`) — lebih baik dari sisi performa karena payload jauh lebih kecil dan logic agregasi cukup ditulis sekali di backend, tidak diulang di tiap platform client (mobile/web). Data akan mengembalikan `null` (200) apabila anak belum memiliki laporan.
 
 ### 20. Get riwayat asesmen KPSP
 

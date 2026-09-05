@@ -43,8 +43,6 @@ func (h *ChildDevelopmentHandler) GetLatestDevelopmentReport(c *gin.Context) {
 		switch {
 		case errors.Is(err, repository.ErrForbidden):
 			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not own this child profile"}})
-		case errors.Is(err, repository.ErrNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "child development report not found"}})
 		default:
 			slog.Error("GetLatestDevelopmentReport failed", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})

@@ -44,6 +44,9 @@ func (s *ChildDevelopmentService) GetLatestDevelopmentReport(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
+	if report == nil {
+		return nil, nil
+	}
 	status := DetermineKPSPStatus(report.KPSPScore)
 	report.Status = &status
 	return report, nil

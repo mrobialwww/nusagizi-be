@@ -43,7 +43,7 @@ func (r *ChildDevelopmentRepository) GetLatestDevelopmentReport(ctx context.Cont
 	err := r.pool.QueryRow(ctx, queryReport, childID).Scan(&reportID, &report.KPSPScore, &nextCheckDate, &createdAt, &kpspAnswersCount)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("record not found")
+			return nil, nil
 		}
 		return nil, err
 	}

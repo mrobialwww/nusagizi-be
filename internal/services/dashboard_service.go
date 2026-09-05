@@ -83,11 +83,43 @@ func (s *DashboardService) GetDashboardSummary(ctx context.Context, userID strin
 			results[i].StatusDevelopment = "Tidak Diketahui"
 		}
 
+		calories := 0.0
+		if results[i].Calories != nil {
+			calories = *results[i].Calories
+		}
+		targetCalories := 0.0
+		if results[i].TargetCalories != nil {
+			targetCalories = *results[i].TargetCalories
+		}
+		protein := 0.0
+		if results[i].Protein != nil {
+			protein = *results[i].Protein
+		}
+		targetProtein := 0.0
+		if results[i].TargetProtein != nil {
+			targetProtein = *results[i].TargetProtein
+		}
+		fat := 0.0
+		if results[i].Fat != nil {
+			fat = *results[i].Fat
+		}
+		targetFat := 0.0
+		if results[i].TargetFat != nil {
+			targetFat = *results[i].TargetFat
+		}
+		carbohydrate := 0.0
+		if results[i].Carbohydrate != nil {
+			carbohydrate = *results[i].Carbohydrate
+		}
+		targetCarbohydrate := 0.0
+		if results[i].TargetCarbohydrate != nil {
+			targetCarbohydrate = *results[i].TargetCarbohydrate
+		}
 		results[i].StatusNutrition = DetermineNutritionStatus(
-			*results[i].Calories, *results[i].TargetCalories,
-			*results[i].Protein, *results[i].TargetProtein,
-			*results[i].Fat, *results[i].TargetFat,
-			*results[i].Carbohydrate, *results[i].TargetCarbohydrate,
+			calories, targetCalories,
+			protein, targetProtein,
+			fat, targetFat,
+			carbohydrate, targetCarbohydrate,
 		)
 
 		// Calculate Combined Status
