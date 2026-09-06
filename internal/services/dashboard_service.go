@@ -11,17 +11,20 @@ import (
 )
 
 type DashboardService struct {
-	repo       *repository.DashboardRepository
-	motherRepo *repository.MotherProfileRepository
+	repo        *repository.DashboardRepository
+	motherRepo  *repository.MotherProfileRepository
+	r2PublicURL string
 }
 
 func NewDashboardService(
 	repo *repository.DashboardRepository,
 	motherRepo *repository.MotherProfileRepository,
+	r2PublicURL string,
 ) *DashboardService {
 	return &DashboardService{
-		repo:       repo,
-		motherRepo: motherRepo,
+		repo:        repo,
+		motherRepo:  motherRepo,
+		r2PublicURL: r2PublicURL,
 	}
 }
 
@@ -37,6 +40,8 @@ func (s *DashboardService) GetDashboardSummary(ctx context.Context, userID strin
 	}
 
 	for i := range results {
+		results[i].PhotoUrl = utils.ResolvePublicPhotoURL(s.r2PublicURL, results[i].PhotoUrl)
+
 		// Calculate Valid Streak
 		if results[i].LastStreakDateRaw != nil {
 			today := time.Now().UTC().Truncate(24 * time.Hour)

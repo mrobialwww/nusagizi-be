@@ -88,7 +88,7 @@ func main() {
 	childNutriSvc := services.NewChildNutritionService(childNutriRepo, childRepo, motherRepo, caregiverRepo, cfg.R2PublicURL)
 	childGrowthSvc := services.NewChildGrowthService(childGrowthRepo, childRepo, motherRepo)
 	caregiverSvc := services.NewCaregiverService(caregiverRepo, motherRepo)
-	dashboardSvc := services.NewDashboardService(dashboardRepo, motherRepo)
+	dashboardSvc := services.NewDashboardService(dashboardRepo, motherRepo, cfg.R2PublicURL)
 	medicalSvc := services.NewMedicalService(medicalRepo, motherRepo, childRepo)
 	photosContactsSvc := services.NewPhotosContactsService(photosContactsRepo, motherRepo, childRepo, caregiverRepo, cfg.R2PublicURL)
 	notificationSvc := services.NewNotificationService(notificationRepo)

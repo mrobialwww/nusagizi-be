@@ -26,7 +26,7 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 		SELECT 
 			c.id, 
 			c.full_name, 
-			c.photo_url,
+			cp.photo_url,
 			c.birth_date, 
 			c.gender,
 			c.streak_days,
@@ -46,6 +46,11 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 			nr.carbohydrate,
 			nr.target_carbohydrate
 		FROM children c
+		LEFT JOIN LATERAL (
+			SELECT photo_url FROM child_photos 
+			WHERE child_id = c.id AND is_review_required = false 
+			ORDER BY created_at DESC LIMIT 1
+		) cp ON true
 		LEFT JOIN LATERAL (
 			SELECT height_cm, weight_kg, head_circumference_cm, measured_at 
 			FROM child_growth_reports 
