@@ -10,7 +10,9 @@ import (
 type CustomClaims struct {
 	Scope string `json:"scope"`
 	// Sesuaikan ini dengan namespace yang Anda isi di rahasia (secrets) Auth0
-	Email string `json:"https://api.nusagizi.com/email"`
+	// Custom claims ditambahkan via Auth0 Post Login Actions
+	Email    string `json:"https://api.nusagizi.com/email"`
+	Username string `json:"https://api.nusagizi.com/username"`
 }
 
 // Validate ensures the custom claims are properly formatted.
