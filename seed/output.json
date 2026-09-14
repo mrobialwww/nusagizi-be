@@ -1,0 +1,143 @@
+{
+    "meta": {
+        "hari_ke": "",
+        "hari_label": "",
+        "tanggal": "",
+        "jumlah_sesi": ""
+    },
+    "anak": [
+        {
+            "id": "",
+            "nama": "",
+            "pertumbuhan": {
+                "usia_bulan": "",
+                "berat_kg": "",
+                "panjang_cm": "",
+                "z_scores": { "lhfa": "", "wfl": "", "wfa": "" },
+                "status": { "lhfa": "", "wfl": "", "wfa": "" },
+                "label": { "lhfa": "", "wfl": "", "wfa": "" },
+                "action": "",
+                "pesan": []
+            },
+            "kebutuhan": {
+                "sumber": "",
+                "energi": "",
+                "protein": "",
+                "lemak": "",
+                "karbo": "",
+                "per_sesi": {
+                    "energi": "",
+                    "protein": "",
+                    "lemak": "",
+                    "karbo": ""
+                },
+                "pesan": []
+            },
+            "kondisi_kesehatan": {
+                "rujuk_darurat": "",
+                "rujuk_konsultasi": "",
+                "pesan_rujuk": [],
+                "penyesuaian": {
+                    "target_faktor": {},
+                    "batas_serat_per_100g": "",
+                    "serat_minimum_per_100g": "",
+                    "lemak_faktor_global": "",
+                    "kapasitas_lambung_faktor": "",
+                    "tekstur_override": "",
+                    "prefer_hangat": "",
+                    "prefer_dingin": "",
+                    "tambah_sesi": ""
+                },
+                "aturan_per_slot": {},
+                "catatan_orang_tua": [],
+                "kondisi_aktif": []
+            },
+            "menu": {
+                "sesi": {
+                    "sarapan | siang | malam": {
+                        "bahan": [
+                            {
+                                "slot": "",
+                                "kode": "",
+                                "gram_mentah": "",
+                                "gram_matang": "",
+                                "satuan": "",
+                                "pengganti": [
+                                    {
+                                        "kode": "",
+                                        "satuan": "",
+                                        "energi": "",
+                                        "protein": "",
+                                        "lemak": "",
+                                        "karbo": "",
+                                        "jarak": ""
+                                    }
+                                ]
+                            }
+                        ],
+                        "panduan_masak": {
+                            "usia_label": "",
+                            "tekstur": "",
+                            "jenis_masakan": "",
+                            "resep_nama": "",
+                            "waktu_masak": "",
+                            "catatan": "",
+                            "bumbu": [
+                                {
+                                    "nama": "",
+                                    "satuan": ""
+                                }
+                            ],
+                            "langkah": []
+                        },
+                        "makro": {
+                            "energi | protein | lemak | karbo": {
+                                "dapat": "",
+                                "target": "",
+                                "persen": ""
+                            }
+                        },
+                        "pesan": []
+                    }
+                },
+                "selingan": {
+                    "selingan_1 | selingan_2": {
+                        "tipe": "",
+                        "bahan": [
+                            {
+                                "slot": "",
+                                "kode": "",
+                                "gram_mentah": "",
+                                "gram_matang": "",
+                                "satuan": "",
+                                "pengganti": [
+                                    {
+                                        "kode": "",
+                                        "satuan": "",
+                                        "energi": "",
+                                        "protein": "",
+                                        "lemak": "",
+                                        "karbo": "",
+                                        "jarak": ""
+                                    }
+                                ]
+                            }
+                        ],
+                        "makro": {
+                            "energi": 35.2,
+                            "protein": 1.9,
+                            "lemak": 2.9,
+                            "karbo": 1.2
+                        },
+                        "resep": { "nama": "", "langkah": [] },
+                        "fokus_mikro": [],
+                        "pesan": []
+                    }
+                }
+            }
+        }
+    ],
+    "catatan": {
+        "peringatan": []
+    }
+}

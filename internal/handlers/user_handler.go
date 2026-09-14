@@ -4,119 +4,232 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
+
 	"nusagizi_be/internal/models"
 	"nusagizi_be/internal/repository"
 	"nusagizi_be/internal/services"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// getUserFromCtx extracts the authenticated *models.User set by the auth middleware.
-func getUserFromCtx(c *gin.Context) (*models.User, bool) {
+type UserHandler struct {
+	service *services.UserService
+}
+
+func NewUserHandler(service *services.UserService) *UserHandler {
+	return &UserHandler{service: service}
+}
+
+// GetUserProfile (Endpoint: 3)
+func (h *UserHandler) GetUserProfile(c *gin.Context) {
 	v, exists := c.Get("user")
-	if !exists {
-		return nil, false
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
 	}
-	user, ok := v.(*models.User)
-	return user, ok
+
+	resp, err := h.service.GetUser(c.Request.Context(), requester.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you can only access your own profile"}})
+		case errors.Is(err, repository.ErrNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "user not found"}})
+		default:
+			slog.Error("GetUser failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
-// errResp builds the standard error JSON body.
-func errResp(code, message string) gin.H {
-	return gin.H{"error": gin.H{"code": code, "message": message}}
+// UpdateUserProfile (Endpoint: 1)
+func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
+	}
+
+	var input models.UpdateUserInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": err.Error()}})
+		return
+	}
+
+	// Validate input name
+	if input.FullName != nil && strings.TrimSpace(*input.FullName) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "full_name cannot be empty"}})
+		return
+	}
+
+	// Validate input email
+	if input.Email != nil {
+		email := strings.TrimSpace(*input.Email)
+		if email == "" || !strings.Contains(email, "@") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "invalid email format"}})
+			return
+		}
+	}
+
+	// Validate input phone number
+	if input.PhoneNumber != nil && strings.TrimSpace(*input.PhoneNumber) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "phone_number cannot be empty"}})
+		return
+	}
+
+	// Validate input gender
+	if input.Gender != nil && *input.Gender != "male" && *input.Gender != "female" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "gender must be 'male' or 'female'"}})
+		return
+	}
+
+	err := h.service.UpdateUser(c.Request.Context(), requester.ID, input)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you can only update your own profile"}})
+		case errors.Is(err, repository.ErrNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "user not found"}})
+		case errors.Is(err, repository.ErrConflict):
+			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "CONFLICT", "message": "email already in use"}})
+		default:
+			slog.Error("UpdateUser failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.Status(http.StatusOK)
 }
 
-// GetUserHandler handles GET /users/:user_id (endpoint 45).
-func GetUserHandler(pool *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		requester, ok := getUserFromCtx(c)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
-			return
-		}
-
-		resp, err := services.GetUser(pool, requester.ID, c.Param("user_id"))
-		if err != nil {
-			switch {
-			case errors.Is(err, services.ErrForbidden):
-				c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you can only access your own profile"))
-			case errors.Is(err, repository.ErrNotFound):
-				c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "user not found"))
-			default:
-				slog.Error("GetUser failed", "error", err)
-				c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
-			}
-			return
-		}
-
-		c.JSON(http.StatusOK, resp)
+// DeleteUserProfile (Endpoint: 2)
+func (h *UserHandler) DeleteUserProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
 	}
+
+	err := h.service.SoftDeleteUser(c.Request.Context(), requester.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you can only delete your own account"}})
+		case errors.Is(err, repository.ErrNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "user not found or already deleted"}})
+		default:
+			slog.Error("DeleteUser failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.Status(http.StatusOK)
 }
 
-// UpdateUserHandler handles PATCH /users/:user_id (endpoint 23).
-func UpdateUserHandler(pool *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		requester, ok := getUserFromCtx(c)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
-			return
-		}
-
-		var input models.UpdateUserInput
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", err.Error()))
-			return
-		}
-
-		if input.Gender != nil && *input.Gender != "male" && *input.Gender != "female" {
-			c.JSON(http.StatusBadRequest, errResp("BAD_REQUEST", "gender must be 'male' or 'female'"))
-			return
-		}
-
-		err := services.UpdateUser(pool, requester.ID, c.Param("user_id"), input)
-		if err != nil {
-			switch {
-			case errors.Is(err, services.ErrForbidden):
-				c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you can only update your own profile"))
-			case errors.Is(err, repository.ErrNotFound):
-				c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "user not found"))
-			case errors.Is(err, repository.ErrConflict):
-				c.JSON(http.StatusConflict, errResp("CONFLICT", "email already in use"))
-			default:
-				slog.Error("UpdateUser failed", "error", err)
-				c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
-			}
-			return
-		}
-
-		c.Status(http.StatusOK)
+// GetMotherProfile (Endpoint: 6)
+func (h *UserHandler) GetMotherProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
 	}
+
+	resp, err := h.service.GetMotherProfile(c.Request.Context(), requester.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have a mother profile"}})
+		case errors.Is(err, repository.ErrNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "mother profile not found"}})
+		default:
+			slog.Error("GetMotherProfile failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
-// DeleteUserHandler handles DELETE /users/:user_id (endpoint 25).
-func DeleteUserHandler(pool *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		requester, ok := getUserFromCtx(c)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, errResp("UNAUTHORIZED", "user not found in context"))
-			return
-		}
-
-		err := services.SoftDeleteUser(pool, requester.ID, c.Param("user_id"))
-		if err != nil {
-			switch {
-			case errors.Is(err, services.ErrForbidden):
-				c.JSON(http.StatusForbidden, errResp("FORBIDDEN", "you can only delete your own account"))
-			case errors.Is(err, repository.ErrNotFound):
-				c.JSON(http.StatusNotFound, errResp("NOT_FOUND", "user not found or already deleted"))
-			default:
-				slog.Error("DeleteUser failed", "error", err)
-				c.JSON(http.StatusInternalServerError, errResp("INTERNAL_ERROR", "internal server error"))
-			}
-			return
-		}
-
-		c.Status(http.StatusOK)
+// GetCaregiverProfile (endpoint: 55)
+func (h *UserHandler) GetCaregiverProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
 	}
+
+	resp, err := h.service.GetCaregiverProfile(c.Request.Context(), requester.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "FORBIDDEN", "message": "you do not have a caregiver profile"}})
+		case errors.Is(err, repository.ErrNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "NOT_FOUND", "message": "caregiver profile not found"}})
+		default:
+			slog.Error("GetCaregiverProfile failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// CreateMotherProfile (Endpoint: 4)
+func (h *UserHandler) CreateMotherProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
+	}
+
+	motherProfileID, err := h.service.CreateMotherProfile(c.Request.Context(), requester.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrConflict):
+			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "CONFLICT", "message": "mother profile already exists for this user"}})
+		default:
+			slog.Error("CreateMotherProfile failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"id": motherProfileID})
+}
+
+// CreateCaregiverProfile (Endpoint: 5)
+func (h *UserHandler) CreateCaregiverProfile(c *gin.Context) {
+	v, exists := c.Get("user")
+	requester, ok := v.(*models.User)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": gin.H{"code": "UNAUTHORIZED", "message": "user not found in context"}})
+		return
+	}
+
+	caregiverProfileID, err := h.service.CreateCaregiverProfile(c.Request.Context(), requester.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrConflict):
+			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "CONFLICT", "message": "caregiver profile already exists for this user"}})
+		default:
+			slog.Error("CreateCaregiverProfile failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "INTERNAL_ERROR", "message": "internal server error"}})
+		}
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"id": caregiverProfileID})
 }
