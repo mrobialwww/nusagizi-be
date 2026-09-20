@@ -211,6 +211,9 @@ func (h *ChildHandler) GetListChild(c *gin.Context) {
 		return
 	}
 
+	if children == nil {
+		children = []models.ChildListItem{}
+	}
 	c.JSON(http.StatusOK, children)
 }
 
