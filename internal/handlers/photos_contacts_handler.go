@@ -44,6 +44,9 @@ func (h *PhotosContactsHandler) GetContacts(c *gin.Context) {
 		return
 	}
 
+	if contacts == nil {
+		contacts = []photos_contacts.ContactResponse{}
+	}
 	c.JSON(http.StatusOK, contacts)
 }
 

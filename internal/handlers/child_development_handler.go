@@ -332,6 +332,9 @@ func (h *ChildDevelopmentHandler) GetRecommendations(c *gin.Context) {
 		return
 	}
 
+	if items == nil {
+		items = []child_dev.RecommendationItem{}
+	}
 	c.JSON(http.StatusOK, items)
 }
 
