@@ -423,7 +423,7 @@ Status code yang dipakai di seluruh dokumen (di tiap endpoint hanya subset yang 
 
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**:
+- **Response Body [FIX] (200)**: (Dijamin selalu mengembalikan `[]` bukan `null` jika data kosong)
 
 ```json
 [
@@ -550,17 +550,17 @@ _(Semua indikator juga membutuhkan parameter Jenis Kelamin untuk memilih tabel)_
 }
 ```
 
-| Field                 | Type   | Keterangan                                                                                |
-| --------------------- | ------ | ----------------------------------------------------------------------------------------- |
-| id                    | UUID   |                                                                                           |
-| measured_at           | date   |                                                                                           |
-| weight_kg             | number |                                                                                           |
-| height_cm             | number |                                                                                           |
-| head_circumference_cm | number |                                                                                           |
-| status                | string | Hasil agregat terburuk dari 5 indikator WHO: `Normal`, `Berisiko`, `Gangguan Pertumbuhan` |
+| Field                 | Type   | Keterangan                                                                        |
+| --------------------- | ------ | --------------------------------------------------------------------------------- |
+| id                    | UUID   |                                                                                   |
+| measured_at           | date   |                                                                                   |
+| weight_kg             | number |                                                                                   |
+| height_cm             | number |                                                                                   |
+| head_circumference_cm | number |                                                                                   |
+| status                | string | Hasil agregat terburuk dari 5 indikator WHO: `Normal`, `Berisiko`, `Sangat Buruk` |
 
 - **Catatan [FIX v5]**: Field `status` dihitung on-the-fly menggunakan Z-Score WHO LMS dari 5 indikator sekaligus. Status yang dikembalikan adalah yang terburuk (_worst-case_) di antara semua indikator:
-    - **`Gangguan Pertumbuhan`**: Jika terdapat _minimal satu_ indikator dengan Z-Score < -3 atau > +3.
+    - **`Sangat Buruk`**: Jika terdapat _minimal satu_ indikator dengan Z-Score < -3 atau > +3.
     - **`Berisiko`**: Jika terdapat _minimal satu_ indikator dengan Z-Score berada di rentang [-3, -2) atau (2, 3].
     - **`Normal`**: Jika _semua_ indikator memiliki Z-Score di dalam rentang aman [-2, +2].
 
@@ -1079,7 +1079,7 @@ null
 
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body (200)**:
+- **Response Body [FIX] (200)**: (Dijamin selalu mengembalikan `[]` bukan `null` jika data kosong)
 
 ```json
 [
@@ -1678,7 +1678,7 @@ null
 - **Path Params**: `-` (tidak ada)
 - **Query Params**: `-` (tidak ada)
 - **Request Body**: `-` (tidak ada)
-- **Response Body [FIX] (200)**: list contacts, di-join ke `mother_profiles` -> `users` untuk menampilkan nama/foto:
+- **Response Body [FIX] (200)**: list contacts, di-join ke `mother_profiles` -> `users` untuk menampilkan nama/foto (Dijamin selalu mengembalikan `[]` bukan `null` jika data kosong):
 
 ```json
 [
