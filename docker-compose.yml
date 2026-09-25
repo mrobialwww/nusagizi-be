@@ -1,8 +1,8 @@
 # =============================================================================
 # docker-compose.yml — Base configuration (shared infrastructure only)
 #
-# Hanya berisi service yang benar-benar shared: postgres dan minio.
-# Backend service TIDAK didefinisikan di sini — ada di override file:
+# Contains only shared services: postgres and minio.
+# Backend services are defined in the override files:
 #
 #   Dev : docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 #   Prod: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
@@ -10,7 +10,7 @@
 
 services:
   # ---------------------------------------------------------------------------
-  # PostgreSQL — shared, 2 database terpisah untuk dev & prod
+  # PostgreSQL — shared instance, two separate databases (dev & prod)
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
@@ -22,7 +22,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nusagizi_prod}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Script inisialisasi: buat DB dev secara otomatis saat pertama kali
+      # Creates the dev database on first container startup
       - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     networks:
       - prod-network
@@ -42,7 +42,7 @@ services:
           memory: 256M
 
   # ---------------------------------------------------------------------------
-  # MinIO — object storage, 2 bucket terpisah untuk dev & prod
+  # MinIO — shared instance, two separate buckets (dev & prod)
   # ---------------------------------------------------------------------------
   minio:
     image: minio/minio:RELEASE.2025-04-08T15-41-24Z
@@ -78,12 +78,12 @@ volumes:
     driver: local
 
 networks:
-  # Network terisolasi untuk production
+  # Isolated network for production containers
   prod-network:
     driver: bridge
     name: nusagizi-prod-net
 
-  # Network terisolasi untuk development
+  # Isolated network for development containers
   dev-network:
     driver: bridge
     name: nusagizi-dev-net

@@ -1,12 +1,12 @@
 # =============================================================================
-# .dockerignore — Exclude file yang tidak perlu masuk ke Docker build context
+# .dockerignore — Excludes files from the Docker build context
 # =============================================================================
 
 # Git
 .git
 .gitignore
 
-# Environment files — JANGAN masuk ke image
+# Environment files — must never be included in an image
 .env
 .env.dev
 .env.prod
@@ -15,7 +15,7 @@
 !.env.dev.example
 !.env.prod.example
 
-# Dokumentasi
+# Documentation
 README.md
 *.md
 endpoint.md
@@ -23,11 +23,8 @@ endpoint.md
 # Air temporary build output
 tmp/
 
-# Seed files (tidak dibutuhkan di runtime)
+# Seed files — not needed at runtime
 seed/
-
-# Scripts tidak perlu di-copy dua kali (sudah di-copy spesifik di Dockerfile)
-# scripts/ — jangan exclude, dibutuhkan oleh entrypoint
 
 # OS & editor artifacts
 .DS_Store
@@ -42,11 +39,11 @@ Thumbs.db
 coverage.out
 coverage.html
 
-# Build artifacts lokal
+# Local build artifacts
 *.exe
 server
 
-# Docker files sendiri (tidak perlu di dalam image)
+# Docker files — not needed inside the image
 Dockerfile
 docker-compose*.yml
 Makefile

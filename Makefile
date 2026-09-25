@@ -1,7 +1,6 @@
 # =============================================================================
 # Makefile — NusaGizi Backend
-#
-# Shortcut untuk operasi Docker dev/prod di VPS.
+# Shortcuts for Docker dev/prod operations on the VPS.
 # =============================================================================
 
 # Compose file combinations
@@ -13,12 +12,12 @@ COMPOSE_DEV    := $(COMPOSE_BASE) -f docker-compose.dev.yml
         prod-up prod-down prod-logs prod-ps prod-restart prod-build \
         dev-up dev-down dev-logs dev-ps dev-restart dev-build \
         ps logs-postgres logs-minio \
-        db-shell db-migrate db-migrate-dev \
+        db-shell db-shell-dev db-migrate db-migrate-dev \
         infra-up infra-down \
         clean prune
 
 # Default target
-help: ## Tampilkan daftar perintah yang tersedia
+help: ## Show available commands
 	@echo ""
 	@echo "NusaGizi Backend — Makefile Commands"
 	@echo "======================================"
@@ -30,93 +29,93 @@ help: ## Tampilkan daftar perintah yang tersedia
 # Production
 # =============================================================================
 
-prod-build: ## Build image production
+prod-build: ## Build production image
 	$(COMPOSE_PROD) build backend-prod
 
-prod-up: ## Jalankan semua service (production)
+prod-up: ## Start all production services
 	$(COMPOSE_PROD) up -d
 
-prod-down: ## Hentikan semua service (production)
+prod-down: ## Stop all production services
 	$(COMPOSE_PROD) down
 
-prod-restart: ## Restart backend production saja
+prod-restart: ## Restart production backend only
 	$(COMPOSE_PROD) restart backend-prod
 
-prod-logs: ## Lihat log backend production (follow)
+prod-logs: ## Follow production backend logs
 	$(COMPOSE_PROD) logs -f backend-prod
 
-prod-ps: ## Status container production
+prod-ps: ## Show production container status
 	$(COMPOSE_PROD) ps
 
 # =============================================================================
 # Development
 # =============================================================================
 
-dev-build: ## Build image development
+dev-build: ## Build development image
 	$(COMPOSE_DEV) build backend-dev
 
-dev-up: ## Jalankan semua service (development)
+dev-up: ## Start all development services
 	$(COMPOSE_DEV) up -d
 
-dev-down: ## Hentikan semua service (development)
+dev-down: ## Stop all development services
 	$(COMPOSE_DEV) down
 
-dev-restart: ## Restart backend development saja
+dev-restart: ## Restart development backend only
 	$(COMPOSE_DEV) restart backend-dev
 
-dev-logs: ## Lihat log backend development (follow)
+dev-logs: ## Follow development backend logs
 	$(COMPOSE_DEV) logs -f backend-dev
 
-dev-ps: ## Status container development
+dev-ps: ## Show development container status
 	$(COMPOSE_DEV) ps
 
 # =============================================================================
-# Shared infrastructure (postgres + minio saja)
+# Shared infrastructure (postgres + minio only)
 # =============================================================================
 
-infra-up: ## Jalankan hanya postgres dan minio
+infra-up: ## Start postgres and minio only
 	$(COMPOSE_BASE) up -d postgres minio
 
-infra-down: ## Hentikan postgres dan minio
+infra-down: ## Stop postgres and minio
 	$(COMPOSE_BASE) down postgres minio
 
 # =============================================================================
 # Monitoring
 # =============================================================================
 
-ps: ## Status semua container NusaGizi
+ps: ## Show all NusaGizi container status
 	docker ps --filter "name=nusagizi"
 
-logs-postgres: ## Lihat log PostgreSQL (follow)
+logs-postgres: ## Follow PostgreSQL logs
 	$(COMPOSE_BASE) logs -f postgres
 
-logs-minio: ## Lihat log MinIO (follow)
+logs-minio: ## Follow MinIO logs
 	$(COMPOSE_BASE) logs -f minio
 
 # =============================================================================
 # Database utilities
 # =============================================================================
 
-db-shell: ## Masuk ke psql database production
+db-shell: ## Open psql shell for production database
 	docker exec -it nusagizi-postgres psql -U $${POSTGRES_USER:-nusagizi} -d $${POSTGRES_DB:-nusagizi_prod}
 
-db-shell-dev: ## Masuk ke psql database development
+db-shell-dev: ## Open psql shell for development database
 	docker exec -it nusagizi-postgres psql -U $${POSTGRES_USER:-nusagizi} -d $${POSTGRES_DB_DEV:-nusagizi_dev}
 
-db-migrate: ## Jalankan migrasi di production (manual)
+db-migrate: ## Run migrations on production (manual)
 	$(COMPOSE_PROD) exec backend-prod migrate -path ./migrations -database "$$DATABASE_URL" up
 
-db-migrate-dev: ## Jalankan migrasi di development (manual)
+db-migrate-dev: ## Run migrations on development (manual)
 	$(COMPOSE_DEV) exec backend-dev migrate -path ./migrations -database "$$DATABASE_URL" up
 
 # =============================================================================
 # Cleanup
 # =============================================================================
 
-clean: ## Hentikan semua container dan hapus anonymous volumes
+clean: ## Stop all containers and remove anonymous volumes
 	$(COMPOSE_PROD) down -v --remove-orphans 2>/dev/null || true
 	$(COMPOSE_DEV) down -v --remove-orphans 2>/dev/null || true
 
-prune: ## Hapus image yang tidak terpakai (jalankan dengan hati-hati)
+prune: ## Remove unused images and volumes (use with caution)
 	docker image prune -f
 	docker volume prune -f

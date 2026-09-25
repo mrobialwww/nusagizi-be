@@ -2,11 +2,11 @@
 # =============================================================================
 # scripts/init-db.sh
 #
-# Dijalankan otomatis oleh PostgreSQL saat container pertama kali dibuat
-# (via /docker-entrypoint-initdb.d/).
+# Runs automatically on first PostgreSQL container startup
+# via /docker-entrypoint-initdb.d/.
 #
-# Tugasnya: buat database development jika belum ada.
-# Database production sudah dibuat oleh POSTGRES_DB di env.
+# Creates the dev database if it does not exist.
+# The prod database is already created by POSTGRES_DB in the environment.
 # =============================================================================
 set -e
 
@@ -15,7 +15,7 @@ DB_USER="${POSTGRES_USER:-nusagizi}"
 
 echo "[init-db] Checking if database '$DB_DEV' exists..."
 
-# Buat DB dev jika belum ada
+# Create dev database only if it does not already exist (idempotent)
 psql -v ON_ERROR_STOP=1 --username "$DB_USER" --dbname "postgres" <<-EOSQL
     SELECT 'CREATE DATABASE "$DB_DEV"'
     WHERE NOT EXISTS (

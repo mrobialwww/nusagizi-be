@@ -1,27 +1,29 @@
 # =============================================================================
 # docker-compose.prod.yml — Production services
 #
-# Cara pakai:
+# Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Atau via Makefile:
+# Or via Makefile:
 #   make prod-up
 # =============================================================================
 
 services:
   postgres:
+    # Bind to localhost only — not exposed to public
     ports:
       - "127.0.0.1:5432:5432"
 
   minio:
+    # Bind to localhost only — not exposed to public
+    # To access the console, use an SSH tunnel:
+    # ssh -L 9001:localhost:9001 user@vps
     ports:
       - "127.0.0.1:9000:9000"
-      # Console MinIO — akses via SSH tunnel jika perlu:
-      # ssh -L 9001:localhost:9001 user@vps
       # - "127.0.0.1:9001:9001"
 
   # ---------------------------------------------------------------------------
-  # Backend Production — didefinisikan penuh di sini, tidak ada di base
+  # Production backend — fully defined here, not present in base
   # ---------------------------------------------------------------------------
   backend-prod:
     build:

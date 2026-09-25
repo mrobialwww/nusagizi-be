@@ -1,27 +1,27 @@
 # =============================================================================
 # docker-compose.dev.yml — Development services
 #
-# Cara pakai:
+# Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 #
-# Atau via Makefile:
+# Or via Makefile:
 #   make dev-up
 # =============================================================================
 
 services:
   postgres:
-    # Di dev, port postgres diekspos ke localhost untuk debugging langsung
+    # Exposed to localhost for direct debugging from host
     ports:
       - "127.0.0.1:5433:5432"
 
   minio:
-    # Di dev, kedua port MinIO diekspos untuk akses langsung dari host
+    # Both ports exposed to localhost for direct access from host
     ports:
       - "127.0.0.1:9002:9000"
       - "127.0.0.1:9003:9001"
 
   # ---------------------------------------------------------------------------
-  # Backend Development — didefinisikan penuh di sini, tidak ada di base
+  # Development backend — fully defined here, not present in base
   # ---------------------------------------------------------------------------
   backend-dev:
     build:
@@ -41,9 +41,9 @@ services:
     ports:
       - "127.0.0.1:8081:8080"
     volumes:
-      # Mount source code untuk Air hot-reload
+      # Mount source code for Air hot-reload
       - .:/app
-      # Lindungi direktori tmp di container dari ditimpa mount di atas
+      # Prevent the mount above from overwriting the tmp dir inside the container
       - /app/tmp
     depends_on:
       postgres:
