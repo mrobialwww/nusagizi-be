@@ -1,0 +1,66 @@
+# =============================================================================
+# docker-compose.dev.yml — Development services
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Or via Makefile:
+#   make dev-up
+# =============================================================================
+
+services:
+  postgres:
+    # Exposed to localhost for direct debugging from host
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  minio:
+    # Both ports exposed to localhost for direct access from host
+    ports:
+      - "127.0.0.1:9002:9000"
+      - "127.0.0.1:9003:9001"
+
+  # ---------------------------------------------------------------------------
+  # Development backend — fully defined here, not present in base
+  # ---------------------------------------------------------------------------
+  backend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    image: nusagizi-backend:dev
+    container_name: nusagizi-backend-dev
+    restart: unless-stopped
+    env_file:
+      - .env.dev
+    environment:
+      APP_ENV: development
+      PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-nusagizi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_DEV:-nusagizi_dev}?sslmode=disable
+      MINIO_ENDPOINT: minio:9000
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      # Mount source code for Air hot-reload
+      - .:/app
+      # Prevent the mount above from overwriting the tmp dir inside the container
+      - /app/tmp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"

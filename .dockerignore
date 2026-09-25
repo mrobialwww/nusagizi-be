@@ -1,0 +1,49 @@
+# =============================================================================
+# .dockerignore — Excludes files from the Docker build context
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# Environment files — must never be included in an image
+.env
+.env.dev
+.env.prod
+*.env
+.env.*
+!.env.dev.example
+!.env.prod.example
+
+# Documentation
+README.md
+*.md
+endpoint.md
+
+# Air temporary build output
+tmp/
+
+# Seed files — not needed at runtime
+seed/
+
+# OS & editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test & coverage
+*_test.go
+coverage.out
+coverage.html
+
+# Local build artifacts
+*.exe
+server
+
+# Docker files — not needed inside the image
+Dockerfile
+docker-compose*.yml
+Makefile
