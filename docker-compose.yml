@@ -1,0 +1,53 @@
+services:
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: nusagizi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nusagizi}
+      POSTGRES_USER: ${POSTGRES_USER:-nusagizi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nusagizi-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nusagizi} -d ${POSTGRES_DB:-nusagizi}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # =============================================================================
+  # Go Backend API
+  # =============================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nusagizi-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL agar pakai service name internal Docker
+      DATABASE_URL: postgres://${POSTGRES_USER:-nusagizi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nusagizi}?sslmode=disable
+      PORT: 8080
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - nusagizi-net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  nusagizi-net:
+    driver: bridge
