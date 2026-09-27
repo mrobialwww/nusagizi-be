@@ -13,10 +13,11 @@ import (
 )
 
 type ImageService struct {
-	storage       storage.ObjectStorage
-	motherRepo    *repository.MotherProfileRepository
-	childRepo     *repository.ChildRepository
-	caregiverRepo *repository.CaregiverRepository
+	storage            storage.ObjectStorage
+	motherRepo         *repository.MotherProfileRepository
+	childRepo          *repository.ChildRepository
+	caregiverRepo      *repository.CaregiverRepository
+	photosContactsRepo *repository.PhotosContactsRepository
 }
 
 func NewImageService(
@@ -24,16 +25,18 @@ func NewImageService(
 	motherRepo *repository.MotherProfileRepository,
 	childRepo *repository.ChildRepository,
 	caregiverRepo *repository.CaregiverRepository,
+	photosContactsRepo *repository.PhotosContactsRepository,
 ) *ImageService {
 	return &ImageService{
-		storage:       storage,
-		motherRepo:    motherRepo,
-		childRepo:     childRepo,
-		caregiverRepo: caregiverRepo,
+		storage:            storage,
+		motherRepo:         motherRepo,
+		childRepo:          childRepo,
+		caregiverRepo:      caregiverRepo,
+		photosContactsRepo: photosContactsRepo,
 	}
 }
 
-func (s *ImageService) GeneratePresignPutURL(ctx context.Context, category, ownerID, userID string, childID *string, contentType string) (uploadURL, objectKey string, err error) {
+func (s *ImageService) GeneratePresignPutURL(ctx context.Context, category, ownerID, userID string, childID *string, existingObjectKey *string, contentType string) (uploadURL, objectKey string, err error) {
 	switch category {
 	case "profile":
 		ownerID = userID
@@ -91,7 +94,19 @@ func (s *ImageService) GeneratePresignPutURL(ctx context.Context, category, owne
 		ext = "png"
 	}
 
-	objectKey = fmt.Sprintf("%s/%s/%s.%s", category, ownerID, uuid.NewString(), ext)
+	if existingObjectKey != nil && *existingObjectKey != "" {
+		objectKey = *existingObjectKey
+		
+		// Touch DB to trigger `updated_at` change for frontend cache-busting `?v={Unix}`
+		if s.photosContactsRepo != nil {
+			go func() {
+				// Run async to avoid blocking presign response; failures are ignored
+				_ = s.photosContactsRepo.TouchPhotoByObjectKey(context.Background(), objectKey)
+			}()
+		}
+	} else {
+		objectKey = fmt.Sprintf("%s/%s/%s.%s", category, ownerID, uuid.NewString(), ext)
+	}
 
 	uploadURL, err = s.storage.PresignPutURL(ctx, objectKey, contentType, 10*time.Minute)
 	return uploadURL, objectKey, err

@@ -44,7 +44,7 @@ func (h *ImageHandler) PresignUpload(c *gin.Context) {
 		return
 	}
 
-	uploadURL, objectKey, err := h.service.GeneratePresignPutURL(c.Request.Context(), req.Category, req.OwnerID, requester.ID, req.ChildID, req.ContentType)
+	uploadURL, objectKey, err := h.service.GeneratePresignPutURL(c.Request.Context(), req.Category, req.OwnerID, requester.ID, req.ChildID, req.ObjectKey, req.ContentType)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
