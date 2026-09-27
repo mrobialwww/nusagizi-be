@@ -23,6 +23,7 @@ type ChildPhotoResponse struct {
 	Visibility       string    `json:"visibility,omitempty"`
 	IsReviewRequired bool      `json:"is_review_required"`
 	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 // CreatePhotoInput is the payload for adding a new photo.
