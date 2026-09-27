@@ -12,7 +12,7 @@ type ChildSummaryResponse struct {
 	PhotoUrl            *string    `json:"photo_url"`
 	Age                 string     `json:"age"`
 	BirthDateRaw        time.Time  `json:"-"`
-	Gender              string     `json:"-"`
+	Gender              string     `json:"gender"`
 	HeightCm            *float64   `json:"height_cm"`
 	WeightKg            *float64   `json:"weight_kg"`
 	HeadCircumferenceCm *float64   `json:"-"`

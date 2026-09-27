@@ -70,7 +70,7 @@ func (r *DashboardRepository) GetDashboardSummary(ctx context.Context, motherPro
 			WHERE child_id = c.id 
 			ORDER BY created_at DESC LIMIT 1
 		) nr ON true
-		WHERE c.mother_profile_id = $1
+		WHERE c.mother_profile_id = $1 AND c.deleted_at IS NULL
 	`
 	rows, err := r.pool.Query(ctx, query, motherProfileID)
 	if err != nil {

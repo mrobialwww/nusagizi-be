@@ -2,8 +2,9 @@ package models
 
 type PresignUploadRequest struct {
 	Category    string  `json:"category" binding:"required"`
-	OwnerID     string  `json:"owner_id"` // can be empty for child creation
-	ChildID     *string `json:"child_id"` // optional child_id cross-reference
+	OwnerID     string  `json:"owner_id"`   // can be empty for child creation
+	ChildID     *string `json:"child_id"`   // optional child_id cross-reference
+	ObjectKey   *string `json:"object_key"` // optional existing objectKey for overwrite
 	ContentType string  `json:"content_type" binding:"required"`
 }
 

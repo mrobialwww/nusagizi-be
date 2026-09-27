@@ -160,7 +160,7 @@ func (r *PhotosContactsRepository) GetMotherChildPhotos(ctx context.Context, mot
 	defer cancel()
 
 	motherChildPhotosQuery := `
-		SELECT p.id, p.child_id, p.photo_url, p.is_review_required, p.created_at
+		SELECT p.id, p.child_id, p.photo_url, p.is_review_required, p.created_at, p.updated_at
 		FROM child_photos p
 		JOIN children c ON p.child_id = c.id
 		WHERE c.mother_profile_id = $1
@@ -171,7 +171,7 @@ func (r *PhotosContactsRepository) GetMotherChildPhotos(ctx context.Context, mot
 	// day) for a single child — used for daily/timeline views.
 	motherChildDailyPhotoQuery := `
 		SELECT DISTINCT ON (DATE(p.created_at AT TIME ZONE 'UTC'))
-			p.id, p.child_id, p.photo_url, p.is_review_required, p.created_at
+			p.id, p.child_id, p.photo_url, p.is_review_required, p.created_at, p.updated_at
 		FROM child_photos p
 		JOIN children c ON p.child_id = c.id
 		WHERE c.mother_profile_id = $1 AND c.id = $2
@@ -181,7 +181,7 @@ func (r *PhotosContactsRepository) GetMotherChildPhotos(ctx context.Context, mot
 	// motherChildLatestPerChildQuery returns the single latest photo per child across all children
 	motherChildLatestPerChildQuery := `
 		SELECT DISTINCT ON (c.id)
-			p.id, p.child_id, p.photo_url, p.is_review_required, p.created_at
+			p.id, p.child_id, p.photo_url, p.is_review_required, p.created_at, p.updated_at
 		FROM child_photos p
 		JOIN children c ON p.child_id = c.id
 		WHERE c.mother_profile_id = $1
@@ -211,9 +211,10 @@ func (r *PhotosContactsRepository) GetMotherChildPhotos(ctx context.Context, mot
 	var photos []photos_contacts.ChildPhotoResponse
 	for rows.Next() {
 		var p photos_contacts.ChildPhotoResponse
-		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.IsReviewRequired, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.IsReviewRequired, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
+		p.PhotoURL = fmt.Sprintf("%s?v=%d", p.PhotoURL, p.UpdatedAt.Unix())
 		photos = append(photos, p)
 	}
 	return photos, rows.Err()
@@ -224,7 +225,7 @@ func (r *PhotosContactsRepository) GetContactChildPhotos(ctx context.Context, co
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	query := `
-		SELECT p.id, p.child_id, p.photo_url, p.created_at
+		SELECT p.id, p.child_id, p.photo_url, p.created_at, p.updated_at
 		FROM child_photos p
 		LEFT JOIN photo_shares psw ON psw.child_photo_id = p.id
 		JOIN children c ON p.child_id = c.id
@@ -248,9 +249,10 @@ func (r *PhotosContactsRepository) GetContactChildPhotos(ctx context.Context, co
 	var photos []photos_contacts.ChildPhotoResponse
 	for rows.Next() {
 		var p photos_contacts.ChildPhotoResponse
-		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
+		p.PhotoURL = fmt.Sprintf("%s?v=%d", p.PhotoURL, p.UpdatedAt.Unix())
 		photos = append(photos, p)
 	}
 	return photos, rows.Err()
@@ -263,7 +265,7 @@ func (r *PhotosContactsRepository) GetAllChildPhotos(ctx context.Context, mother
 	// A UNION query could be used here, combining GetMotherChildPhotos and GetContactChildPhotos logic
 	// but filtered for is_review_required = false.
 	query := `
-		SELECT DISTINCT p.id, p.child_id, p.photo_url, p.created_at
+		SELECT DISTINCT p.id, p.child_id, p.photo_url, p.created_at, p.updated_at
 		FROM child_photos p
 		JOIN children c ON p.child_id = c.id
 		LEFT JOIN contacts ct ON ct.related_mother_profile_id = c.mother_profile_id 
@@ -292,9 +294,10 @@ func (r *PhotosContactsRepository) GetAllChildPhotos(ctx context.Context, mother
 	var photos []photos_contacts.ChildPhotoResponse
 	for rows.Next() {
 		var p photos_contacts.ChildPhotoResponse
-		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
+		p.PhotoURL = fmt.Sprintf("%s?v=%d", p.PhotoURL, p.UpdatedAt.Unix())
 		photos = append(photos, p)
 	}
 	return photos, rows.Err()
@@ -306,17 +309,18 @@ func (r *PhotosContactsRepository) GetPhotoDetail(ctx context.Context, photoID u
 	defer cancel()
 	var p photos_contacts.ChildPhotoResponse
 	query := `
-		SELECT id, child_id, photo_url, caption, created_at
+		SELECT id, child_id, photo_url, caption, created_at, updated_at
 		FROM child_photos
 		WHERE id = $1
 	`
-	err := r.pool.QueryRow(ctx, query, photoID).Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.Caption, &p.CreatedAt)
+	err := r.pool.QueryRow(ctx, query, photoID).Scan(&p.ID, &p.ChildID, &p.PhotoURL, &p.Caption, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("record not found")
 		}
 		return nil, err
 	}
+	p.PhotoURL = fmt.Sprintf("%s?v=%d", p.PhotoURL, p.UpdatedAt.Unix())
 	return &p, nil
 }
 
@@ -569,4 +573,15 @@ func (r *PhotosContactsRepository) DeletePhoto(ctx context.Context, photoID uuid
 		return fmt.Errorf("record not found")
 	}
 	return nil
+}
+
+// TouchPhotoByObjectKey performs a dummy update via R2 key to trigger trg_child_photos_updated_at, generating a fresh updated_at for cache busting.
+func (r *PhotosContactsRepository) TouchPhotoByObjectKey(ctx context.Context, objectKey string) error {
+	query := `
+		UPDATE child_photos
+		SET photo_url = photo_url
+		WHERE photo_url ILIKE '%' || $1
+	`
+	_, err := r.pool.Exec(ctx, query, objectKey)
+	return err
 }

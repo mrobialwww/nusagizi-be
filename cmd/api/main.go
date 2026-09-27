@@ -80,7 +80,7 @@ func main() {
 
 	// Services
 	emailOTPSvc := services.NewEmailOTPService(idTokenVerifier, managementClient)
-	imageSvc := services.NewImageService(r2Client, motherRepo, childRepo, caregiverRepo)
+	imageSvc := services.NewImageService(r2Client, motherRepo, childRepo, caregiverRepo, photosContactsRepo)
 	userSvc := services.NewUserService(userRepo, motherRepo, caregiverRepo, cfg.R2PublicURL)
 	childSvc := services.NewChildService(childRepo, motherRepo, caregiverRepo, cfg.R2PublicURL)
 	childDevSvc := services.NewChildDevelopmentService(childDevRepo, childRepo, motherRepo, cfg.R2PublicURL)
