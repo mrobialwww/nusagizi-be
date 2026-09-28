@@ -3,7 +3,7 @@
 # =============================================================================
 FROM golang:1.25-alpine AS base
 
-RUN apk add --no-cache git ca-certificates tzdata curl
+RUN apk add --no-cache git ca-certificates tzdata curl netcat-openbsd
 
 WORKDIR /app
 
@@ -48,7 +48,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 # =============================================================================
 FROM alpine:3.20 AS prod
 
-RUN apk add --no-cache ca-certificates tzdata curl
+RUN apk add --no-cache ca-certificates tzdata curl netcat-openbsd
 
 ENV TZ=Asia/Jakarta
 
