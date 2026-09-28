@@ -11,7 +11,7 @@ COMPOSE_DEV    := $(COMPOSE_BASE) -f docker-compose.dev.yml
 .PHONY: help \
         prod-up prod-down prod-logs prod-ps prod-restart prod-build \
         dev-up dev-down dev-logs dev-ps dev-restart dev-build \
-        ps logs-postgres logs-minio \
+        ps logs-postgres \
         db-shell db-shell-dev db-migrate db-migrate-dev \
         infra-up infra-down \
         clean prune
@@ -70,14 +70,14 @@ dev-ps: ## Show development container status
 	$(COMPOSE_DEV) ps
 
 # =============================================================================
-# Shared infrastructure (postgres + minio only)
+# Shared infrastructure (postgres only)
 # =============================================================================
 
-infra-up: ## Start postgres and minio only
-	$(COMPOSE_BASE) up -d postgres minio
+infra-up: ## Start postgres
+	$(COMPOSE_BASE) up -d postgres
 
-infra-down: ## Stop postgres and minio
-	$(COMPOSE_BASE) down postgres minio
+infra-down: ## Stop postgres
+	$(COMPOSE_BASE) down postgres
 
 # =============================================================================
 # Monitoring
@@ -88,9 +88,6 @@ ps: ## Show all NusaGizi container status
 
 logs-postgres: ## Follow PostgreSQL logs
 	$(COMPOSE_BASE) logs -f postgres
-
-logs-minio: ## Follow MinIO logs
-	$(COMPOSE_BASE) logs -f minio
 
 # =============================================================================
 # Database utilities

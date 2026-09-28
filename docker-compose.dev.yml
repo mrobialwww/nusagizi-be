@@ -14,12 +14,6 @@ services:
     ports:
       - "127.0.0.1:5433:5432"
 
-  minio:
-    # Both ports exposed to localhost for direct access from host
-    ports:
-      - "127.0.0.1:9002:9000"
-      - "127.0.0.1:9003:9001"
-
   # ---------------------------------------------------------------------------
   # Development backend — fully defined here, not present in base
   # ---------------------------------------------------------------------------
@@ -37,7 +31,6 @@ services:
       APP_ENV: development
       PORT: 8080
       DATABASE_URL: postgres://${POSTGRES_USER:-nusagizi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_DEV:-nusagizi_dev}?sslmode=disable
-      MINIO_ENDPOINT: minio:9000
     ports:
       - "127.0.0.1:8081:8080"
     volumes:
@@ -47,8 +40,6 @@ services:
       - /app/tmp
     depends_on:
       postgres:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     networks:
       - dev-network
