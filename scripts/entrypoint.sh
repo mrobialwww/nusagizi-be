@@ -45,7 +45,7 @@ echo "[3/3] Starting server..."
 
 if [ "${APP_ENV}" = "development" ]; then
   echo "  Mode: DEVELOPMENT (Air hot-reload)"
-  exec air -c .air.toml
+  exec air -c .air.linux.toml
 else
   echo "  Mode: PRODUCTION (static binary)"
   exec ./server
