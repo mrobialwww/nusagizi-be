@@ -3,10 +3,18 @@
 # Shortcuts for Docker dev/prod operations on the VPS.
 # =============================================================================
 
-# Compose file combinations
-COMPOSE_BASE   := docker compose -f docker-compose.yml
-COMPOSE_PROD   := $(COMPOSE_BASE) -f docker-compose.prod.yml
-COMPOSE_DEV    := $(COMPOSE_BASE) -f docker-compose.dev.yml
+# Auto-detect which base file to use based on current directory name.
+# - nusagizi-be-prod: uses docker-compose.yml (owns postgres)
+# - nusagizi-be-dev : uses docker-compose.base-dev.yml (postgres is external)
+CURRENT_DIR := $(notdir $(CURDIR))
+ifeq ($(CURRENT_DIR), nusagizi-be-dev)
+  COMPOSE_BASE := docker compose -f docker-compose.base-dev.yml
+else
+  COMPOSE_BASE := docker compose -f docker-compose.yml
+endif
+
+COMPOSE_PROD := $(COMPOSE_BASE) -f docker-compose.prod.yml
+COMPOSE_DEV  := $(COMPOSE_BASE) -f docker-compose.dev.yml
 
 .PHONY: help \
         prod-up prod-down prod-logs prod-ps prod-restart prod-build \
@@ -73,11 +81,11 @@ dev-ps: ## Show development container status
 # Shared infrastructure (postgres only)
 # =============================================================================
 
-infra-up: ## Start postgres
-	$(COMPOSE_BASE) up -d postgres
+infra-up: ## Start postgres (run from nusagizi-be-prod only)
+	docker compose -f docker-compose.yml up -d postgres
 
-infra-down: ## Stop postgres
-	$(COMPOSE_BASE) down postgres
+infra-down: ## Stop postgres (run from nusagizi-be-prod only)
+	docker compose -f docker-compose.yml down postgres
 
 # =============================================================================
 # Monitoring
