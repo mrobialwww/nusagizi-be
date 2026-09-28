@@ -25,6 +25,7 @@ WORKDIR /app
 
 # Source code will be overridden by volume mount in docker-compose.dev.yml
 COPY . .
+RUN chmod +x ./scripts/entrypoint.sh
 
 EXPOSE 8080
 
