@@ -2,18 +2,11 @@
 # docker-compose.base-dev.yml — External resource references for dev directory
 #
 # Used instead of docker-compose.yml when running from the dev directory.
-# Declares postgres and networks as external so Docker does not try to
-# recreate resources already managed by the prod directory.
+# Declares networks as external so Docker reuses what the prod directory owns.
 #
 # Usage (via Makefile):
 #   docker compose -f docker-compose.base-dev.yml -f docker-compose.dev.yml up -d
 # =============================================================================
-
-services:
-  # Postgres is already running — managed by nusagizi-be-prod directory
-  postgres:
-    image: postgres:16-alpine
-    container_name: nusagizi-postgres
 
 networks:
   prod-network:

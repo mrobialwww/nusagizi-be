@@ -2,18 +2,13 @@
 # docker-compose.dev.yml — Development services
 #
 # Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.base-dev.yml -f docker-compose.dev.yml up -d
 #
 # Or via Makefile:
 #   make dev-up
 # =============================================================================
 
 services:
-  postgres:
-    # Exposed to localhost for direct debugging from host
-    ports:
-      - "127.0.0.1:5433:5432"
-
   # ---------------------------------------------------------------------------
   # Development backend — fully defined here, not present in base
   # ---------------------------------------------------------------------------
@@ -38,9 +33,6 @@ services:
       - .:/app
       # Prevent the mount above from overwriting the tmp dir inside the container
       - /app/tmp
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - dev-network
     deploy:
