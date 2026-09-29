@@ -28,11 +28,6 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-nusagizi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_DEV:-nusagizi_dev}?sslmode=disable
     ports:
       - "127.0.0.1:8081:8080"
-    volumes:
-      # Mount source code for Air hot-reload
-      - .:/app
-      # Prevent the mount above from overwriting the tmp dir inside the container
-      - /app/tmp
     networks:
       - dev-network
     deploy:
