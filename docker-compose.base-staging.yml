@@ -1,11 +1,11 @@
 # =============================================================================
-# docker-compose.base-dev.yml — External resource references for dev directory
+# docker-compose.base-staging.yml — External resource references for staging directory
 #
-# Used instead of docker-compose.yml when running from the dev directory.
+# Used instead of docker-compose.yml when running from the staging directory.
 # Declares networks as external so Docker reuses what the prod directory owns.
 #
 # Usage (via Makefile):
-#   docker compose -f docker-compose.base-dev.yml -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.base-staging.yml -f docker-compose.staging.yml up -d
 # =============================================================================
 
 networks:
@@ -13,6 +13,6 @@ networks:
     external: true
     name: nusagizi-prod-net
 
-  dev-network:
+  staging-network:
     external: true
-    name: nusagizi-dev-net
+    name: nusagizi-staging-net

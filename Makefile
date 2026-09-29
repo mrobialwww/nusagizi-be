@@ -1,26 +1,26 @@
 # =============================================================================
 # Makefile — NusaGizi Backend
-# Shortcuts for Docker dev/prod operations on the VPS.
+# Shortcuts for Docker staging/prod operations on the VPS.
 # =============================================================================
 
 # Auto-detect which base file to use based on current directory name.
-# - nusagizi-be-prod: uses docker-compose.yml (owns postgres)
-# - nusagizi-be-dev : uses docker-compose.base-dev.yml (postgres is external)
+# - nusagizi-be-prod   : uses docker-compose.yml (owns postgres)
+# - nusagizi-be-staging: uses docker-compose.base-staging.yml (postgres is external)
 CURRENT_DIR := $(notdir $(CURDIR))
-ifeq ($(CURRENT_DIR), nusagizi-be-dev)
-  COMPOSE_BASE := docker compose -f docker-compose.base-dev.yml
+ifeq ($(CURRENT_DIR), nusagizi-be-staging)
+  COMPOSE_BASE := docker compose -f docker-compose.base-staging.yml
 else
   COMPOSE_BASE := docker compose -f docker-compose.yml
 endif
 
-COMPOSE_PROD := $(COMPOSE_BASE) -f docker-compose.prod.yml
-COMPOSE_DEV  := $(COMPOSE_BASE) -f docker-compose.dev.yml
+COMPOSE_PROD    := $(COMPOSE_BASE) -f docker-compose.prod.yml
+COMPOSE_STAGING := $(COMPOSE_BASE) -f docker-compose.staging.yml
 
 .PHONY: help \
         prod-up prod-down prod-logs prod-ps prod-restart prod-build \
-        dev-up dev-down dev-logs dev-ps dev-restart dev-build \
+        staging-up staging-down staging-logs staging-ps staging-restart staging-build \
         ps logs-postgres \
-        db-shell db-shell-dev db-migrate db-migrate-dev \
+        db-shell db-shell-staging db-migrate db-migrate-staging \
         infra-up infra-down \
         clean prune
 
@@ -56,26 +56,26 @@ prod-ps: ## Show production container status
 	$(COMPOSE_PROD) ps
 
 # =============================================================================
-# Development
+# Staging
 # =============================================================================
 
-dev-build: ## Build development image
-	$(COMPOSE_DEV) build backend-dev
+staging-build: ## Build staging image
+	$(COMPOSE_STAGING) build backend-staging
 
-dev-up: ## Start all development services
-	$(COMPOSE_DEV) up -d
+staging-up: ## Start all staging services
+	$(COMPOSE_STAGING) up -d
 
-dev-down: ## Stop all development services
-	$(COMPOSE_DEV) down
+staging-down: ## Stop all staging services
+	$(COMPOSE_STAGING) down
 
-dev-restart: ## Restart development backend only
-	$(COMPOSE_DEV) restart backend-dev
+staging-restart: ## Restart staging backend only
+	$(COMPOSE_STAGING) restart backend-staging
 
-dev-logs: ## Follow development backend logs
-	$(COMPOSE_DEV) logs -f backend-dev
+staging-logs: ## Follow staging backend logs
+	$(COMPOSE_STAGING) logs -f backend-staging
 
-dev-ps: ## Show development container status
-	$(COMPOSE_DEV) ps
+staging-ps: ## Show staging container status
+	$(COMPOSE_STAGING) ps
 
 # =============================================================================
 # Shared infrastructure (postgres only)
@@ -104,14 +104,14 @@ logs-postgres: ## Follow PostgreSQL logs
 db-shell: ## Open psql shell for production database
 	docker exec -it nusagizi-postgres psql -U $${POSTGRES_USER:-nusagizi} -d $${POSTGRES_DB:-nusagizi_prod}
 
-db-shell-dev: ## Open psql shell for development database
-	docker exec -it nusagizi-postgres psql -U $${POSTGRES_USER:-nusagizi} -d $${POSTGRES_DB_DEV:-nusagizi_dev}
+db-shell-staging: ## Open psql shell for staging database
+	docker exec -it nusagizi-postgres psql -U $${POSTGRES_USER:-nusagizi} -d $${POSTGRES_DB_STAGING:-nusagizi_staging}
 
 db-migrate: ## Run migrations on production (manual)
 	$(COMPOSE_PROD) exec backend-prod migrate -path ./migrations -database "$$DATABASE_URL" up
 
-db-migrate-dev: ## Run migrations on development (manual)
-	$(COMPOSE_DEV) exec backend-dev migrate -path ./migrations -database "$$DATABASE_URL" up
+db-migrate-staging: ## Run migrations on staging (manual)
+	$(COMPOSE_STAGING) exec backend-staging migrate -path ./migrations -database "$$DATABASE_URL" up
 
 # =============================================================================
 # Cleanup
@@ -119,7 +119,7 @@ db-migrate-dev: ## Run migrations on development (manual)
 
 clean: ## Stop all containers and remove anonymous volumes
 	$(COMPOSE_PROD) down -v --remove-orphans 2>/dev/null || true
-	$(COMPOSE_DEV) down -v --remove-orphans 2>/dev/null || true
+	$(COMPOSE_STAGING) down -v --remove-orphans 2>/dev/null || true
 
 prune: ## Remove unused images and volumes (use with caution)
 	docker image prune -f

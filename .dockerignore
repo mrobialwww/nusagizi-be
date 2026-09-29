@@ -8,11 +8,11 @@
 
 # Environment files — must never be included in an image
 .env
-.env.dev
+.env.staging
 .env.prod
 *.env
 .env.*
-!.env.dev.example
+!.env.staging.example
 !.env.prod.example
 
 # Documentation

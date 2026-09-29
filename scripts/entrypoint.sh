@@ -43,8 +43,8 @@ echo "  Migrations applied successfully."
 # Start server
 echo "[3/3] Starting server..."
 
-if [ "${APP_ENV}" = "development" ]; then
-  echo "  Mode: DEVELOPMENT"
+if [ "${APP_ENV}" = "staging" ]; then
+  echo "  Mode: STAGING"
 else
   echo "  Mode: PRODUCTION"
 fi

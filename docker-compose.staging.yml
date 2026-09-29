@@ -1,35 +1,35 @@
 # =============================================================================
-# docker-compose.dev.yml — Development services
+# docker-compose.staging.yml — Staging services
 #
 # Usage:
-#   docker compose -f docker-compose.base-dev.yml -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.base-staging.yml -f docker-compose.staging.yml up -d
 #
 # Or via Makefile:
-#   make dev-up
+#   make staging-up
 # =============================================================================
 
 services:
   # ---------------------------------------------------------------------------
-  # Development backend — fully defined here, not present in base
+  # Staging backend — fully defined here, not present in base
   # ---------------------------------------------------------------------------
-  backend-dev:
+  backend-staging:
     build:
       context: .
       dockerfile: Dockerfile
       target: dev
-    image: nusagizi-backend:dev
-    container_name: nusagizi-backend-dev
+    image: nusagizi-backend:staging
+    container_name: nusagizi-backend-staging
     restart: unless-stopped
     env_file:
-      - .env.dev
+      - .env.staging
     environment:
-      APP_ENV: development
+      APP_ENV: staging
       PORT: 8080
-      DATABASE_URL: postgres://${POSTGRES_USER:-nusagizi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_DEV:-nusagizi_dev}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-nusagizi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_STAGING:-nusagizi_staging}?sslmode=disable
     ports:
       - "127.0.0.1:8081:8080"
     networks:
-      - dev-network
+      - staging-network
     deploy:
       resources:
         limits:
