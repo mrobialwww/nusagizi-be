@@ -4,6 +4,7 @@
 .env.*.local
 .env.prod
 .env.dev
+.env.staging
 
 # External dependencies
 /vendor/
