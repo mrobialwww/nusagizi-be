@@ -15,16 +15,18 @@ RUN go mod download
 RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.3
 
 # =============================================================================
-# Stage 2: Development — Air hot-reload
+# Stage 2: Development — pre-built binary with debug info
 # =============================================================================
 FROM base AS dev
 
-RUN go install github.com/air-verse/air@v1.61.7
-
 WORKDIR /app
 
-# Source code will be overridden by volume mount in docker-compose.dev.yml
 COPY . .
+
+# Build binary with debug info (no -w -s flags unlike prod)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -o /app/server ./cmd/api/main.go
+
 RUN chmod +x ./scripts/entrypoint.sh
 
 EXPOSE 8080

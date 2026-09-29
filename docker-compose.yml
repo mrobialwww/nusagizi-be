@@ -3,13 +3,13 @@
 #
 # Contains only shared services. Backend services are defined in:
 #
-#   Dev : docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-#   Prod: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Staging: docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+#   Prod   : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 # =============================================================================
 
 services:
   # ---------------------------------------------------------------------------
-  # PostgreSQL — shared instance, two separate databases (dev & prod)
+  # PostgreSQL — shared instance, two separate databases (staging & prod)
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
@@ -21,11 +21,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nusagizi_prod}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Creates the dev database on first container startup
+      # Creates the staging database on first container startup
       - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     networks:
       - prod-network
-      - dev-network
+      - staging-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nusagizi}"]
       interval: 10s
@@ -50,7 +50,7 @@ networks:
     driver: bridge
     name: nusagizi-prod-net
 
-  # Isolated network for development containers
-  dev-network:
+  # Isolated network for staging containers
+  staging-network:
     driver: bridge
-    name: nusagizi-dev-net
+    name: nusagizi-staging-net

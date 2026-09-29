@@ -1,0 +1,44 @@
+# =============================================================================
+# docker-compose.staging.yml — Staging services
+#
+# Usage:
+#   docker compose -f docker-compose.base-staging.yml -f docker-compose.staging.yml up -d
+#
+# Or via Makefile:
+#   make staging-up
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Staging backend — fully defined here, not present in base
+  # ---------------------------------------------------------------------------
+  backend-staging:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    image: nusagizi-backend:staging
+    container_name: nusagizi-backend-staging
+    restart: unless-stopped
+    env_file:
+      - .env.staging
+    environment:
+      APP_ENV: staging
+      PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-nusagizi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_STAGING:-nusagizi_staging}?sslmode=disable
+    ports:
+      - "127.0.0.1:8081:8080"
+    networks:
+      - staging-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 1G
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"

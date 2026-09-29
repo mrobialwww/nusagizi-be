@@ -40,13 +40,13 @@ echo "[2/3] Running database migrations..."
 migrate -path ./migrations -database "$DATABASE_URL" up
 echo "  Migrations applied successfully."
 
-# Start server based on APP_ENV
+# Start server
 echo "[3/3] Starting server..."
 
-if [ "${APP_ENV}" = "development" ]; then
-  echo "  Mode: DEVELOPMENT (Air hot-reload)"
-  exec air -c .air.toml
+if [ "${APP_ENV}" = "staging" ]; then
+  echo "  Mode: STAGING"
 else
-  echo "  Mode: PRODUCTION (static binary)"
-  exec ./server
+  echo "  Mode: PRODUCTION"
 fi
+
+exec ./server
