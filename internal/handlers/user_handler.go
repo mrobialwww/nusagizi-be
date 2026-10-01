@@ -77,12 +77,6 @@ func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 		}
 	}
 
-	// Validate input phone number
-	if input.PhoneNumber != nil && strings.TrimSpace(*input.PhoneNumber) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "phone_number cannot be empty"}})
-		return
-	}
-
 	// Validate input gender
 	if input.Gender != nil && *input.Gender != "male" && *input.Gender != "female" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "gender must be 'male' or 'female'"}})

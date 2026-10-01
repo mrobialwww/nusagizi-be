@@ -44,7 +44,7 @@ func NewMenuService(cfg *config.Config, menuRepo *repository.MenuRepository, mot
 }
 
 // GenerateMenu (Endpoint: 39) generates and saves today's menu for all children of a mother.
-func (s *MenuService) GenerateMenu(ctx context.Context, userID string, reportDate time.Time) error {
+func (s *MenuService) GenerateMenu(ctx context.Context, userID string, startDate time.Time) error {
 	motherProfileID, err := s.motherRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -73,18 +73,39 @@ func (s *MenuService) GenerateMenu(ctx context.Context, userID string, reportDat
 	if err != nil {
 		return err
 	}
-	if len(aiResponse.Anak) == 0 {
+	if len(aiResponse.Hari) == 0 {
 		return errors.New("ai engine returned no menu data")
 	}
-	if len(aiResponse.Anak) != len(children) {
-		slog.WarnContext(ctx, "ai engine returned a different number of children than requested",
-			"mother_profile_id", motherProfileID,
-			"requested", len(children),
-			"returned", len(aiResponse.Anak),
-		)
+
+	var saveErrs []error
+
+	for dayOffset := range 7 {
+		// Format the map key ("1" to "7")
+		dayKey := fmt.Sprintf("%d", dayOffset+1)
+		hariPayload := aiResponse.Hari[dayKey]
+
+		if len(hariPayload.Anak) != len(children) {
+			slog.WarnContext(ctx, "ai engine returned a different number of children than requested",
+				"day", dayKey,
+				"mother_profile_id", motherProfileID,
+				"requested", len(children),
+				"returned", len(hariPayload.Anak),
+			)
+		}
+
+		// Calculate the exact calendar date for the parsed daytime block (startDate + dayOffset)
+		targetDate := startDate.AddDate(0, 0, dayOffset)
+
+		err := s.saveAllChildMenus(ctx, hariPayload.Anak, targetDate)
+		if err != nil {
+			saveErrs = append(saveErrs, fmt.Errorf("day %s failed: %w", dayKey, err))
+		}
 	}
 
-	return s.saveAllChildMenus(ctx, aiResponse.Anak, reportDate)
+	if len(saveErrs) > 0 {
+		return fmt.Errorf("failed to save menu for some days: %w", errors.Join(saveErrs...))
+	}
+	return nil
 }
 
 // saveAllChildMenus saves children's menus concurrently (max 4).
