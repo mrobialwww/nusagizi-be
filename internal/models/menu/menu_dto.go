@@ -49,6 +49,10 @@ type FoodEnginePayloadKondisi struct {
 // -----------------------------------------------------------------------------
 
 type FoodEngineResponse struct {
+	Hari map[string]FoodEngineHariPayload `json:"hari"`
+}
+
+type FoodEngineHariPayload struct {
 	Meta    FoodEngineMeta    `json:"meta"`
 	Anak    []FoodEngineAnak  `json:"anak"`
 	Catatan FoodEngineCatatan `json:"catatan"`

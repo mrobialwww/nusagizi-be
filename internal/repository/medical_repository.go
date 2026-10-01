@@ -56,7 +56,7 @@ func (r *MedicalRepository) GetMedicalNotes(ctx context.Context, motherProfileID
 
 	if month != nil {
 		args = append(args, *month)
-		query += fmt.Sprintf(` AND EXTRACT(MONTH FROM m.valid_until) = $%d`, len(args))
+		query += fmt.Sprintf(` AND EXTRACT(MONTH FROM m.created_at) = $%d`, len(args))
 	}
 
 	query += ` ORDER BY m.valid_until DESC`
