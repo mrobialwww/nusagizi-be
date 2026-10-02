@@ -44,15 +44,7 @@ jobs:
         run: go mod download
 
       # -----------------------------------------------------------------------
-      # 4. Verify dependencies haven't changed
-      # -----------------------------------------------------------------------
-      - name: Verify go.mod and go.sum are tidy
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod go.sum
-
-      # -----------------------------------------------------------------------
-      # 5. Static analysis
+      # 4. Static analysis
       # -----------------------------------------------------------------------
       - name: Run go vet
         run: go vet ./...

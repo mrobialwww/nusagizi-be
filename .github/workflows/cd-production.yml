@@ -91,7 +91,15 @@ jobs:
             set -e
 
             IMAGE="${{ needs.build-and-push.outputs.image }}:latest"
-            PROD_DIR="${{ secrets.VPS_PROD_DIR }}"
+            # Trim any accidental whitespace/newline from the secret value
+            PROD_DIR=$(echo "${{ secrets.VPS_PROD_DIR }}" | tr -d '[:space:]')
+
+            echo "=== [0/4] Validating production directory: '$PROD_DIR' ==="
+            if [ ! -d "$PROD_DIR" ]; then
+              echo "[ERROR] Directory '$PROD_DIR' does not exist on VPS."
+              echo "        Set VPS_PROD_DIR secret to the correct absolute path."
+              exit 1
+            fi
 
             echo "=== [1/4] Pulling new production image: $IMAGE ==="
             docker pull "$IMAGE"

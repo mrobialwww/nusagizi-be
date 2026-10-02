@@ -86,7 +86,15 @@ jobs:
             set -e
 
             IMAGE="${{ steps.meta.outputs.image }}:staging-latest"
-            STAGING_DIR="${{ secrets.VPS_STAGING_DIR }}"
+            # Trim any accidental whitespace/newline from the secret value
+            STAGING_DIR=$(echo "${{ secrets.VPS_STAGING_DIR }}" | tr -d '[:space:]')
+
+            echo "=== [0/4] Validating staging directory: '$STAGING_DIR' ==="
+            if [ ! -d "$STAGING_DIR" ]; then
+              echo "[ERROR] Directory '$STAGING_DIR' does not exist on VPS."
+              echo "        Set VPS_STAGING_DIR secret to the correct absolute path."
+              exit 1
+            fi
 
             echo "=== [1/4] Pulling new image: $IMAGE ==="
             docker pull "$IMAGE"
