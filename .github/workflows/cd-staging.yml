@@ -115,3 +115,6 @@ jobs:
 
             echo "=== Staging deploy complete ==="
             docker ps --filter "name=nusagizi-backend-staging" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+            echo "=== [Cleanup] Removing dangling images ==="
+            docker image prune -f
