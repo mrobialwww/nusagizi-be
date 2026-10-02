@@ -29,25 +29,25 @@ func (h *MenuHandler) GenerateMenu(c *gin.Context) {
 	}
 
 	var req struct {
-		ReportDate string `json:"report_date" binding:"required"`
+		StartDate string `json:"start_date" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Request body must contain 'report_date' (YYYY-MM-DD)"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Request body must contain 'start_date' (YYYY-MM-DD)"})
 		return
 	}
 
 	// Validate and Convert YYYY-MM-DD to time.Time
-	reportDate, err := time.Parse("2006-01-02", req.ReportDate)
+	startDate, err := time.Parse("2006-01-02", req.StartDate)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report_date format, expected YYYY-MM-DD"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start_date format, expected YYYY-MM-DD"})
 		return
 	}
 
-	err = h.menuService.GenerateMenu(c.Request.Context(), requester.ID, reportDate)
+	err = h.menuService.GenerateMenu(c.Request.Context(), requester.ID, startDate)
 	if err == nil {
 		c.JSON(http.StatusCreated, gin.H{
 			"status":  "created",
-			"message": "Menu berhasil di-generate",
+			"message": "7 hari menu berhasil di-generate",
 		})
 		return
 	}
