@@ -1,0 +1,113 @@
+# =============================================================================
+# cd-production.yml — Continuous Deployment: Production
+#
+# Triggers when a push or merge lands on the `main` branch.
+# Pipeline:
+#   1. Build Docker image (prod target) and push to Docker Hub
+#   2. [MANUAL APPROVAL] — requires reviewer sign-off via GitHub Environments
+#   3. SSH into VPS → pull new image → redeploy production container
+#
+# Setup required:
+#   - Create a GitHub Environment named "production"
+#   - Under Settings → Environments → production → enable "Required reviewers"
+#   - Add at least one reviewer (yourself or your team)
+# =============================================================================
+
+name: CD — Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Build image and push to Docker Hub
+  # Runs immediately — no approval needed for the build step
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "tag=prod-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image=${{ secrets.DOCKERHUB_USERNAME }}/nusagizi-be" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build with prod target, push two tags:
+      #   prod-<sha>   — immutable, traceable
+      #   latest       — always points to newest prod release
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: prod
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Deploy to production VPS
+  # Blocked until a reviewer approves via the GitHub "production" Environment
+  # ---------------------------------------------------------------------------
+  deploy-production:
+    name: Deploy to Production (requires approval)
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production        # ← triggers manual approval gate
+
+    steps:
+      - name: Deploy to VPS (Production)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+
+            IMAGE="${{ needs.build-and-push.outputs.image }}:latest"
+            PROD_DIR="${{ secrets.VPS_PROD_DIR }}"
+
+            echo "=== [1/4] Pulling new production image: $IMAGE ==="
+            docker pull "$IMAGE"
+
+            echo "=== [2/4] Moving to production directory ==="
+            cd "$PROD_DIR"
+
+            echo "=== [3/4] Updating BACKEND_IMAGE in .env.prod ==="
+            if grep -q "^BACKEND_IMAGE=" .env.prod 2>/dev/null; then
+              sed -i "s|^BACKEND_IMAGE=.*|BACKEND_IMAGE=$IMAGE|" .env.prod
+            else
+              echo "BACKEND_IMAGE=$IMAGE" >> .env.prod
+            fi
+
+            echo "=== [4/4] Redeploying production container ==="
+            make prod-up
+
+            echo "=== Production deploy complete ==="
+            docker ps --filter "name=nusagizi-backend-prod" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
