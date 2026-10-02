@@ -1,0 +1,80 @@
+# =============================================================================
+# ci.yml — Continuous Integration
+#
+# Runs on every push and pull request to any branch.
+# Validates that the code compiles, passes static analysis,
+# and the Docker image builds successfully.
+# =============================================================================
+
+name: CI — Build & Test
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout source code
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. Set up Go — version pinned to match go.mod
+      # -----------------------------------------------------------------------
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.0"
+          cache: true
+
+      # -----------------------------------------------------------------------
+      # 3. Download dependencies
+      # -----------------------------------------------------------------------
+      - name: Download dependencies
+        run: go mod download
+
+      # -----------------------------------------------------------------------
+      # 4. Static analysis
+      # -----------------------------------------------------------------------
+      - name: Run go vet
+        run: go vet ./...
+
+      # -----------------------------------------------------------------------
+      # 6. Compile — ensures no build errors before building Docker image
+      # -----------------------------------------------------------------------
+      - name: Build binary
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /dev/null ./cmd/api/main.go
+
+      # -----------------------------------------------------------------------
+      # 7. Run tests
+      # Note: Tests that require DB/external services are skipped here
+      # because we run unit tests only (no DB connection in CI)
+      # -----------------------------------------------------------------------
+      - name: Run tests
+        run: go test ./... -count=1 -timeout 60s
+
+      # -----------------------------------------------------------------------
+      # 8. Validate Docker image builds (no push)
+      # -----------------------------------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Docker build (prod target)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: prod
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -27,3 +27,6 @@
 *.njsproj
 *.sln
 *.sw?
+
+# Documentation
+.github/CICD_SECRETS.md

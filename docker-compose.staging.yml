@@ -11,13 +11,13 @@
 services:
   # ---------------------------------------------------------------------------
   # Staging backend — fully defined here, not present in base
+  #
+  # In CI/CD: image is pulled from Docker Hub by GitHub Actions.
+  # The BACKEND_IMAGE env var is written by the CD workflow before make staging-up.
+  # Fallback to a local build tag if running manually without Docker Hub access.
   # ---------------------------------------------------------------------------
   backend-staging:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: dev
-    image: nusagizi-backend:staging
+    image: ${BACKEND_IMAGE:-nusagizi-backend:staging}
     container_name: nusagizi-backend-staging
     restart: unless-stopped
     env_file:

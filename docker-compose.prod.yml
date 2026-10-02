@@ -16,13 +16,13 @@ services:
 
   # ---------------------------------------------------------------------------
   # Production backend — fully defined here, not present in base
+  #
+  # In CI/CD: image is pulled from Docker Hub by GitHub Actions.
+  # The BACKEND_IMAGE env var is written by the CD workflow before make prod-up.
+  # Fallback to a local build tag if running manually without Docker Hub access.
   # ---------------------------------------------------------------------------
   backend-prod:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: prod
-    image: nusagizi-backend:prod
+    image: ${BACKEND_IMAGE:-nusagizi-backend:prod}
     container_name: nusagizi-backend-prod
     restart: unless-stopped
     env_file:
